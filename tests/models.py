@@ -5,6 +5,20 @@ from django.db.models.functions import Concat
 from queryable_properties import AnnotationMixin, QueryableProperty, queryable_property, SetterMixin, UpdateMixin
 
 
+class DummyProperty(SetterMixin, QueryableProperty):
+
+    def __init__(self):
+        super(DummyProperty, self).__init__()
+        self.counter = 0
+
+    def get_value(self, obj):
+        self.counter += 1
+        return self.counter
+
+    def set_value(self, obj, value):
+        pass
+
+
 class MajorMinorVersionProperty(QueryableProperty):
 
     def get_value(self, obj):
@@ -49,7 +63,8 @@ class Application(models.Model):
 
 
 class ApplicationWithClassBasedProperty(Application):
-    pass
+
+    dummy = DummyProperty()
 
 
 class ApplicationWithDecoratorBasedProperty(Application):

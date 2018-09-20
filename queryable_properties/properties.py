@@ -53,7 +53,7 @@ class QueryableProperty(object):
         if self.cached:
             self._set_cached_value(obj, value)
 
-    def get_value(self, obj):
+    def get_value(self, obj):  # pragma: no cover
         """
         Getter method for the queryable property, which will be called when
         the property is read-accessed.
@@ -63,7 +63,7 @@ class QueryableProperty(object):
         """
         raise NotImplementedError()
 
-    def get_filter(self, cls, lookup, value):
+    def get_filter(self, cls, lookup, value):  # pragma: no cover
         """
         Generate a :class:`django.db.models.Q` object that emulates filtering
         a queryset using this property.
@@ -137,7 +137,7 @@ class SetterMixin(object):
     A mixin for queryable properties that also define a setter.
     """
 
-    def set_value(self, obj, value):
+    def set_value(self, obj, value):  # pragma: no cover
         """
         Setter method for the queryable property, which will be called when the
         property is write-accessed.
@@ -156,7 +156,7 @@ class AnnotationMixin(object):
 
     filter_requires_annotation = True
 
-    def get_annotation(self, cls):
+    def get_annotation(self, cls):  # pragma: no cover
         """
         Construct an annotation representing this property that can be added
         to querysets of the model associated with this property.
@@ -179,7 +179,7 @@ class UpdateMixin(object):
     queries.
     """
 
-    def get_update_kwargs(self, cls, value):
+    def get_update_kwargs(self, cls, value):  # pragma: no cover
         """
         Resolve an update keyword argument for this property into the actual
         keyword arguments to emulate an update using this property.
