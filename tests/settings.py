@@ -1,7 +1,6 @@
 # encoding: utf-8
 
-# CHANGE THIS!
-SECRET_KEY = '96a40240ed25433cb8ff8ce819bf710b'
+SECRET_KEY = '1337' * 8
 
 DATABASES = {
     'default': {
@@ -25,11 +24,7 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     'django.contrib.admindocs',
     'queryable_properties',
+    'tests',
 )
 
-ROOT_URLCONF = 'queryable_properties.urls'
-
 SITE_ID = 1
-
-QUERYABLE_PROPERTIES_IMPORTANT = 23
-QUERYABLE_PROPERTIES_FOO = 'baz'
