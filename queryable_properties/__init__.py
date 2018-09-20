@@ -1,5 +1,4 @@
 # encoding: utf-8
 
-from __future__ import absolute_import, unicode_literals
-
+from .properties import AnnotationMixin, QueryableProperty, queryable_property, SetterMixin, UpdateMixin  # noqa
 from .version import __version__  # noqa

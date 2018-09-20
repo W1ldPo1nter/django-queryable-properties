@@ -169,7 +169,7 @@ class AnnotationMixin(object):
 
     def get_filter(self, cls, lookup, value):
         # Since annotations can be filtered like regular fields, a Q object
-        # that simply passed the filter through can be used.
+        # that simply passes the filter through can be used.
         return Q(**{LOOKUP_SEP.join((self.name, lookup)): value})
 
 
@@ -229,11 +229,11 @@ class queryable_property(QueryableProperty):
         """
         super(queryable_property, self).__init__()
         if getter:
-            self.get_value = self._extract_function(getter)
+            self.get_value = getter
             if doc is None:
-                doc = self.get_value.__doc__
+                doc = getter.__doc__
         if setter:
-            self.set_value = self._extract_function(setter)
+            self.set_value = setter
         if filter:
             self.get_filter = self._extract_function(filter)
         if annotater:
