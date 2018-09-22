@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models.functions import Concat
 
 from queryable_properties import AnnotationMixin, QueryableProperty, queryable_property, SetterMixin, UpdateMixin
+from queryable_properties.managers import QueryablePropertiesManager
 
 
 class DummyProperty(SetterMixin, QueryableProperty):
@@ -64,11 +65,14 @@ class Application(models.Model):
 
 class ApplicationWithClassBasedProperty(Application):
 
+    objects = QueryablePropertiesManager()
+
     dummy = DummyProperty()
 
 
 class ApplicationWithDecoratorBasedProperty(Application):
-    pass
+
+    objects = QueryablePropertiesManager()
 
 
 class Version(models.Model):
@@ -81,14 +85,20 @@ class Version(models.Model):
 
 
 class VersionWithClassBasedProperties(Version):
-    application = models.ForeignKey(ApplicationWithClassBasedProperty, on_delete=models.CASCADE)
+    application = models.ForeignKey(ApplicationWithClassBasedProperty, on_delete=models.CASCADE,
+                                    related_name='versions')
+
+    objects = QueryablePropertiesManager()
 
     major_minor = MajorMinorVersionProperty()
     version = FullVersionProperty()
 
 
 class VersionWithDecoratorBasedProperties(Version):
-    application = models.ForeignKey(ApplicationWithDecoratorBasedProperty, on_delete=models.CASCADE)
+    application = models.ForeignKey(ApplicationWithDecoratorBasedProperty, on_delete=models.CASCADE,
+                                    related_name='versions')
+
+    objects = QueryablePropertiesManager()
 
     @queryable_property
     def major_minor(self):
@@ -110,7 +120,7 @@ class VersionWithDecoratorBasedProperties(Version):
     def version(self, value):
         self.major, self.minor, self.patch = value.split('.')
 
-    @version.filter
+    @version.filter(requires_annotation=False)
     @classmethod
     def version(cls, lookup, value):
         if lookup != 'exact':
