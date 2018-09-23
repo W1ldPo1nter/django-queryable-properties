@@ -20,7 +20,7 @@ class DummyProperty(SetterMixin, QueryableProperty):
         pass
 
 
-class MajorMinorVersionProperty(QueryableProperty):
+class MajorMinorVersionProperty(UpdateMixin, QueryableProperty):
 
     def get_value(self, obj):
         return '{major}.{minor}'.format(major=obj.major, minor=obj.minor)
@@ -30,6 +30,10 @@ class MajorMinorVersionProperty(QueryableProperty):
             raise NotImplementedError()
         parts = value.split('.')
         return models.Q(major=parts[0], minor=parts[1])
+
+    def get_update_kwargs(self, cls, value):
+        parts = value.split('.')
+        return dict(major=parts[0], minor=parts[1])
 
 
 class FullVersionProperty(UpdateMixin, AnnotationMixin, SetterMixin, QueryableProperty):
@@ -52,8 +56,8 @@ class FullVersionProperty(UpdateMixin, AnnotationMixin, SetterMixin, QueryablePr
         return Concat('major', models.Value('.'), 'minor', models.Value('.'), 'patch', output_field=models.CharField())
 
     def get_update_kwargs(self, cls, value):
-        parts = value.split('.')
-        return dict(major=parts[0], minor=parts[1], patch=parts[2])
+        parts = value.rsplit('.', 1)
+        return dict(major_minor=parts[0], patch=parts[1])
 
 
 class Application(models.Model):
@@ -112,6 +116,12 @@ class VersionWithDecoratorBasedProperties(Version):
         parts = value.split('.')
         return models.Q(major=parts[0], minor=parts[1])
 
+    @major_minor.updater
+    @classmethod
+    def major_minor(cls, value):
+        parts = value.split('.')
+        return dict(major=parts[0], minor=parts[1])
+
     @queryable_property
     def version(self):
         return '{major_minor}.{patch}'.format(major_minor=self.major_minor, patch=self.patch)
@@ -136,5 +146,5 @@ class VersionWithDecoratorBasedProperties(Version):
     @version.updater
     @classmethod
     def version(cls, value):
-        parts = value.split('.')
-        return dict(major=parts[0], minor=parts[1], patch=parts[2])
+        parts = value.rsplit('.', 1)
+        return dict(major_minor=parts[0], patch=parts[1])
