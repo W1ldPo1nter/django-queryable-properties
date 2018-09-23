@@ -15,7 +15,7 @@ from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, inject_mixin
 
 
-# TODO: Don't cache implicitly added annotations and make properties usable across relations
+# TODO: Don't cache implicitly added annotations, make properties usable across relations, auto-annotate in order_by
 class QueryablePropertiesQueryMixin(object):
     """
     A mixin for :class:`django.db.models.sql.Query` objects that extends the
@@ -68,6 +68,7 @@ class QueryablePropertiesQueryMixin(object):
 
     def build_filter(self, filter_expr, branch_negated=False, current_negated=False, can_reuse=None, connector=AND,
                      allow_joins=True, split_subq=True):
+        # TODO: change this to make properties with fra=False work correctly
         # Let Django try and deal with the expression first - this is
         # advantageous for multiple reasons: Django will already perform basic
         # sanity checks (is the expression in the correct format at all?) and
