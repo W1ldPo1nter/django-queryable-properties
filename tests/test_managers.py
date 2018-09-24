@@ -6,7 +6,8 @@ from django.db.models import F
 
 from queryable_properties.exceptions import QueryablePropertyError
 
-from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
+from .models import (ApplicationWithClassBasedProperty, ApplicationWithDecoratorBasedProperty,
+                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 
 @pytest.mark.django_db
@@ -32,6 +33,16 @@ class TestQueryFilters(object):
         queryset = model.objects.filter(version='1.2.3')
         assert 'version' not in queryset.query.annotations
         assert all(obj.version == '1.2.3' for obj in queryset)
+
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperty, ApplicationWithDecoratorBasedProperty])
+    def test_filter_with_required_annotation(self, versions, model):
+        version_model = model.objects.first().versions.model
+        version_model.objects.filter(version='2.0.0')[0].delete()
+        queryset = model.objects.filter(highest_version='2.0.0')
+        assert 'highest_version' in queryset.query.annotations
+        assert len(queryset) == 1
+        application = queryset[0]
+        assert application.versions.filter(major=2, minor=0, patch=0).exists()
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_filter(self, monkeypatch, model):
@@ -115,7 +126,10 @@ class TestUpdateQueries(object):
             version = model.objects.get(pk=pk)  # Reload from DB
             assert version.version == '1.3.37'
 
-    # TODO: test for exception based on missing updater
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperty, ApplicationWithDecoratorBasedProperty])
+    def test_exception_on_unimplemented_updater(self, model):
+        with pytest.raises(QueryablePropertyError):
+            model.objects.update(highest_version='1.3.37')
 
     @pytest.mark.parametrize('model, kwargs', [
         (VersionWithClassBasedProperties, {'major_minor': '42.42', 'major': 18}),
