@@ -20,6 +20,21 @@ class DummyProperty(SetterMixin, QueryableProperty):
         pass
 
 
+class HighestVersionProperty(AnnotationMixin, QueryableProperty):
+
+    def get_value(self, obj):
+        try:
+            return obj.versions.order_by('-major', '-minor', '-patch')[0].version
+        except IndexError:
+            return None
+
+    def get_annotation(self, cls):
+        queryset = (VersionWithClassBasedProperties.objects.select_properties('version')
+                                                           .filter(application=models.OuterRef('pk'))
+                                                           .order_by('-major', '-minor', '-patch'))
+        return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
+
+
 class MajorMinorVersionProperty(UpdateMixin, QueryableProperty):
 
     def get_value(self, obj):
@@ -71,12 +86,28 @@ class ApplicationWithClassBasedProperty(Application):
 
     objects = QueryablePropertiesManager()
 
+    highest_version = HighestVersionProperty()
     dummy = DummyProperty()
 
 
 class ApplicationWithDecoratorBasedProperty(Application):
 
     objects = QueryablePropertiesManager()
+
+    @queryable_property
+    def highest_version(self):
+        try:
+            return self.versions.order_by('-major', '-minor', '-patch')[0].version
+        except IndexError:
+            return None
+
+    @highest_version.annotater
+    @classmethod
+    def highest_version(cls):
+        queryset = (VersionWithDecoratorBasedProperties.objects.select_properties('version')
+                                                               .filter(application=models.OuterRef('pk'))
+                                                               .order_by('-major', '-minor', '-patch'))
+        return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
 
 
 class Version(models.Model):
