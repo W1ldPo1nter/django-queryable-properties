@@ -15,7 +15,7 @@ from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, inject_mixin
 
 
-# TODO: Don't cache implicitly added annotations, make properties usable across relations, auto-annotate in order_by
+# TODO: Make properties usable across relations, auto-annotate in order_by
 class QueryablePropertiesQueryMixin(object):
     """
     A mixin for :class:`django.db.models.sql.Query` objects that extends the
@@ -25,7 +25,9 @@ class QueryablePropertiesQueryMixin(object):
 
     def __init__(self, *args, **kwargs):
         super(QueryablePropertiesQueryMixin, self).__init__(*args, **kwargs)
-        self._queryable_property_annotation_names = set()  # Stores names of annotations used in this query
+        # Stores queryable properties used as annotations in this query along
+        # with the information if the annotated value should be selected.
+        self._queryable_property_annotations = dict()
 
     def _resolve_queryable_property(self, path):
         """
@@ -50,7 +52,7 @@ class QueryablePropertiesQueryMixin(object):
                                          'the property name and a single lookup.'.format(path))
         return prop
 
-    def add_queryable_property_annotation(self, prop):
+    def add_queryable_property_annotation(self, prop, select=False):
         """
         Add an annotation for the given queryable property to this query (if
         it wasn't annotated already). An exception will be raised if the
@@ -58,13 +60,15 @@ class QueryablePropertiesQueryMixin(object):
 
         :param queryable_properties.properties.QueryableProperty prop:
             The property to add an annotation for.
+        :param bool select: Signals whether the annotation should be selected
+                            or not.
         """
-        if prop.name not in self.annotations:
+        if prop not in self._queryable_property_annotations:
             if not prop.get_annotation:
                 raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
                                              'implement annotation creation.'.format(prop.name))
             self.add_annotation(prop.get_annotation(self.model), prop.name)
-            self._queryable_property_annotation_names.add(prop.name)
+        self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
 
     def build_filter(self, filter_expr, branch_negated=False, current_negated=False, can_reuse=None, connector=AND,
                      allow_joins=True, split_subq=True):
@@ -120,7 +124,7 @@ class QueryablePropertiesQueryMixin(object):
 
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
-        obj._queryable_property_annotation_names = set(self._queryable_property_annotation_names)
+        obj._queryable_property_annotations = dict(self._queryable_property_annotations)
         return obj
 
 
@@ -140,7 +144,7 @@ class QueryablePropertiesQuerySetMixin(object):
             self.query = self.query.clone()
             class_name = 'QueryableProperties' + self.query.__class__.__name__
             inject_mixin(self.query, QueryablePropertiesQueryMixin, class_name,
-                         _queryable_property_annotation_names=set())
+                         _queryable_property_annotations=dict())
 
     @property
     def _returns_model_instances(self):
@@ -207,20 +211,24 @@ class QueryablePropertiesQuerySetMixin(object):
         """
         changed_aliases = {}
         select = dict(self.query.annotation_select)
-        for annotation_name in self.query._queryable_property_annotation_names:
-            if annotation_name not in select:
-                continue  # Annotations may have been removed somehow
+        for prop, requires_selection in dict(self.query._queryable_property_annotations).items():
+            if prop.name not in select or not requires_selection:
+                # Annotations may have been removed somehow or don't require
+                # selection
+                del self.query._queryable_property_annotations[prop]
+                select.pop(prop.name, None)
+                continue
 
-            changed_name = annotation_name
+            changed_name = prop.name
             # Suffix the original annotation names with random UUIDs until an
             # available name could be found. Since the suffix is delimited by
             # the lookup separator, these names are guaranteed to not clash
             # with names of model fields, which don't allow the separator in
             # their names.
             while changed_name in select:
-                changed_name = LOOKUP_SEP.join((annotation_name, uuid.uuid4().hex))
-            changed_aliases[annotation_name] = changed_name
-            select[changed_name] = select.pop(annotation_name)
+                changed_name = LOOKUP_SEP.join((prop.name, uuid.uuid4().hex))
+            changed_aliases[prop.name] = changed_name
+            select[changed_name] = select.pop(prop.name)
 
         # Patch the correct select property on the query with the new names,
         # since this property is used by the SQL compiler to build the actual
@@ -242,7 +250,7 @@ class QueryablePropertiesQuerySetMixin(object):
         queryset = getattr(self, '_chain', self._clone)()
         for name in names:
             prop = get_queryable_property(self.model, name)
-            queryset.query.add_queryable_property_annotation(prop)
+            queryset.query.add_queryable_property_annotation(prop, select=True)
         return queryset
 
     def update(self, **kwargs):
