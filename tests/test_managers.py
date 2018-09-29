@@ -43,6 +43,9 @@ class TestQueryFilters(object):
         assert len(queryset) == 1
         application = queryset[0]
         assert application.versions.filter(major=2, minor=0, patch=0).exists()
+        # Check that a property annotation used implicitly by a filter does not
+        # lead to a selection of the property annotation
+        assert not model.highest_version._has_cached_value(application)
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_filter(self, monkeypatch, model):
@@ -87,9 +90,16 @@ class TestNonModelInstanceQueries(object):
 @pytest.mark.django_db
 class TestQueryAnnotations(object):
 
-    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-    def test_cached_annotation_value(self, versions, model):
-        queryset = model.objects.select_properties('version')
+    @pytest.mark.parametrize('model, filters', [
+        (VersionWithClassBasedProperties, {}),
+        (VersionWithDecoratorBasedProperties, {}),
+        (VersionWithClassBasedProperties, {'version': '1.2.3'}),
+        (VersionWithDecoratorBasedProperties, {'version': '1.2.3'}),
+    ])
+    def test_cached_annotation_value(self, versions, model, filters):
+        # Filter both before and after the select_properties call to check if
+        # the annotation gets selected correctly regardless
+        queryset = model.objects.filter(**filters).select_properties('version').filter(**filters)
         assert 'version' in queryset.query.annotations
         assert all(model.version._has_cached_value(obj) for obj in queryset)
 
@@ -98,6 +108,10 @@ class TestQueryAnnotations(object):
         queryset = model.objects.annotate(annotation=F('version'))
         for version in queryset:
             assert version.version == version.annotation
+            # Check that a property annotation used implicitly by another
+            # annotation does not lead to a selection of the property
+            # annotation
+            assert not model.version._has_cached_value(version)
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_annotater(self, model):
