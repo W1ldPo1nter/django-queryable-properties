@@ -8,7 +8,6 @@ import uuid
 from django.db.models import F, Manager, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.query import ModelIterable
-from django.db.models.sql import AND
 from django.utils import six
 
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
@@ -22,6 +21,14 @@ class QueryablePropertiesQueryMixin(object):
     original Django objects to deal with queryable properties, e.g. managing
     used properties or automatically add required properties as annotations.
     """
+
+    BUILD_FILTER_TO_ADD_Q_KWARGS_MAP = {
+        'can_reuse': 'used_aliases',
+        'branch_negated': 'branch_negated',
+        'current_negated': 'current_negated',
+        'allow_joins': 'allow_joins',
+        'split_subq': 'split_subq',
+    }
 
     def __init__(self, *args, **kwargs):
         super(QueryablePropertiesQueryMixin, self).__init__(*args, **kwargs)
@@ -74,6 +81,22 @@ class QueryablePropertiesQueryMixin(object):
                                          'the property name and a single lookup.'.format(path))
         return prop
 
+    def _build_filter_to_add_q_kwargs(self, **build_filter_kwargs):
+        """
+        Transform the keyword arguments of a :meth:`build_filter` call into
+        keyword arguments for an appropriate :meth:`_add_q` call.
+
+        :param build_filter_kwargs: The keyword arguments passed to
+                                    :meth:`build_filter`.
+        :return: The keywords argument to use for :meth:`_add_q`.
+        :rtype: dict
+        """
+        add_q_kwargs = {}
+        for key, value in six.iteritems(build_filter_kwargs):
+            if key in self.BUILD_FILTER_TO_ADD_Q_KWARGS_MAP:
+                add_q_kwargs[self.BUILD_FILTER_TO_ADD_Q_KWARGS_MAP[key]] = value
+        return add_q_kwargs
+
     def add_queryable_property_annotation(self, prop, select=False):
         """
         Add an annotation for the given queryable property to this query (if
@@ -92,8 +115,7 @@ class QueryablePropertiesQueryMixin(object):
             self.add_annotation(prop.get_annotation(self.model), prop.name)
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
 
-    def build_filter(self, filter_expr, branch_negated=False, current_negated=False, can_reuse=None, connector=AND,
-                     allow_joins=True, split_subq=True):
+    def build_filter(self, filter_expr, **kwargs):
         # Check if the given filter expression is meant to use a queryable
         # property. Therefore, the possibility of filter_expr not being of the
         # correct type must be taken into account (a case Django would cover
@@ -115,8 +137,7 @@ class QueryablePropertiesQueryMixin(object):
             # call Django's default implementation, which may in turn raise an
             # exception. Act the same way if the current top of the required
             # annotation stack is used to avoid endless recursions.
-            return super(QueryablePropertiesQueryMixin, self).build_filter(
-                filter_expr, branch_negated, current_negated, can_reuse, connector, allow_joins, split_subq)
+            return super(QueryablePropertiesQueryMixin, self).build_filter(filter_expr, **kwargs)
 
         if not prop.get_filter:
             raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
@@ -136,7 +157,7 @@ class QueryablePropertiesQueryMixin(object):
         # structure, so an _add_q call can be used to actually create the
         # return value for the current call.
         with self._required_annotation(required_annotation_prop):
-            return self._add_q(q_object, can_reuse, branch_negated, current_negated, allow_joins, split_subq)
+            return self._add_q(q_object, **self._build_filter_to_add_q_kwargs(**kwargs))
 
     def add_annotation(self, annotation, alias, is_summary=False):
         # An annotation may reference a field name that is actually a queryable
