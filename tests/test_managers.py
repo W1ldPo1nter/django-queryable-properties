@@ -2,7 +2,8 @@
 import pytest
 
 from django.core.exceptions import FieldError
-from django.db.models import F
+from django.db.models import F, Q
+from django.utils import six
 
 from queryable_properties.exceptions import QueryablePropertyError
 
@@ -22,14 +23,17 @@ class TestQueryFilters(object):
         (VersionWithDecoratorBasedProperties, '2.0', 2),
     ])
     def test_simple_filter(self, versions, model, major_minor, expected_count):
-        queryset = model.objects.filter(major_minor=major_minor)
+        # Also test that using non-property filters still work and can be used
+        # together with filters for queryable properties
+        queryset = model.objects.filter(major_minor=major_minor, major=major_minor[0])
         assert len(queryset) == expected_count
         assert all(obj.major_minor == major_minor for obj in queryset)
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_filter_without_required_annotation(self, versions, model):
-        # Filtering the 'version' property is also based on filtering the 'major_minor' property, so this test also
-        # tests properties that build on each other
+        # Filtering the 'version' property is also based on filtering the
+        # 'major_minor' property, so this test also tests properties that build
+        # on each other
         queryset = model.objects.filter(version='1.2.3')
         assert 'version' not in queryset.query.annotations
         assert all(obj.version == '1.2.3' for obj in queryset)
@@ -48,6 +52,15 @@ class TestQueryFilters(object):
         assert not model.highest_version._has_cached_value(application)
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_filter_implementation_used_despite_present_annotation(self, versions, model):
+        queryset = model.objects.select_properties('version').filter(version='2.0.0')
+        pseudo_sql = six.text_type(queryset.query)
+        assert '"major" = 2' in pseudo_sql
+        assert '"minor" = 0' in pseudo_sql
+        assert '"patch" = 0' in pseudo_sql
+        assert queryset.count() == 2
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_filter(self, monkeypatch, model):
         monkeypatch.setattr(model.version, 'get_filter', None)
         with pytest.raises(QueryablePropertyError):
@@ -56,7 +69,14 @@ class TestQueryFilters(object):
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_standard_exception_on_invalid_field_name(self, model):
         with pytest.raises(FieldError):
-            model.objects.filter(non_existing_field=1337)
+            model.objects.filter(non_existent_field=1337)
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_standard_exception_on_invalid_filter_expression(self, model):
+        with pytest.raises(FieldError):
+            # The dict is passed as arg instead of kwargs, making it an invalid
+            # filter expression.
+            model.objects.filter(Q({'version': '2.0.0'}))
 
 
 @pytest.mark.django_db
