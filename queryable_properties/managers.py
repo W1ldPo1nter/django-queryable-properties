@@ -2,9 +2,9 @@
 
 from __future__ import unicode_literals
 
+from contextlib import contextmanager
 import uuid
 
-from django.core.exceptions import FieldError
 from django.db.models import F, Manager, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.query import ModelIterable
@@ -27,7 +27,29 @@ class QueryablePropertiesQueryMixin(object):
         super(QueryablePropertiesQueryMixin, self).__init__(*args, **kwargs)
         # Stores queryable properties used as annotations in this query along
         # with the information if the annotated value should be selected.
-        self._queryable_property_annotations = dict()
+        self._queryable_property_annotations = {}
+        # A stack for queryable properties whose annotations are currently
+        # required while filtering.
+        self._required_annotation_stack = []
+
+    @contextmanager
+    def _required_annotation(self, prop=None):
+        """
+        Context manager to add the given queryable property to the top of the
+        required annotation stack when entering and removing it again when
+        exiting. Intended to be used when queryable properties with
+        filter_requires_annotation=True are used to filter. The given property
+        may be None (which won't change the stack at all) to simplify any code
+        using the context manager.
+
+        :param queryable_properties.properties.QueryableProperty prop:
+            The property that should act as the current context.
+        """
+        if prop:
+            self._required_annotation_stack.append(prop)
+        yield self
+        if prop:
+            self._required_annotation_stack.pop()
 
     def _resolve_queryable_property(self, path):
         """
@@ -72,42 +94,48 @@ class QueryablePropertiesQueryMixin(object):
 
     def build_filter(self, filter_expr, branch_negated=False, current_negated=False, can_reuse=None, connector=AND,
                      allow_joins=True, split_subq=True):
-        # TODO: change this to make properties with fra=False work correctly
-        # Let Django try and deal with the expression first - this is
-        # advantageous for multiple reasons: Django will already perform basic
-        # sanity checks (is the expression in the correct format at all?) and
-        # will correctly resolve queryable property annotations that have
-        # already been added (so we avoid unnecessary duplicate operations).
+        # Check if the given filter expression is meant to use a queryable
+        # property. Therefore, the possibility of filter_expr not being of the
+        # correct type must be taken into account (a case Django would cover
+        # already, but the check for queryable properties MUST run first).
         try:
-            return super(QueryablePropertiesQueryMixin, self).build_filter(
-                filter_expr, branch_negated, current_negated, can_reuse, connector, allow_joins, split_subq)
-        except FieldError as e:
-            if not six.text_type(e).startswith('Cannot resolve'):
-                raise
-
-            # Django couldn't resolve the expression into an actual field - it
-            # may be a queryable property that needs to be resolved into its
-            # filter.
             arg, value = filter_expr
+        except ValueError:
+            # Invalid value - just treat it as "no queryable property found",
+            # delegate it to Django and let it generate the exception.
+            path = prop = None
+        else:
             path = arg.split(LOOKUP_SEP)
             prop = self._resolve_queryable_property(path)
-            if not prop:
-                raise  # It wasn't a queryable property either - re-raise.
 
-            # Before applying the filter implemented by the property, check if
-            # the property signals the need of its own annotation to function.
-            # If so, add the annotation first to avoid endless recursion, since
-            # resolved filter will likely contain the same property name again.
-            if prop.filter_requires_annotation:
-                self.add_queryable_property_annotation(prop)
-            if not prop.get_filter:
-                raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does '
-                                             'not implement filtering.'.format(prop.name))
-            lookup = path[1] if len(path) > 1 else 'exact'
-            q_object = prop.get_filter(self.model, lookup, value)
-            # Luckily, build_filter and _add_q use the same return value
-            # structure, so an _add_q call can be used to actually create the
-            # return value for the current call.
+        if not prop or (self._required_annotation_stack and self._required_annotation_stack[-1] == prop):
+            # If no queryable property could be determined for the filter
+            # expression (either because a regular/non-existent field is
+            # referenced or because the expression was an invalid value),
+            # call Django's default implementation, which may in turn raise an
+            # exception. Act the same way if the current top of the required
+            # annotation stack is used to avoid endless recursions.
+            return super(QueryablePropertiesQueryMixin, self).build_filter(
+                filter_expr, branch_negated, current_negated, can_reuse, connector, allow_joins, split_subq)
+
+        if not prop.get_filter:
+            raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
+                                         'implement filtering.'.format(prop.name))
+
+        # Before applying the filter implemented by the property, check if
+        # the property signals the need of its own annotation to function.
+        # If so, add the annotation first to avoid endless recursion, since
+        # resolved filter will likely contain the same property name again.
+        required_annotation_prop = None
+        if prop.filter_requires_annotation:
+            self.add_queryable_property_annotation(prop)
+            required_annotation_prop = prop
+        lookup = path[1] if len(path) > 1 else 'exact'
+        q_object = prop.get_filter(self.model, lookup, value)
+        # Luckily, build_filter and _add_q use the same return value
+        # structure, so an _add_q call can be used to actually create the
+        # return value for the current call.
+        with self._required_annotation(required_annotation_prop):
             return self._add_q(q_object, can_reuse, branch_negated, current_negated, allow_joins, split_subq)
 
     def add_annotation(self, annotation, alias, is_summary=False):
@@ -125,6 +153,7 @@ class QueryablePropertiesQueryMixin(object):
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
         obj._queryable_property_annotations = dict(self._queryable_property_annotations)
+        obj._required_annotation_stack = list(self._required_annotation_stack)
         return obj
 
 
@@ -144,7 +173,7 @@ class QueryablePropertiesQuerySetMixin(object):
             self.query = self.query.clone()
             class_name = 'QueryableProperties' + self.query.__class__.__name__
             inject_mixin(self.query, QueryablePropertiesQueryMixin, class_name,
-                         _queryable_property_annotations=dict())
+                         _queryable_property_annotations={}, _required_annotation_stack=[])
 
     @property
     def _returns_model_instances(self):
