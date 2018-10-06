@@ -9,10 +9,10 @@ from django.db.models import F, Manager, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.utils import six
 
-try:
+try:  # pragma: no cover
     from django.db.models.query import ModelIterable
     ValuesQuerySet = None
-except ImportError:
+except ImportError:  # pragma: no cover
     from django.db.models.query import ValuesQuerySet
     ModelIterable = None
 
