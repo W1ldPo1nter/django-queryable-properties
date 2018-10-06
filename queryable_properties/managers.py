@@ -7,8 +7,14 @@ import uuid
 
 from django.db.models import F, Manager, QuerySet
 from django.db.models.constants import LOOKUP_SEP
-from django.db.models.query import ModelIterable
 from django.utils import six
+
+try:
+    from django.db.models.query import ModelIterable
+    ValuesQuerySet = None
+except ImportError:
+    from django.db.models.query import ValuesQuerySet
+    ModelIterable = None
 
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, inject_mixin
@@ -210,7 +216,8 @@ class QueryablePropertiesQuerySetMixin(object):
         :return: True if model instances are returned; otherwise False.
         :rtype: bool
         """
-        return issubclass(self._iterable_class, ModelIterable)
+        return ((ModelIterable is not None and issubclass(self._iterable_class, ModelIterable)) or
+                (ValuesQuerySet is not None and not isinstance(self, ValuesQuerySet)))
 
     def _resolve_update_kwargs(self, **kwargs):
         """
