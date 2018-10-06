@@ -113,6 +113,10 @@ class QueryablePropertiesQueryMixin(object):
                 raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
                                              'implement annotation creation.'.format(prop.name))
             self.add_annotation(prop.get_annotation(self.model), prop.name)
+            # Perform the requires GROUP BY setup if the annotation contained
+            # aggregates, which is normally done by QuerySet.annotate.
+            if self.annotations[prop.name].contains_aggregate and self.group_by is not True:
+                self.set_group_by()
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
 
     def build_filter(self, filter_expr, **kwargs):
