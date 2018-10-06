@@ -1,12 +1,9 @@
 coverage==4.5.1
-Django>=1.11,<2.2
 flake8==3.5.0
 mock==2.0.0
 pydocstyle==2.1.1
-pip-tools==1.11.0
-pylint==1.8.2
 pytest==3.6.2
-pytest-django==2.9.1  # pytest-django 3.0 doesn't support Django <1.7
+pytest-django==3.4.3
 pytest-pep8==1.0.6
 pytest-cov==2.5.1
 pytest-pythonpath==0.7.2
