@@ -1,6 +1,7 @@
 # encoding: utf-8
 import pytest
 
+from django import VERSION as DJANGO_VERSION
 from django.core.exceptions import FieldError
 from django.db.models import F, Q
 from django.utils import six
@@ -38,6 +39,7 @@ class TestQueryFilters(object):
         assert 'version' not in queryset.query.annotations
         assert all(obj.version == '1.2.3' for obj in queryset)
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason='using MIN/MAX in filters was not supported with sqlite')
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_with_required_annotation(self, versions, model):
         version_model = model.objects.first().versions.model
@@ -71,6 +73,7 @@ class TestQueryFilters(object):
         with pytest.raises(FieldError):
             model.objects.filter(non_existent_field=1337)
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="type check didn't exist before Django 1.9")
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_standard_exception_on_invalid_filter_expression(self, model):
         with pytest.raises(FieldError):
@@ -123,16 +126,9 @@ class TestQueryAnnotations(object):
         assert 'version' in queryset.query.annotations
         assert all(model.version._has_cached_value(obj) for obj in queryset)
 
-    @pytest.mark.parametrize('model, filters', [
-        (ApplicationWithClassBasedProperties, {}),
-        (ApplicationWithDecoratorBasedProperties, {}),
-        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}),
-        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}),
-    ])
-    def test_cached_annotation_value_with_group_by(self, versions, model, filters):
-        # Filter both before and after the select_properties call to check if
-        # the annotation gets selected correctly regardless
-        queryset = model.objects.filter(**filters).select_properties('version_count').filter(**filters)
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_cached_annotation_value_with_group_by(self, versions, model):
+        queryset = model.objects.select_properties('version_count')
         assert 'version_count' in queryset.query.annotations
         assert all(model.version_count._has_cached_value(obj) for obj in queryset)
 
