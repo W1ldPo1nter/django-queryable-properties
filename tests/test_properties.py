@@ -7,7 +7,7 @@ from django.utils import six
 from queryable_properties import AnnotationMixin, QueryableProperty, queryable_property
 from queryable_properties.utils import reset_queryable_property
 
-from .models import (ApplicationWithClassBasedProperty, VersionWithClassBasedProperties,
+from .models import (ApplicationWithClassBasedProperties, VersionWithClassBasedProperties,
                      VersionWithDecoratorBasedProperties)
 
 
@@ -26,7 +26,7 @@ class TestBasics(object):
 
     @pytest.fixture
     def model_instance(self):
-        instance = ApplicationWithClassBasedProperty(name='Test')
+        instance = ApplicationWithClassBasedProperties(name='Test')
         instance.__class__.dummy.counter = 0
         return instance
 
@@ -112,7 +112,7 @@ class TestAnnotationMixin(object):
         ('lte', 5),
     ])
     def test_get_filter(self, mixin_instance, lookup, value):
-        q = mixin_instance.get_filter(ApplicationWithClassBasedProperty, lookup, value)
+        q = mixin_instance.get_filter(ApplicationWithClassBasedProperties, lookup, value)
         assert isinstance(q, Q)
         assert len(q.children) == 1
         q_expression, q_value = q.children[0]

@@ -7,7 +7,7 @@ from django.utils import six
 
 from queryable_properties.exceptions import QueryablePropertyError
 
-from .models import (ApplicationWithClassBasedProperty, ApplicationWithDecoratorBasedProperty,
+from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 
@@ -38,7 +38,7 @@ class TestQueryFilters(object):
         assert 'version' not in queryset.query.annotations
         assert all(obj.version == '1.2.3' for obj in queryset)
 
-    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperty, ApplicationWithDecoratorBasedProperty])
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_with_required_annotation(self, versions, model):
         version_model = model.objects.first().versions.model
         version_model.objects.filter(version='2.0.0')[0].delete()
@@ -123,6 +123,19 @@ class TestQueryAnnotations(object):
         assert 'version' in queryset.query.annotations
         assert all(model.version._has_cached_value(obj) for obj in queryset)
 
+    @pytest.mark.parametrize('model, filters', [
+        (ApplicationWithClassBasedProperties, {}),
+        (ApplicationWithDecoratorBasedProperties, {}),
+        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}),
+        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}),
+    ])
+    def test_cached_annotation_value_with_group_by(self, versions, model, filters):
+        # Filter both before and after the select_properties call to check if
+        # the annotation gets selected correctly regardless
+        queryset = model.objects.filter(**filters).select_properties('version_count').filter(**filters)
+        assert 'version_count' in queryset.query.annotations
+        assert all(model.version_count._has_cached_value(obj) for obj in queryset)
+
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_annotation_based_on_queryable_property(self, versions, model):
         queryset = model.objects.annotate(annotation=F('version'))
@@ -160,7 +173,7 @@ class TestUpdateQueries(object):
             version = model.objects.get(pk=pk)  # Reload from DB
             assert version.version == '1.3.37'
 
-    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperty, ApplicationWithDecoratorBasedProperty])
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_updater(self, model):
         with pytest.raises(QueryablePropertyError):
             model.objects.update(highest_version='1.3.37')

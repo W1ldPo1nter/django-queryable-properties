@@ -29,10 +29,26 @@ class HighestVersionProperty(AnnotationMixin, QueryableProperty):
             return None
 
     def get_annotation(self, cls):
+        if not hasattr(models, 'Subquery'):
+            # An incorrect substitute for the subquery-based annotation for
+            # Django versions without subqueries. Only works in the tests
+            # because of the version fixture constellation.
+            return Concat(models.Max('versions__major'), models.Value('.'),
+                          models.Min('versions__minor'), models.Value('.'),
+                          models.Min('versions__patch'), output_field=models.CharField())
         queryset = (VersionWithClassBasedProperties.objects.select_properties('version')
                                                            .filter(application=models.OuterRef('pk'))
                                                            .order_by('-major', '-minor', '-patch'))
         return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
+
+
+class VersionCountProperty(AnnotationMixin, QueryableProperty):
+
+    def get_value(self, obj):
+        return obj.versions.count()
+
+    def get_annotation(self, cls):
+        return models.Count('versions')
 
 
 class MajorMinorVersionProperty(UpdateMixin, QueryableProperty):
@@ -82,15 +98,16 @@ class Application(models.Model):
         abstract = True
 
 
-class ApplicationWithClassBasedProperty(Application):
+class ApplicationWithClassBasedProperties(Application):
 
     objects = QueryablePropertiesManager()
 
     highest_version = HighestVersionProperty()
+    version_count = VersionCountProperty()
     dummy = DummyProperty()
 
 
-class ApplicationWithDecoratorBasedProperty(Application):
+class ApplicationWithDecoratorBasedProperties(Application):
 
     objects = QueryablePropertiesManager()
 
@@ -104,10 +121,26 @@ class ApplicationWithDecoratorBasedProperty(Application):
     @highest_version.annotater
     @classmethod
     def highest_version(cls):
+        if not hasattr(models, 'Subquery'):
+            # An incorrect substitute for the subquery-based annotation for
+            # Django versions without subqueries. Only works in the tests
+            # because of the version fixture constellation.
+            return Concat(models.Max('versions__major'), models.Value('.'),
+                          models.Min('versions__minor'), models.Value('.'),
+                          models.Min('versions__patch'), output_field=models.CharField())
         queryset = (VersionWithDecoratorBasedProperties.objects.select_properties('version')
                                                                .filter(application=models.OuterRef('pk'))
                                                                .order_by('-major', '-minor', '-patch'))
         return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
+
+    @queryable_property
+    def version_count(self):
+        return self.versions.count()
+
+    @version_count.annotater
+    @classmethod
+    def version_count(cls):
+        return models.Count('versions')
 
 
 class Version(models.Model):
@@ -120,7 +153,7 @@ class Version(models.Model):
 
 
 class VersionWithClassBasedProperties(Version):
-    application = models.ForeignKey(ApplicationWithClassBasedProperty, on_delete=models.CASCADE,
+    application = models.ForeignKey(ApplicationWithClassBasedProperties, on_delete=models.CASCADE,
                                     related_name='versions')
 
     objects = QueryablePropertiesManager()
@@ -130,7 +163,7 @@ class VersionWithClassBasedProperties(Version):
 
 
 class VersionWithDecoratorBasedProperties(Version):
-    application = models.ForeignKey(ApplicationWithDecoratorBasedProperty, on_delete=models.CASCADE,
+    application = models.ForeignKey(ApplicationWithDecoratorBasedProperties, on_delete=models.CASCADE,
                                     related_name='versions')
 
     objects = QueryablePropertiesManager()

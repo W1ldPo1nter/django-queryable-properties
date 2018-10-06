@@ -2,16 +2,16 @@
 
 import pytest
 
-from .models import ApplicationWithClassBasedProperty, ApplicationWithDecoratorBasedProperty
+from .models import ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties
 
 
 @pytest.fixture
 def applications():
     return [
-        ApplicationWithClassBasedProperty.objects.create(name='My cool App'),
-        ApplicationWithClassBasedProperty.objects.create(name='Another App'),
-        ApplicationWithDecoratorBasedProperty.objects.create(name='My cool App'),
-        ApplicationWithDecoratorBasedProperty.objects.create(name='Another App'),
+        ApplicationWithClassBasedProperties.objects.create(name='My cool App'),
+        ApplicationWithClassBasedProperties.objects.create(name='Another App'),
+        ApplicationWithDecoratorBasedProperties.objects.create(name='My cool App'),
+        ApplicationWithDecoratorBasedProperties.objects.create(name='Another App'),
     ]
 
 
