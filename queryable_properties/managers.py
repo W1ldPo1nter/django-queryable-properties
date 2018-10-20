@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 from contextlib import contextmanager
 import uuid
 
-from django.db.models import F, Manager, QuerySet
+from django.db.models import Manager, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.utils import six
 
@@ -20,7 +20,6 @@ from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, inject_mixin
 
 
-# TODO: Make properties usable across relations, auto-annotate in order_by
 class QueryablePropertiesQueryMixin(object):
     """
     A mixin for :class:`django.db.models.sql.Query` objects that extends the
@@ -103,6 +102,24 @@ class QueryablePropertiesQueryMixin(object):
                 add_q_kwargs[self.BUILD_FILTER_TO_ADD_Q_KWARGS_MAP[key]] = value
         return add_q_kwargs
 
+    def _auto_annotate(self, path):
+        """
+        Try to resolve the given path into a queryable property and annotate
+        the property as a non-selected property (if the property wasn't added
+        as an annotation already). Do nothing if the path does not match a
+        queryable property.
+
+        :param collections.Sequence path: The path to resolve (a string of
+                                          Django's query expression split up
+                                          by the lookup separator).
+        :return: The resolved annotation or None if the path couldn't be
+                 resolved.
+        """
+        prop = self._resolve_queryable_property(path)
+        if not prop:
+            return None
+        return self.add_queryable_property_annotation(prop)
+
     def add_queryable_property_annotation(self, prop, select=False):
         """
         Add an annotation for the given queryable property to this query (if
@@ -113,6 +130,7 @@ class QueryablePropertiesQueryMixin(object):
             The property to add an annotation for.
         :param bool select: Signals whether the annotation should be selected
                             or not.
+        :return: The resolved annotation.
         """
         if prop not in self._queryable_property_annotations:
             if not prop.get_annotation:
@@ -124,6 +142,7 @@ class QueryablePropertiesQueryMixin(object):
             if self.annotations[prop.name].contains_aggregate and self.group_by is not True:
                 self.set_group_by()
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
+        return self.annotations[prop.name]
 
     def build_filter(self, filter_expr, **kwargs):
         # Check if the given filter expression is meant to use a queryable
@@ -169,17 +188,22 @@ class QueryablePropertiesQueryMixin(object):
         with self._required_annotation(required_annotation_prop):
             return self._add_q(q_object, **self._build_filter_to_add_q_kwargs(**kwargs))
 
-    def add_annotation(self, annotation, alias, is_summary=False):
-        # An annotation may reference a field name that is actually a queryable
-        # property, which may not have been annotated yet. If that's the case,
-        # add the queryable property annotation to the query, so these kinds of
-        # annotations work without explicitly adding the queryable property
-        # annotations to the query first.
-        if isinstance(annotation, F) and annotation.name not in self.annotations:
-            prop = self._resolve_queryable_property([annotation.name])
-            if prop:
-                self.add_queryable_property_annotation(prop)
-        return super(QueryablePropertiesQueryMixin, self).add_annotation(annotation, alias, is_summary)
+    def names_to_path(self, names, *args, **kwargs):
+        # This method is called when Django tries to resolve field names. If
+        # a queryable property is used, it needs to be auto-annotated and its
+        # infos must be returned instead of calling Django's default
+        # implementation.
+        property_annotation = self._auto_annotate(names)
+        if property_annotation:
+            return [], property_annotation.output_field, (property_annotation.output_field,), []
+        return super(QueryablePropertiesQueryMixin, self).names_to_path(names, *args, **kwargs)
+
+    def resolve_ref(self, name, *args, **kwargs):
+        # This method is used to resolve field names in complex expressions. If
+        # a queryable property is used in such an expression, it needs to be
+        # auto-annotated and returned here.
+        return self._auto_annotate([name]) or super(QueryablePropertiesQueryMixin, self).resolve_ref(name, *args,
+                                                                                                     **kwargs)
 
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
@@ -201,7 +225,7 @@ class QueryablePropertiesQuerySetMixin(object):
         # will be dynamically injected into the query. That way, other Django
         # extensions using custom query objects are also supported.
         if not isinstance(self.query, QueryablePropertiesQueryMixin):
-            self.query = self.query.clone()
+            self.query = getattr(self.query, 'chain', self.query.clone)()
             class_name = 'QueryableProperties' + self.query.__class__.__name__
             inject_mixin(self.query, QueryablePropertiesQueryMixin, class_name,
                          _queryable_property_annotations={}, _required_annotation_stack=[])
@@ -314,6 +338,18 @@ class QueryablePropertiesQuerySetMixin(object):
             queryset.query.add_queryable_property_annotation(prop, select=True)
         return queryset
 
+    def order_by(self, *field_names):
+        queryset = super(QueryablePropertiesQuerySetMixin, self).order_by(*field_names)
+        for field_name in field_names:
+            # Ordering by a queryable property via simple string values
+            # requires auto-annotating here, while a queryable property used
+            # in a complex ordering expression is resolved through overridden
+            # query methods.
+            if isinstance(field_name, six.string_types):
+                field_name = field_name[1:] if field_name.startswith('-') else field_name
+                queryset.query._auto_annotate(field_name.split(LOOKUP_SEP))
+        return queryset
+
     def update(self, **kwargs):
         # Resolve any queryable properties into their actual update kwargs
         # before calling the base update method.
@@ -337,7 +373,7 @@ class QueryablePropertiesQuerySetMixin(object):
             # changed back to the original one where nothing was renamed and
             # can be used for the constructions of further querysets based on
             # this one.
-            self.query = original_query.clone()
+            self.query = getattr(original_query, 'chain', original_query.clone)()
             changed_aliases = self._change_queryable_property_aliases()
             super_method()
         finally:
