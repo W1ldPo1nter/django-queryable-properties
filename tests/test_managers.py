@@ -3,7 +3,8 @@ import pytest
 
 from django import VERSION as DJANGO_VERSION
 from django.core.exceptions import FieldError
-from django.db.models import F, Q
+from django.db.models import F, Q, Value
+from django.db.models.functions import Concat
 from django.utils import six
 
 from queryable_properties.exceptions import QueryablePropertyError
@@ -132,11 +133,16 @@ class TestQueryAnnotations(object):
         assert 'version_count' in queryset.query.annotations
         assert all(model.version_count._has_cached_value(obj) for obj in queryset)
 
-    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-    def test_annotation_based_on_queryable_property(self, versions, model):
-        queryset = model.objects.annotate(annotation=F('version'))
+    @pytest.mark.parametrize('model, annotation, expected_value', [
+        (VersionWithClassBasedProperties, F('version'), '{}'),
+        (VersionWithDecoratorBasedProperties, F('version'), '{}'),
+        (VersionWithClassBasedProperties, Concat(Value('V'), 'version'), 'V{}'),
+        (VersionWithDecoratorBasedProperties, Concat(Value('V'), 'version'), 'V{}'),
+    ])
+    def test_annotation_based_on_queryable_property(self, versions, model, annotation, expected_value):
+        queryset = model.objects.annotate(annotation=annotation)
         for version in queryset:
-            assert version.version == version.annotation
+            assert version.annotation == expected_value.format(version.version)
             # Check that a property annotation used implicitly by another
             # annotation does not lead to a selection of the property
             # annotation
@@ -185,3 +191,33 @@ class TestUpdateQueries(object):
     def test_exception_on_conflicting_values(self, model, kwargs):
         with pytest.raises(QueryablePropertyError):
             model.objects.update(**kwargs)
+
+
+@pytest.mark.django_db
+class TestOrdering(object):
+
+    @pytest.mark.parametrize('model, order_by, with_selection', [
+        # All parametrizations are expected to yield the same result order
+        (VersionWithClassBasedProperties, '-version', False),
+        (VersionWithDecoratorBasedProperties, '-version', False),
+        (VersionWithClassBasedProperties, Concat(Value('V'), 'version').desc(), False),
+        (VersionWithDecoratorBasedProperties, Concat(Value('V'), 'version').desc(), False),
+        (VersionWithClassBasedProperties, '-version', True),
+        (VersionWithDecoratorBasedProperties, '-version', True),
+        (VersionWithClassBasedProperties, Concat(Value('V'), 'version').desc(), True),
+        (VersionWithDecoratorBasedProperties, Concat(Value('V'), 'version').desc(), True),
+    ])
+    def test_order_by_property_with_annotater(self, model, order_by, with_selection, versions):
+        queryset = model.objects.all()
+        if with_selection:
+            queryset = queryset.select_properties('version')
+        results = list(queryset.order_by(order_by))
+        assert results == sorted(results, key=lambda version: version.version, reverse=True)
+        # Check that ordering by a property annotation does not lead to a
+        # selection of the property annotation
+        assert all(model.version._has_cached_value(version) is with_selection for version in results)
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_exception_on_unimplemented_annotater(self, model):
+        with pytest.raises(QueryablePropertyError):
+            iter(model.objects.order_by('major_minor'))
