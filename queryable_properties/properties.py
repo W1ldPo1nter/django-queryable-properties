@@ -4,10 +4,65 @@ from __future__ import unicode_literals
 
 from django.db.models import Q
 from django.db.models.constants import LOOKUP_SEP
+from django.utils import six
 
 from .utils import inject_mixin, reset_queryable_property
 
 RESET_METHOD_NAME = 'reset_property'
+
+
+def CLEAR_CACHE(prop, obj, value, return_value):
+    """
+    Setter cache behavior function that will clear the cached value for a
+    cached queryable property on objects after the setter was used.
+
+    :param QueryableProperty prop: The property whose setter was used.
+    :param django.db.models.Model obj: The object the setter was used on.
+    :param value: The value that was passed to the setter.
+    :param return_value: The return value of the setter function/method.
+    """
+    prop._clear_cached_value(obj)
+
+
+def CACHE_VALUE(prop, obj, value, return_value):
+    """
+    Setter cache behavior function that will update the cache for the cached
+    queryable property on the object in question with the (raw) value that was
+    passed to the setter.
+
+    :param QueryableProperty prop: The property whose setter was used.
+    :param django.db.models.Model obj: The object the setter was used on.
+    :param value: The value that was passed to the setter.
+    :param return_value: The return value of the setter function/method.
+    """
+    prop._set_cached_value(obj, value)
+
+
+def CACHE_RETURN_VALUE(prop, obj, value, return_value):
+    """
+    Setter cache behavior function that will update the cache for the cached
+    queryable property on the object in question with the return value of the
+    setter function/method.
+
+    :param QueryableProperty prop: The property whose setter was used.
+    :param django.db.models.Model obj: The object the setter was used on.
+    :param value: The value that was passed to the setter.
+    :param return_value: The return value of the setter function/method.
+    """
+    prop._set_cached_value(obj, return_value)
+
+
+def DO_NOTHING(prop, obj, value, return_value):
+    """
+    Setter cache behavior function that will do nothing after the setter of
+    a cached queryable property was used, retaining previously cached values.
+
+    :param QueryableProperty prop: The property whose setter was used.
+    :param django.db.models.Model obj: The object the setter was used on.
+    :param value: The value that was passed to the setter.
+    :param return_value: The return value of the setter function/method.
+    """
+    pass
 
 
 class QueryableProperty(object):
@@ -17,6 +72,7 @@ class QueryableProperty(object):
     """
 
     cached = False  # Determines if the result of the getter is cached, like Django's cached_property
+    setter_cache_behavior = CLEAR_CACHE  # Determines what happens if the setter of a cached property is used
     filter_requires_annotation = False  # Determines if using the property to filter requires annotating first
 
     # Set the attributes of mixin methods to None for easier checks if a
@@ -28,6 +84,7 @@ class QueryableProperty(object):
     def __init__(self):
         self.model = None
         self.name = None
+        self.setter_cache_behavior = six.get_method_function(self.setter_cache_behavior)
 
     def __get__(self, obj, objtype=None):
         if obj is None:
@@ -47,11 +104,11 @@ class QueryableProperty(object):
     def __set__(self, obj, value):
         if not self.set_value:
             raise AttributeError("Can't set queryable property.")
-        self.set_value(obj, value)
-        # If a value is set and the property is set up to cache values, the
-        # newly set value is the one that should be cached.
-        if self.cached:
-            self._set_cached_value(obj, value)
+        return_value = self.set_value(obj, value)
+        # If a value is set and the property is set up to cache values or has
+        # a current cache value, invoke the configured setter cache behavior.
+        if self.cached or self._has_cached_value(obj):
+            self.setter_cache_behavior(self, obj, value, return_value)
 
     def get_value(self, obj):  # pragma: no cover
         """
@@ -206,7 +263,7 @@ class queryable_property(QueryableProperty):
     get_filter = None
 
     def __init__(self, getter=None, setter=None, filter=None, annotater=None, updater=None,
-                 cached=False, filter_requires_annotation=None, doc=None):
+                 cached=False, setter_cache_behavior=CLEAR_CACHE, filter_requires_annotation=None, doc=None):
         """
         Initialize a new queryable property using the given methods, which may
         be regular functions or classmethods.
@@ -221,6 +278,8 @@ class queryable_property(QueryableProperty):
                         (see :meth:`QueryableProperty.get_update_kwargs`).
         :param bool cached: Determines if values obtained by the getter should
                             be cached (like Django's cached_property).
+        :param setter_cache_behavior: A function that defines how the setter
+                                      interacts with cached values.
         :param bool filter_requires_annotation: Determines if using the
                                                 property to filter requires
                                                 annotating first.
@@ -241,6 +300,7 @@ class queryable_property(QueryableProperty):
         if updater:
             self.get_update_kwargs = self._extract_function(updater)
         self.cached = cached
+        self.setter_cache_behavior = setter_cache_behavior
         # Use None as a default value for filter_requires_annotation to
         # distinct between a "default False" (None) and an explicit False set
         # by the implementation.
@@ -280,6 +340,7 @@ class queryable_property(QueryableProperty):
             annotater=self.__dict__.get('get_annotation'),
             updater=self.__dict__.get('get_update_kwargs'),
             cached=self.cached,
+            setter_cache_behavior=self.setter_cache_behavior,
             filter_requires_annotation=self.filter_requires_annotation,
             doc=self.__doc__
         )
@@ -306,15 +367,23 @@ class queryable_property(QueryableProperty):
             return decorator
         return self._clone(getter=method)
 
-    def setter(self, method):
+    def setter(self, method=None, cache_behavior=CLEAR_CACHE):
         """
         Decorator for a function or method that is used as the setter of this
-        queryable property.
+        queryable property. May be used as a parameter-less decorator (@setter)
+        or as a decorator with keyword args
+        (@setter(cache_behavior=DO_NOTHING)).
 
         :param method: The method to decorate.
+        :param cache_behavior: A function that defines how the setter interacts
+                               with cached values.
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
+        if not method:
+            def decorator(meth):
+                return self._clone(setter=meth, setter_cache_behavior=cache_behavior)
+            return decorator
         return self._clone(setter=method)
 
     def filter(self, method=None, requires_annotation=None):
