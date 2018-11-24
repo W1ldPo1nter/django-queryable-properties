@@ -17,7 +17,7 @@ class DummyProperty(SetterMixin, QueryableProperty):
         return self.counter
 
     def set_value(self, obj, value):
-        pass
+        return -1  # A value < 0 to test the CACHE_RETURN_VALUE setter behavior
 
 
 class HighestVersionProperty(AnnotationMixin, QueryableProperty):

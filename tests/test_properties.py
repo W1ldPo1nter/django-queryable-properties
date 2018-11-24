@@ -4,7 +4,8 @@ import pytest
 from django.db.models import F, Q
 from django.utils import six
 
-from queryable_properties import AnnotationMixin, QueryableProperty, queryable_property
+from queryable_properties import (AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING,
+                                  QueryableProperty, queryable_property)
 from queryable_properties.utils import reset_queryable_property
 
 from .models import (ApplicationWithClassBasedProperties, VersionWithClassBasedProperties,
@@ -47,27 +48,35 @@ class TestBasics(object):
         (True, False, [1, 1, 1, 1, 1]),  # Caching is enabled (and never cleared); first value should always be returned
         (True, True, [1, 2, 3, 4, 5]),  # Cache is cleared every time; expect the same result like without caching
     ])
-    def test_descriptor_get(self, model_instance, cached, clear_cache, expected_values):
-        model_instance.__class__.dummy.cached = cached
+    def test_descriptor_get(self, monkeypatch, model_instance, cached, clear_cache, expected_values):
+        monkeypatch.setattr(model_instance.__class__.dummy, 'cached', cached)
         for expected_value in expected_values:
             assert model_instance.dummy == expected_value
             if clear_cache:
                 model_instance.reset_property('dummy')
 
-    @pytest.mark.parametrize('cached, clear_cache, values, expected_values', [
-        # The setter of the dummy property doesn't actually do anything, so the regular getter values are expected
-        # (except for cases with caching, where the cached values are expected)
-        (False, False, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
-        (False, True, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
-        (True, False, [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]),
-        (True, True, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+    def test_descriptor_get_exception(self, monkeypatch, model_instance):
+        monkeypatch.setattr(model_instance.__class__.dummy, 'get_value', None)
+        with pytest.raises(AttributeError):
+            model_instance.dummy
+
+    @pytest.mark.parametrize('cached, setter_cache_behavior, values, expected_values', [
+        # The setter cache behavior should not make a difference if a property
+        # is not cached
+        (False, CLEAR_CACHE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+        (False, CACHE_VALUE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+        (False, CACHE_RETURN_VALUE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+        (False, DO_NOTHING, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+        (True, CLEAR_CACHE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),  # Getter always gets called again due to cache clear
+        (True, CACHE_VALUE, [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]),  # The raw value gets should get cached
+        (True, CACHE_RETURN_VALUE, [0, 0, 0, 0, 0], [-1, -1, -1, -1, -1]),  # The return value should get cached
+        (True, DO_NOTHING, [0, 0, 0, 0, 0], [1, 1, 1, 1, 1]),  # The first getter value should get and stay cached
     ])
-    def test_descriptor_set(self, model_instance, cached, clear_cache, values, expected_values):
-        model_instance.__class__.dummy.cached = cached
+    def test_descriptor_set(self, monkeypatch, model_instance, cached, setter_cache_behavior, values, expected_values):
+        monkeypatch.setattr(model_instance.__class__.dummy, 'cached', cached)
+        monkeypatch.setattr(model_instance.__class__.dummy, 'setter_cache_behavior', setter_cache_behavior)
         for value, expected_value in zip(values, expected_values):
             model_instance.dummy = value
-            if clear_cache:
-                model_instance.reset_property('dummy')
             assert model_instance.dummy == expected_value
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
@@ -129,6 +138,7 @@ class TestDecorators(object):
         'annotater': 'get_annotation',
         'updater': 'get_update_kwargs',
         'cached': 'cached',
+        'setter_cache_behavior': 'setter_cache_behavior',
         'filter_requires_annotation': 'filter_requires_annotation',
         'doc': '__doc__',
     }
@@ -140,10 +150,8 @@ class TestDecorators(object):
             # Check for a new docstring that was set via a new getter
             if kwarg_name == 'doc' and 'doc' not in changed_attrs and original.__doc__ is None and clone.get_value:
                 assert clone.__doc__ == clone.get_value.__doc__
-            elif kwarg_name in changed_attrs:
-                assert value == changed_attrs[kwarg_name]
             else:
-                assert value == getattr(original, attr_name)
+                assert value == changed_attrs.get(kwarg_name, getattr(original, attr_name))
 
     def decorate_function(self, func, decorator, decorator_kwargs=None):
         if decorator_kwargs is not None:
@@ -207,15 +215,23 @@ class TestDecorators(object):
         clone = self.decorate_function(func, original.getter, kwargs)
         self.assert_cloned_property(original, clone, dict(kwargs or {}, getter=func))
 
-    @pytest.mark.parametrize('old_value', [None, lambda: None])
-    def test_setter(self, old_value):
+    @pytest.mark.parametrize('old_value, kwargs', [
+        (None, None),
+        (lambda: None, None),
+        (None, {'setter_cache_behavior': DO_NOTHING}),
+        (lambda: None, {'setter_cache_behavior': CACHE_VALUE}),
+    ])
+    def test_setter(self, old_value, kwargs):
         original = queryable_property(setter=old_value)
 
         def func():
             pass
 
-        clone = self.decorate_function(func, original.setter)
-        self.assert_cloned_property(original, clone, {'setter': func})
+        decorator_kwargs = kwargs and dict(kwargs)
+        if decorator_kwargs:
+            decorator_kwargs['cache_behavior'] = decorator_kwargs.pop('setter_cache_behavior')
+        clone = self.decorate_function(func, original.setter, decorator_kwargs)
+        self.assert_cloned_property(original, clone, dict(kwargs or {}, setter=func))
 
     @pytest.mark.parametrize('init_kwargs, decorator_kwargs, expected_requires_annotation', [
         ({'filter': lambda: Q()}, {}, None),
