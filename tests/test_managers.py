@@ -96,7 +96,7 @@ class TestNonModelInstanceQueries(object):
     ])
     def test_values(self, versions, model, filters, expected_versions):
         queryset = model.objects.filter(**filters).select_properties('version').values('version')
-        assert (obj_dict['version'] in expected_versions for obj_dict in queryset)
+        assert all(obj_dict['version'] in expected_versions for obj_dict in queryset)
 
     @pytest.mark.parametrize('model, filters, expected_versions', [
         (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
@@ -108,7 +108,7 @@ class TestNonModelInstanceQueries(object):
     ])
     def test_values_list(self, versions, model, filters, expected_versions):
         queryset = model.objects.filter(**filters).select_properties('version').values_list('version', flat=True)
-        assert (version in expected_versions for version in queryset)
+        assert all(version in expected_versions for version in queryset)
 
 
 @pytest.mark.django_db
