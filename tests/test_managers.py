@@ -166,14 +166,21 @@ class TestUpdateQueries(object):
             version = model.objects.get(pk=pk)  # Reload from DB
             assert version.major_minor == '42.42'
 
-    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-    def test_update_based_on_other_property(self, versions, model):
+    @pytest.mark.parametrize('model, update_kwargs', [
+        (VersionWithClassBasedProperties, {'version': '1.3.37'}),
+        (VersionWithDecoratorBasedProperties, {'version': '1.3.37'}),
+        # Also test that setting the same field(s) via multiple queryable
+        # properties works as long as they try to set the same values
+        (VersionWithClassBasedProperties, {'version': '1.3.37', 'major_minor': '1.3'}),
+        (VersionWithDecoratorBasedProperties, {'version': '1.3.37', 'major_minor': '1.3'}),
+    ])
+    def test_update_based_on_other_property(self, versions, model, update_kwargs):
         queryset = model.objects.filter(version='1.3.1')
         pks = list(queryset.values_list('pk', flat=True))
-        assert queryset.update(version='1.3.37') == len(pks)
+        assert queryset.update(**update_kwargs) == len(pks)
         for pk in pks:
             version = model.objects.get(pk=pk)  # Reload from DB
-            assert version.version == '1.3.37'
+            assert version.version == update_kwargs['version']
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_updater(self, model):
@@ -182,10 +189,8 @@ class TestUpdateQueries(object):
 
     @pytest.mark.parametrize('model, kwargs', [
         (VersionWithClassBasedProperties, {'major_minor': '42.42', 'major': 18}),
-        (VersionWithClassBasedProperties, {'major_minor': '42.42', 'version': '42.42.42'}),
         (VersionWithClassBasedProperties, {'major_minor': '1.2', 'version': '1.3.37', 'minor': 5}),
         (VersionWithDecoratorBasedProperties, {'major_minor': '42.42', 'major': 18}),
-        (VersionWithDecoratorBasedProperties, {'major_minor': '42.42', 'version': '42.42.42'}),
         (VersionWithDecoratorBasedProperties, {'major_minor': '1.2', 'version': '1.3.37', 'minor': 5}),
     ])
     def test_exception_on_conflicting_values(self, model, kwargs):
