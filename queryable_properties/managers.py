@@ -270,10 +270,10 @@ class QueryablePropertiesQuerySetMixin(object):
             # Make sure that there are no conflicting values after resolving
             # the update keyword arguments of the queryable properties.
             for additional_name, value in six.iteritems(additional_kwargs):
-                if additional_name in kwargs:
+                if additional_name in kwargs and kwargs[additional_name] != value:
                     raise QueryablePropertyError(
-                        'Updating queryable property "{prop}" would change field "{field}", but a conflicting explicit '
-                        'value was set for this field in the update arguments.'
+                        'Updating queryable property "{prop}" would change field "{field}", but a conflicting value '
+                        'was set for this field by another queryable property or explicitly in the update arguments.'
                         .format(prop=original_name, field=additional_name)
                     )
                 kwargs[additional_name] = value
@@ -345,8 +345,9 @@ class QueryablePropertiesQuerySetMixin(object):
             # requires auto-annotating here, while a queryable property used
             # in a complex ordering expression is resolved through overridden
             # query methods.
-            if isinstance(field_name, six.string_types):
-                field_name = field_name[1:] if field_name.startswith('-') else field_name
+            if isinstance(field_name, six.string_types) and field_name != '?':
+                if field_name.startswith('-') or field_name.startswith('+'):
+                    field_name = field_name[1:]
                 queryset.query._auto_annotate(field_name.split(LOOKUP_SEP))
         return queryset
 
