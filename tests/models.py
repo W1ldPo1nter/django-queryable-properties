@@ -1,6 +1,9 @@
 # encoding: utf-8
 from django.db import models
-from django.db.models.functions import Concat
+try:
+    from django.db.models.functions import Concat
+except ImportError:
+    Concat = None
 
 from queryable_properties import AnnotationMixin, QueryableProperty, queryable_property, SetterMixin, UpdateMixin
 from queryable_properties.managers import QueryablePropertiesManager
@@ -84,6 +87,11 @@ class FullVersionProperty(UpdateMixin, AnnotationMixin, SetterMixin, QueryablePr
         return models.Q(major_minor=parts[0], patch=parts[1])
 
     def get_annotation(self, cls):
+        if Concat is None:
+            from .conftest import RawSQLAnnotation
+            sql = '"{table}"."major" || \'.\' || "{table}"."minor" || \'.\' || "{table}"."patch"'.format(
+                table=cls._meta.db_table)
+            return RawSQLAnnotation(sql, output_field=models.CharField())
         return Concat('major', models.Value('.'), 'minor', models.Value('.'), 'patch', output_field=models.CharField())
 
     def get_update_kwargs(self, cls, value):
@@ -106,10 +114,16 @@ class ApplicationWithClassBasedProperties(Application):
     version_count = VersionCountProperty()
     dummy = DummyProperty()
 
+    class Meta:
+        verbose_name = 'Application'
+
 
 class ApplicationWithDecoratorBasedProperties(Application):
 
     objects = QueryablePropertiesManager()
+
+    class Meta:
+        verbose_name = 'Application'
 
     @queryable_property
     def highest_version(self):
@@ -161,12 +175,18 @@ class VersionWithClassBasedProperties(Version):
     major_minor = MajorMinorVersionProperty()
     version = FullVersionProperty()
 
+    class Meta:
+        verbose_name = 'Version'
+
 
 class VersionWithDecoratorBasedProperties(Version):
     application = models.ForeignKey(ApplicationWithDecoratorBasedProperties, on_delete=models.CASCADE,
                                     related_name='versions')
 
     objects = QueryablePropertiesManager()
+
+    class Meta:
+        verbose_name = 'Version'
 
     @queryable_property
     def major_minor(self):
@@ -205,6 +225,11 @@ class VersionWithDecoratorBasedProperties(Version):
     @version.annotater
     @classmethod
     def version(cls):
+        if Concat is None:
+            from .conftest import RawSQLAnnotation
+            sql = '"{table}"."major" || \'.\' || "{table}"."minor" || \'.\' || "{table}"."patch"'.format(
+                table=cls._meta.db_table)
+            return RawSQLAnnotation(sql, output_field=models.CharField())
         return Concat('major', models.Value('.'), 'minor', models.Value('.'), 'patch', output_field=models.CharField())
 
     @version.updater
