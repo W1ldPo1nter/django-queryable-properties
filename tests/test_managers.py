@@ -3,8 +3,11 @@ import pytest
 
 from django import VERSION as DJANGO_VERSION
 from django.core.exceptions import FieldError
-from django.db.models import F, Q, Value
-from django.db.models.functions import Concat
+from django.db import models
+try:
+    from django.db.models.functions import Concat
+except ImportError:
+    Concat = []  # This way, the name can be used in "and" expressions in parametrizations
 from django.utils import six
 
 from queryable_properties.exceptions import QueryablePropertyError
@@ -80,7 +83,7 @@ class TestQueryFilters(object):
         with pytest.raises(FieldError):
             # The dict is passed as arg instead of kwargs, making it an invalid
             # filter expression.
-            model.objects.filter(Q({'version': '2.0.0'}))
+            model.objects.filter(models.Q({'version': '2.0.0'}))
 
 
 @pytest.mark.django_db
@@ -133,12 +136,14 @@ class TestQueryAnnotations(object):
         assert 'version_count' in queryset.query.annotations
         assert all(model.version_count._has_cached_value(obj) for obj in queryset)
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason='F objects could not be used as annotations before Django 1.8')
     @pytest.mark.parametrize('model, annotation, expected_value', [
-        (VersionWithClassBasedProperties, F('version'), '{}'),
-        (VersionWithDecoratorBasedProperties, F('version'), '{}'),
-        (VersionWithClassBasedProperties, Concat(Value('V'), 'version'), 'V{}'),
-        (VersionWithDecoratorBasedProperties, Concat(Value('V'), 'version'), 'V{}'),
-    ])
+        (VersionWithClassBasedProperties, models.F('version'), '{}'),
+        (VersionWithDecoratorBasedProperties, models.F('version'), '{}'),
+    ] + (Concat and [  # The next test parametrizations are only active if Concat is defined
+        (VersionWithClassBasedProperties, Concat(models.Value('V'), 'version'), 'V{}'),
+        (VersionWithDecoratorBasedProperties, Concat(models.Value('V'), 'version'), 'V{}'),
+    ]))
     def test_annotation_based_on_queryable_property(self, versions, model, annotation, expected_value):
         queryset = model.objects.annotate(annotation=annotation)
         for version in queryset:
@@ -201,23 +206,33 @@ class TestUpdateQueries(object):
 @pytest.mark.django_db
 class TestOrdering(object):
 
-    @pytest.mark.parametrize('model, order_by, with_selection', [
-        # All parametrizations are expected to yield the same result order
-        (VersionWithClassBasedProperties, '-version', False),
-        (VersionWithDecoratorBasedProperties, '-version', False),
-        (VersionWithClassBasedProperties, Concat(Value('V'), 'version').desc(), False),
-        (VersionWithDecoratorBasedProperties, Concat(Value('V'), 'version').desc(), False),
-        (VersionWithClassBasedProperties, '-version', True),
-        (VersionWithDecoratorBasedProperties, '-version', True),
-        (VersionWithClassBasedProperties, Concat(Value('V'), 'version').desc(), True),
-        (VersionWithDecoratorBasedProperties, Concat(Value('V'), 'version').desc(), True),
-    ])
-    def test_order_by_property_with_annotater(self, model, order_by, with_selection, versions):
+    @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
+        # All parametrizations are expected to yield results ordered by the
+        # full version (ASC/DESC depending on the reverse parameter).
+        (VersionWithClassBasedProperties, 'version', False, False),
+        (VersionWithDecoratorBasedProperties, 'version', False, False),
+        (VersionWithClassBasedProperties, 'version', False, True),
+        (VersionWithDecoratorBasedProperties, 'version', False, True),
+        (VersionWithClassBasedProperties, '-version', True, False),
+        (VersionWithDecoratorBasedProperties, '-version', True, False),
+        (VersionWithClassBasedProperties, '-version', True, True),
+        (VersionWithDecoratorBasedProperties, '-version', True, True),
+    ] + (Concat and [  # The next test parametrizations are only active if Concat is defined
+        (VersionWithClassBasedProperties, Concat(models.Value('V'), 'version').asc(), False, False),
+        (VersionWithDecoratorBasedProperties, Concat(models.Value('V'), 'version').asc(), False, False),
+        (VersionWithClassBasedProperties, Concat(models.Value('V'), 'version').asc(), False, True),
+        (VersionWithDecoratorBasedProperties, Concat(models.Value('V'), 'version').asc(), False, True),
+        (VersionWithClassBasedProperties, Concat(models.Value('V'), 'version').desc(), True, False),
+        (VersionWithDecoratorBasedProperties, Concat(models.Value('V'), 'version').desc(), True, False),
+        (VersionWithClassBasedProperties, Concat(models.Value('V'), 'version').desc(), True, True),
+        (VersionWithDecoratorBasedProperties, Concat(models.Value('V'), 'version').desc(), True, True),
+    ]))
+    def test_order_by_property_with_annotater(self, model, order_by, reverse, with_selection, versions):
         queryset = model.objects.all()
         if with_selection:
             queryset = queryset.select_properties('version')
         results = list(queryset.order_by(order_by))
-        assert results == sorted(results, key=lambda version: version.version, reverse=True)
+        assert results == sorted(results, key=lambda version: version.version, reverse=reverse)
         # Check that ordering by a property annotation does not lead to a
         # selection of the property annotation
         assert all(model.version._has_cached_value(version) is with_selection for version in results)
