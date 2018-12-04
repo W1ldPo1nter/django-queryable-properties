@@ -8,6 +8,7 @@ import uuid
 from django.db.models import Manager, QuerySet
 from django.db.models.constants import LOOKUP_SEP
 from django.utils import six
+from django.utils.functional import curry
 
 try:  # pragma: no cover
     from django.db.models.query import ModelIterable
@@ -43,6 +44,18 @@ class QueryablePropertiesQueryMixin(object):
         # A stack for queryable properties whose annotations are currently
         # required while filtering.
         self._required_annotation_stack = []
+
+    def __getattr__(self, item):  # pragma: no cover
+        # Redirect some attribute accesses for older Django versions (where
+        # annotations were tied to aggregations, hence "aggregation" in the
+        # names instead of "annotation".
+        if item == 'add_annotation':
+            # The add_aggregate function also took the model as an additional
+            # parameter, which will be supplied via curry.
+            return curry(self.add_aggregate, model=self.model)
+        if item in ('_annotations ', 'annotations', '_annotation_select_cache', 'annotation_select'):
+            return getattr(self, item.replace('annotation', 'aggregate'))
+        raise AttributeError()
 
     @contextmanager
     def _required_annotation(self, prop=None):
@@ -136,10 +149,13 @@ class QueryablePropertiesQueryMixin(object):
             if not prop.get_annotation:
                 raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
                                              'implement annotation creation.'.format(prop.name))
-            self.add_annotation(prop.get_annotation(self.model), prop.name)
-            # Perform the requires GROUP BY setup if the annotation contained
-            # aggregates, which is normally done by QuerySet.annotate.
-            if self.annotations[prop.name].contains_aggregate and self.group_by is not True:
+            self.add_annotation(prop.get_annotation(self.model), alias=prop.name, is_summary=False)
+            # Perform the required GROUP BY setup if the annotation contained
+            # aggregates, which is normally done by QuerySet.annotate. In older
+            # Django versions, the contains_aggregate attribute didn't exist,
+            # but aggregates are always assumed in this case since annotations
+            # were strongly tied to aggregates.
+            if getattr(self.annotations[prop.name], 'contains_aggregate', True) and self.group_by is not True:
                 self.set_group_by()
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
         return self.annotations[prop.name]
@@ -284,23 +300,29 @@ class QueryablePropertiesQuerySetMixin(object):
         """
         Change the internal aliases of the annotations that belong to queryable
         properties in the query of this queryset to something unique and return
-        a dictionary mapping the original annotation names to the changed ones.
+        a dictionary mapping the queryable properties to the changed aliases.
         This is necessary to allow Django to populate the annotation attributes
         on the resulting model instances, which would otherwise call the setter
         of the queryable properties. This way, Django can populate attributes
         with different names instead and avoid using the setter methods.
 
-        :return: A dictionary mapping the original annotation names to the
-                 changed ones.
-        :rtype: dict
+        :return: A dictionary mapping the queryable properties that selected
+                 annotations are based on to the changed aliases.
+        :rtype: dict[queryable_properties.properties.QueryableProperty, str]
         """
         changed_aliases = {}
         select = dict(self.query.annotation_select)
-        for prop, requires_selection in dict(self.query._queryable_property_annotations).items():
-            if prop.name not in select or not requires_selection:
-                # Annotations may have been removed somehow or don't require
-                # selection
-                del self.query._queryable_property_annotations[prop]
+        legacy_mode = '_annotation_select_cache' not in self.query.__dict__
+
+        for prop, requires_selection in self.query._queryable_property_annotations.items():
+            if prop.name not in select:
+                continue  # Annotations may have been removed somehow
+
+            # Older Django versions didn't make a clear distinction between
+            # selected an non-selected annotations, therefore non-selected
+            # annotations can only be removed from the annotation select dict
+            # in newer versions (to no unnecessarily query fields).
+            if not requires_selection and not legacy_mode:
                 select.pop(prop.name, None)
                 continue
 
@@ -312,13 +334,21 @@ class QueryablePropertiesQuerySetMixin(object):
             # their names.
             while changed_name in select:
                 changed_name = LOOKUP_SEP.join((prop.name, uuid.uuid4().hex))
-            changed_aliases[prop.name] = changed_name
+            changed_aliases[prop] = changed_name
             select[changed_name] = select.pop(prop.name)
+
+            # Older Django versions only work with the annotation select dict
+            # when it comes to ordering, so queryable property annotations used
+            # for ordering must be renamed in the queries ordering as well.
+            if legacy_mode:
+                for i, field_name in enumerate(self.query.order_by):
+                    if field_name == prop.name or field_name[1:] == prop.name:
+                        self.query.order_by[i] = field_name.replace(prop.name, changed_name)
 
         # Patch the correct select property on the query with the new names,
         # since this property is used by the SQL compiler to build the actual
         # SQL query (which is where the the changed names should be used).
-        self.query._annotation_select_cache = select
+        setattr(self.query, '_aggregate_select_cache' if legacy_mode else '_annotation_select_cache', select)
         return changed_aliases
 
     def select_properties(self, *names):
@@ -383,11 +413,16 @@ class QueryablePropertiesQuerySetMixin(object):
         # Retrieve the annotation values from each renamed attribute and use it
         # to populate the cache for the corresponding queryable property on
         # each object. Remove the weird, renamed attributes afterwards.
-        for original_name, changed_name in six.iteritems(changed_aliases):
-            prop = get_queryable_property(self.model, original_name)
+        for prop, changed_name in six.iteritems(changed_aliases):
             for obj in self._result_cache:
-                prop._set_cached_value(obj, getattr(obj, changed_name))
+                value = getattr(obj, changed_name)
                 delattr(obj, changed_name)
+                # The following check is only required for older Django
+                # versions, where all annotations were necessarily selected.
+                # Therefore values that have been selected only due to this
+                # will simply be discarded.
+                if self.query._queryable_property_annotations[prop]:
+                    prop._set_cached_value(obj, value)
 
 
 class QueryablePropertiesQuerySet(QueryablePropertiesQuerySetMixin, QuerySet):
