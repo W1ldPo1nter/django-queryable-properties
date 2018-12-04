@@ -256,7 +256,7 @@ class QueryablePropertiesQuerySetMixin(object):
         :return: True if model instances are returned; otherwise False.
         :rtype: bool
         """
-        return ((ModelIterable is not None and issubclass(self._iterable_class, ModelIterable)) or
+        return ((ModelIterable is not None and issubclass(self._iterable_class, ModelIterable)) or  # noqa: W504
                 (ValuesQuerySet is not None and not isinstance(self, ValuesQuerySet)))
 
     def _resolve_update_kwargs(self, **kwargs):

@@ -11,7 +11,6 @@ if DJANGO_VERSION < (1, 8):
     from django.db.models.sql.aggregates import Aggregate
     from django.db.models.sql.query import Query
 
-
     class RawSQLAnnotation(Aggregate):
         """
         An annotation that simply adds custom SQL for Django versions < 1.8.
