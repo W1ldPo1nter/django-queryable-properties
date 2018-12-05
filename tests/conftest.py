@@ -2,25 +2,26 @@
 
 import pytest
 
-from django import VERSION as DJANGO_VERSION
-
 from .models import ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties
 
 
-if DJANGO_VERSION < (1, 8):
+try:
+    from django.db.models.expressions import RawSQL
+except ImportError:
     from django.db.models.sql.aggregates import Aggregate
     from django.db.models.sql.query import Query
 
-    class RawSQLAnnotation(Aggregate):
+    class RawSQL(Aggregate):
         """
         An annotation that simply adds custom SQL for Django versions < 1.8.
         Used to maintain the test setup by emulating newer ORM features via
         custom SQL.
         """
 
-        def __init__(self, sql, output_field, contains_aggregate=False):
+        def __init__(self, sql, params, output_field):
             self.sql = sql
-            self.contains_aggregate = contains_aggregate
+            self.params = params
+            self.contains_aggregate = False
             self.field = output_field
             # Make sure all the regular attributes are set
             self.col = None
@@ -30,7 +31,7 @@ if DJANGO_VERSION < (1, 8):
             self.lookup = 'pk'
 
         def as_sql(self, qn, connection):
-            return self.sql, ()
+            return '({})'.format(self.sql), self.params
 
         def add_to_query(self, query, alias, col, source, is_summary):
             query.aggregates[alias] = self
@@ -46,7 +47,7 @@ if DJANGO_VERSION < (1, 8):
 
         def patched(self, obj):
             need_having = original(self, obj)
-            if isinstance(need_having, RawSQLAnnotation):
+            if isinstance(need_having, RawSQL):
                 need_having = need_having.contains_aggregate
             return need_having
 
