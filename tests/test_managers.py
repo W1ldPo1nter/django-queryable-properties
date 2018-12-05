@@ -43,7 +43,6 @@ class TestQueryFilters(object):
         assert 'version' not in queryset.query.annotations
         assert all(obj.version == '1.2.3' for obj in queryset)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason='using MIN/MAX in filters was not supported with sqlite')
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_with_required_annotation(self, versions, model):
         version_model = model.objects.first().versions.model
