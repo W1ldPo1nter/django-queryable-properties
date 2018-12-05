@@ -32,17 +32,19 @@ class HighestVersionProperty(AnnotationMixin, QueryableProperty):
             return None
 
     def get_annotation(self, cls):
+        queryset = VersionWithClassBasedProperties.objects.select_properties('version')
+        queryset = queryset.order_by('-major', '-minor', '-patch').values('version')
         if not hasattr(models, 'Subquery'):
-            # An incorrect substitute for the subquery-based annotation for
-            # Django versions without subqueries. Only works in the tests
-            # because of the version fixture constellation.
-            return Concat(models.Max('versions__major'), models.Value('.'),
-                          models.Min('versions__minor'), models.Value('.'),
-                          models.Min('versions__patch'), output_field=models.CharField())
-        queryset = (VersionWithClassBasedProperties.objects.select_properties('version')
-                                                           .filter(application=models.OuterRef('pk'))
-                                                           .order_by('-major', '-minor', '-patch'))
-        return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
+            # Emulate the subquery via custom SQL, but let Django still generate most of the SQL
+            from .conftest import RawSQL
+            # Random filter value that will be replaced with the reference to the outer table
+            queryset = queryset.filter(application_id=1)[:1]
+            filter_value = '"{table}"."{field}"'.format(table=cls._meta.db_table, field=cls._meta.pk.name)
+            sql, params = queryset.query.sql_with_params()
+            # The filter placeholder should always be the last one -> replace with reference to the outer table
+            sql = filter_value.join(sql.rsplit('%s', 1))
+            return RawSQL(sql, list(params)[:-1], output_field=models.CharField())
+        return models.Subquery(queryset.filter(application=models.OuterRef('pk'))[:1], output_field=models.CharField())
 
 
 class VersionCountProperty(AnnotationMixin, QueryableProperty):
@@ -88,10 +90,10 @@ class FullVersionProperty(UpdateMixin, AnnotationMixin, SetterMixin, QueryablePr
 
     def get_annotation(self, cls):
         if Concat is None:
-            from .conftest import RawSQLAnnotation
+            from .conftest import RawSQL
             sql = '"{table}"."major" || \'.\' || "{table}"."minor" || \'.\' || "{table}"."patch"'.format(
                 table=cls._meta.db_table)
-            return RawSQLAnnotation(sql, output_field=models.CharField())
+            return RawSQL(sql, (), output_field=models.CharField())
         return Concat('major', models.Value('.'), 'minor', models.Value('.'), 'patch', output_field=models.CharField())
 
     def get_update_kwargs(self, cls, value):
@@ -135,17 +137,19 @@ class ApplicationWithDecoratorBasedProperties(Application):
     @highest_version.annotater
     @classmethod
     def highest_version(cls):
+        queryset = VersionWithDecoratorBasedProperties.objects.select_properties('version')
+        queryset = queryset.order_by('-major', '-minor', '-patch').values('version')
         if not hasattr(models, 'Subquery'):
-            # An incorrect substitute for the subquery-based annotation for
-            # Django versions without subqueries. Only works in the tests
-            # because of the version fixture constellation.
-            return Concat(models.Max('versions__major'), models.Value('.'),
-                          models.Min('versions__minor'), models.Value('.'),
-                          models.Min('versions__patch'), output_field=models.CharField())
-        queryset = (VersionWithDecoratorBasedProperties.objects.select_properties('version')
-                                                               .filter(application=models.OuterRef('pk'))
-                                                               .order_by('-major', '-minor', '-patch'))
-        return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
+            # Emulate the subquery via custom SQL, but let Django still generate most of the SQL
+            from .conftest import RawSQL
+            # Random filter value that will be replaced with the reference to the outer table
+            queryset = queryset.filter(application_id=1)[:1]
+            filter_value = '"{table}"."{field}"'.format(table=cls._meta.db_table, field=cls._meta.pk.name)
+            sql, params = queryset.query.sql_with_params()
+            # The filter placeholder should always be the last one -> replace with reference to the outer table
+            sql = filter_value.join(sql.rsplit('%s', 1))
+            return RawSQL(sql, list(params)[:-1], output_field=models.CharField())
+        return models.Subquery(queryset.filter(application=models.OuterRef('pk'))[:1], output_field=models.CharField())
 
     @queryable_property
     def version_count(self):
@@ -226,10 +230,10 @@ class VersionWithDecoratorBasedProperties(Version):
     @classmethod
     def version(cls):
         if Concat is None:
-            from .conftest import RawSQLAnnotation
+            from .conftest import RawSQL
             sql = '"{table}"."major" || \'.\' || "{table}"."minor" || \'.\' || "{table}"."patch"'.format(
                 table=cls._meta.db_table)
-            return RawSQLAnnotation(sql, output_field=models.CharField())
+            return RawSQL(sql, (), output_field=models.CharField())
         return Concat('major', models.Value('.'), 'minor', models.Value('.'), 'patch', output_field=models.CharField())
 
     @version.updater
