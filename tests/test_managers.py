@@ -152,6 +152,11 @@ class TestQueryAnnotations(object):
             # annotation
             assert not model.version._has_cached_value(version)
 
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_aggregation_based_on_queryable_property(self, versions, model):
+        result = model.objects.aggregate(total_version_count=models.Sum('version_count'))
+        assert result['total_version_count'] == len(versions) / 2  # List contains objects for both approaches
+
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_annotater(self, model):
         with pytest.raises(QueryablePropertyError):
