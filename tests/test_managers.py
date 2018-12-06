@@ -96,9 +96,15 @@ class TestNonModelInstanceQueries(object):
         (VersionWithDecoratorBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
         (VersionWithDecoratorBasedProperties, {'version': '2.0.0'}, {'2.0.0'}),
     ])
-    def test_values(self, versions, model, filters, expected_versions):
+    def test_values_after_annotate(self, versions, model, filters, expected_versions):
         queryset = model.objects.filter(**filters).select_properties('version').values('version')
         assert all(obj_dict['version'] in expected_versions for obj_dict in queryset)
+
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_values_before_annotate(self, versions, model):
+        values = model.objects.values('category').select_properties('version_count')
+        assert len(values) == 1
+        assert values[0]['version_count'] == len(versions) / 2
 
     @pytest.mark.parametrize('model, filters, expected_versions', [
         (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
