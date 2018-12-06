@@ -45,16 +45,16 @@ class QueryablePropertiesQueryMixin(object):
         # required while filtering.
         self._required_annotation_stack = []
 
-    def __getattr__(self, item):  # pragma: no cover
+    def __getattr__(self, name):  # pragma: no cover
         # Redirect some attribute accesses for older Django versions (where
         # annotations were tied to aggregations, hence "aggregation" in the
         # names instead of "annotation".
-        if item == 'add_annotation':
+        if name == 'add_annotation':
             # The add_aggregate function also took the model as an additional
             # parameter, which will be supplied via curry.
             return curry(self.add_aggregate, model=self.model)
-        if item in ('_annotations ', 'annotations', '_annotation_select_cache', 'annotation_select'):
-            return getattr(self, item.replace('annotation', 'aggregate'))
+        if name in ('_annotations ', 'annotations', '_annotation_select_cache', 'annotation_select'):
+            return getattr(self, name.replace('annotation', 'aggregate'))
         raise AttributeError()
 
     @contextmanager
@@ -159,6 +159,13 @@ class QueryablePropertiesQueryMixin(object):
                 self.set_group_by()
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
         return self.annotations[prop.name]
+
+    def add_aggregate(self, aggregate, *args, **kwargs):
+        # This method is called in older versions to add an aggregation or
+        # annotation. Since both might be based on a queryable property, an
+        # auto-annotation has to occur here.
+        self._auto_annotate(aggregate.lookup.split(LOOKUP_SEP))
+        return super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, *args, **kwargs)
 
     def build_filter(self, filter_expr, **kwargs):
         # Check if the given filter expression is meant to use a queryable
@@ -340,7 +347,7 @@ class QueryablePropertiesQuerySetMixin(object):
             # Older Django versions only work with the annotation select dict
             # when it comes to ordering, so queryable property annotations used
             # for ordering must be renamed in the queries ordering as well.
-            if legacy_mode:
+            if legacy_mode:  # pragma: no cover
                 for i, field_name in enumerate(self.query.order_by):
                     if field_name == prop.name or field_name[1:] == prop.name:
                         self.query.order_by[i] = field_name.replace(prop.name, changed_name)
