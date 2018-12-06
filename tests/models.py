@@ -103,6 +103,7 @@ class FullVersionProperty(UpdateMixin, AnnotationMixin, SetterMixin, QueryablePr
 
 class Application(models.Model):
     name = models.CharField(max_length=255)
+    category = models.CharField(max_length=255, default='Demo apps')
 
     class Meta:
         abstract = True
