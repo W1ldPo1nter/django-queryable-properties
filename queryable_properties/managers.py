@@ -5,8 +5,9 @@ from __future__ import unicode_literals
 from contextlib import contextmanager
 import uuid
 
-from django.db.models import Manager, QuerySet
+from django.db.models import Manager
 from django.db.models.constants import LOOKUP_SEP
+from django.db.models.query import QuerySet
 from django.utils import six
 from django.utils.functional import curry
 
