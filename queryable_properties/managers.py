@@ -250,8 +250,8 @@ class QueryablePropertiesQuerySetMixin(object):
     to use queryable properties in filters, annotations and update queries.
     """
 
-    def __init__(self, model=None, query=None, using=None, hints=None):
-        super(QueryablePropertiesQuerySetMixin, self).__init__(model, query, using, hints)
+    def __init__(self, *args, **kwargs):
+        super(QueryablePropertiesQuerySetMixin, self).__init__(*args, **kwargs)
         # To work correctly, a query using the QueryablePropertiesQueryMixin is
         # required. If the current query is not using the mixin already, it
         # will be dynamically injected into the query. That way, other Django
@@ -449,4 +449,13 @@ class QueryablePropertiesQuerySet(QueryablePropertiesQuerySetMixin, QuerySet):
     pass
 
 
-QueryablePropertiesManager = Manager.from_queryset(QueryablePropertiesQuerySet)
+if hasattr(Manager, 'from_queryset'):
+    QueryablePropertiesManager = Manager.from_queryset(QueryablePropertiesQuerySet)
+else:  # pragma: no cover
+    class QueryablePropertiesManager(Manager):
+
+        def get_queryset(self):
+            return QueryablePropertiesQuerySet(self.model, using=self._db)
+
+        def select_properties(self, *names):
+            return self.get_queryset().select_properties(*names)
