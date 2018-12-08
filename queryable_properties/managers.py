@@ -221,12 +221,20 @@ class QueryablePropertiesQueryMixin(object):
             return [], property_annotation.output_field, (property_annotation.output_field,), []
         return super(QueryablePropertiesQueryMixin, self).names_to_path(names, *args, **kwargs)
 
-    def resolve_ref(self, name, *args, **kwargs):
+    def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False):
         # This method is used to resolve field names in complex expressions. If
         # a queryable property is used in such an expression, it needs to be
         # auto-annotated and returned here.
-        return self._auto_annotate([name]) or super(QueryablePropertiesQueryMixin, self).resolve_ref(name, *args,
-                                                                                                     **kwargs)
+        property_annotation = self._auto_annotate([name])
+        if property_annotation:
+            if summarize:
+                # Outer queries for aggregations need refs to annotations of
+                # the inner queries
+                from django.db.models.expressions import Ref
+                return Ref(name, property_annotation)
+            else:
+                return property_annotation
+        return super(QueryablePropertiesQueryMixin, self).resolve_ref(name, allow_joins, reuse, summarize)
 
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
