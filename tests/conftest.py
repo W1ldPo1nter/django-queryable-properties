@@ -10,6 +10,7 @@ try:
 except ImportError:
     from django.db.models.sql.aggregates import Aggregate
     from django.db.models.sql.query import Query
+    from django.utils.tree import Node
 
     class RawSQL(Aggregate):
         """
@@ -46,10 +47,9 @@ except ImportError:
         original = Query.need_having
 
         def patched(self, obj):
-            need_having = original(self, obj)
-            if isinstance(need_having, RawSQL):
-                need_having = need_having.contains_aggregate
-            return need_having
+            if not isinstance(obj, Node) and isinstance(self.aggregates.get(obj[0], None), RawSQL):
+                return self.aggregates[obj[0]].contains_aggregate
+            return original(self, obj)
 
         monkeypatch.setattr(Query, 'need_having', patched)
 
