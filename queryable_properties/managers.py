@@ -9,7 +9,6 @@ from django.db.models import Manager
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.query import QuerySet
 from django.utils import six
-from django.utils.functional import curry
 
 try:  # pragma: no cover
     from django.db.models.query import ModelIterable
@@ -36,6 +35,13 @@ class QueryablePropertiesQueryMixin(object):
         'allow_joins': 'allow_joins',
         'split_subq': 'split_subq',
     }
+    NEW_TO_LEGACY_ATTRIBUTES_MAP = {
+        'add_annotation': 'add_aggregate',
+        '_annotations': '_aggregates',
+        'annotations': 'aggregates',
+        '_annotation_select_cache': '_aggregate_select_cache',
+        'annotation_select': 'aggregate_select',
+    }
 
     def __init__(self, *args, **kwargs):
         super(QueryablePropertiesQueryMixin, self).__init__(*args, **kwargs)
@@ -49,13 +55,9 @@ class QueryablePropertiesQueryMixin(object):
     def __getattr__(self, name):  # pragma: no cover
         # Redirect some attribute accesses for older Django versions (where
         # annotations were tied to aggregations, hence "aggregation" in the
-        # names instead of "annotation".
-        if name == 'add_annotation':
-            # The add_aggregate function also took the model as an additional
-            # parameter, which will be supplied via curry.
-            return curry(self.add_aggregate, model=self.model)
-        if name in ('_annotations ', 'annotations', '_annotation_select_cache', 'annotation_select'):
-            return getattr(self, name.replace('annotation', 'aggregate'))
+        # names instead of "annotation").
+        if name in self.NEW_TO_LEGACY_ATTRIBUTES_MAP:
+            return getattr(self, self.NEW_TO_LEGACY_ATTRIBUTES_MAP[name])
         raise AttributeError()
 
     @property
@@ -141,9 +143,7 @@ class QueryablePropertiesQueryMixin(object):
                  resolved.
         """
         prop = self._resolve_queryable_property(path)
-        if not prop:
-            return None
-        return self.add_queryable_property_annotation(prop)
+        return prop and self.add_queryable_property_annotation(prop)
 
     def add_queryable_property_annotation(self, prop, select=False):
         """
@@ -172,12 +172,16 @@ class QueryablePropertiesQueryMixin(object):
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
         return self.annotations[prop.name]
 
-    def add_aggregate(self, aggregate, *args, **kwargs):
+    def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):
         # This method is called in older versions to add an aggregation or
         # annotation. Since both might be based on a queryable property, an
         # auto-annotation has to occur here.
         self._auto_annotate(aggregate.lookup.split(LOOKUP_SEP))
-        return super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, *args, **kwargs)
+        # The overridden method also allows to set a default value for the
+        # model parameter, which will be missing if add_annotation calls are
+        # redirected to add_aggregate for older Django versions.
+        model = model or self.model
+        return super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, model, alias, is_summary)
 
     def build_filter(self, filter_expr, **kwargs):
         # Check if the given filter expression is meant to use a queryable
