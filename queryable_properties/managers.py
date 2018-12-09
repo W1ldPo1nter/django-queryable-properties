@@ -58,6 +58,17 @@ class QueryablePropertiesQueryMixin(object):
             return getattr(self, name.replace('annotation', 'aggregate'))
         raise AttributeError()
 
+    @property
+    def _legacy_mode(self):
+        """
+        Determine if this query uses legacy mode, i.e. if the annotation-related attributes are named after aggregates.
+        In newer Django versions, these attributes are named after annotations.
+
+        :return: True if this queryset uses legacy attributes; otherwise False.
+        :rtype: bool
+        """
+        return '_annotation_select_cache' not in self.__dict__
+
     @contextmanager
     def _required_annotation(self, prop=None):
         """
@@ -262,6 +273,17 @@ class QueryablePropertiesQuerySetMixin(object):
             inject_mixin(self.query, QueryablePropertiesQueryMixin, class_name,
                          _queryable_property_annotations={}, _required_annotation_stack=[])
 
+    def _clone(self, *args, **kwargs):
+        clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
+        # In older Django versions, the class of the property may be completely
+        # replaced while cloning (e.g when using .values()). Therefore this
+        # mixin might need to be re-injected to enable queryable properties
+        # functionality.
+        if not isinstance(clone, QueryablePropertiesQuerySetMixin):  # pragma: no cover
+            class_name = 'QueryableProperties' + clone.__class__.__name__
+            inject_mixin(clone, QueryablePropertiesQuerySetMixin, class_name)
+        return clone
+
     @property
     def _returns_model_instances(self):
         """
@@ -328,7 +350,6 @@ class QueryablePropertiesQuerySetMixin(object):
         """
         changed_aliases = {}
         select = dict(self.query.annotation_select)
-        legacy_mode = '_annotation_select_cache' not in self.query.__dict__
 
         for prop, requires_selection in self.query._queryable_property_annotations.items():
             if prop.name not in select:
@@ -338,7 +359,7 @@ class QueryablePropertiesQuerySetMixin(object):
             # selected an non-selected annotations, therefore non-selected
             # annotations can only be removed from the annotation select dict
             # in newer versions (to no unnecessarily query fields).
-            if not requires_selection and not legacy_mode:
+            if not requires_selection and not self.query._legacy_mode:
                 select.pop(prop.name, None)
                 continue
 
@@ -356,7 +377,7 @@ class QueryablePropertiesQuerySetMixin(object):
             # Older Django versions only work with the annotation select dict
             # when it comes to ordering, so queryable property annotations used
             # for ordering must be renamed in the queries ordering as well.
-            if legacy_mode:  # pragma: no cover
+            if self.query._legacy_mode:  # pragma: no cover
                 for i, field_name in enumerate(self.query.order_by):
                     if field_name == prop.name or field_name[1:] == prop.name:
                         self.query.order_by[i] = field_name.replace(prop.name, changed_name)
@@ -364,7 +385,8 @@ class QueryablePropertiesQuerySetMixin(object):
         # Patch the correct select property on the query with the new names,
         # since this property is used by the SQL compiler to build the actual
         # SQL query (which is where the the changed names should be used).
-        setattr(self.query, '_aggregate_select_cache' if legacy_mode else '_annotation_select_cache', select)
+        cache_attr = '_aggregate_select_cache' if self.query._legacy_mode else '_annotation_select_cache'
+        setattr(self.query, cache_attr, select)
         return changed_aliases
 
     def select_properties(self, *names):
@@ -382,6 +404,11 @@ class QueryablePropertiesQuerySetMixin(object):
         for name in names:
             prop = get_queryable_property(self.model, name)
             queryset.query.add_queryable_property_annotation(prop, select=True)
+        if self.query._legacy_mode and isinstance(self, ValuesQuerySet):  # pragma: no cover
+            # In older Django versions, the annotation mask was changed by the
+            # queryset itself when applying annotations to a ValuesQuerySet.
+            # Therefore the same must be done here in this case.
+            queryset.query.set_aggregate_mask((queryset.query.aggregate_select_mask or set()) | set(names))
         return queryset
 
     def order_by(self, *field_names):
