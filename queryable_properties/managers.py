@@ -34,6 +34,7 @@ class QueryablePropertiesQueryMixin(object):
         'current_negated': 'current_negated',
         'allow_joins': 'allow_joins',
         'split_subq': 'split_subq',
+        'force_having': 'force_having',
     }
     NEW_TO_LEGACY_ATTRIBUTES_MAP = {
         'add_annotation': 'add_aggregate',
@@ -183,7 +184,23 @@ class QueryablePropertiesQueryMixin(object):
         model = model or self.model
         return super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, model, alias, is_summary)
 
-    def build_filter(self, filter_expr, **kwargs):
+    def add_filter(self, *args, **kwargs):
+        base = super(QueryablePropertiesQueryMixin, self)
+        # The build_filter method was called add_filter in very old Django
+        # versions. Since recent versions still have an add_filter method (for
+        # different purposes), the queryable properties customizations should
+        # only occur in old versions. This is determined by checking if the
+        # base queryset class already defines build_filter, which the old
+        # versions didn't.
+        if not hasattr(base, 'build_filter'):
+            # Simply use the build_filter implementation that does all the
+            # having lifting and is aware of the different methods in different
+            # versions and therefore calls the correct super methods if
+            # necessary.
+            return self.build_filter(*args, **kwargs)
+        return base.add_filter(*args, **kwargs)
+
+    def build_filter(self, filter_expr, *args, **kwargs):
         # Check if the given filter expression is meant to use a queryable
         # property. Therefore, the possibility of filter_expr not being of the
         # correct type must be taken into account (a case Django would cover
@@ -198,14 +215,19 @@ class QueryablePropertiesQueryMixin(object):
             path = arg.split(LOOKUP_SEP)
             prop = self._resolve_queryable_property(path)
 
+        # If no queryable property could be determined for the filter
+        # expression (either because a regular/non-existent field is referenced
+        # or because the expression was an invalid value), call Django's
+        # default implementation, which may in turn raise an exception. Act the
+        # same way if the current top of the required annotation stack is used
+        # to avoid endless recursions.
         if not prop or (self._required_annotation_stack and self._required_annotation_stack[-1] == prop):
-            # If no queryable property could be determined for the filter
-            # expression (either because a regular/non-existent field is
-            # referenced or because the expression was an invalid value),
-            # call Django's default implementation, which may in turn raise an
-            # exception. Act the same way if the current top of the required
-            # annotation stack is used to avoid endless recursions.
-            return super(QueryablePropertiesQueryMixin, self).build_filter(filter_expr, **kwargs)
+            # The base method has different names in different Django versions.
+            # Which one to use can be determined by the presence of positional
+            # arguments, which were only used in very old versions, where the
+            # method was called "add_filter".
+            base_method = getattr(super(QueryablePropertiesQueryMixin, self), 'add_filter' if args else 'build_filter')
+            return base_method(filter_expr, *args, **kwargs)
 
         if not prop.get_filter:
             raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
@@ -225,7 +247,12 @@ class QueryablePropertiesQueryMixin(object):
         # structure, so an _add_q call can be used to actually create the
         # return value for the current call.
         with self._required_annotation(required_annotation_prop):
-            return self._add_q(q_object, **self._build_filter_to_add_q_kwargs(**kwargs))
+            # The (_)add_q method has different names in different Django
+            # versions. Which one to use can be determined by the presence of
+            # positional arguments, which were only used in very old versions,
+            # where the method was called "add_q".
+            method = getattr(self, 'add_q' if args else '_add_q')
+            return method(q_object, **self._build_filter_to_add_q_kwargs(**kwargs))
 
     def names_to_path(self, names, *args, **kwargs):
         # This method is called when Django tries to resolve field names. If
