@@ -45,7 +45,7 @@ class TestQueryFilters(object):
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_with_required_annotation(self, versions, model):
-        version_model = model.objects.first().versions.model
+        version_model = model.objects.all()[0].versions.model
         version_model.objects.filter(version='2.0.0')[0].delete()
         queryset = model.objects.filter(highest_version='2.0.0')
         assert 'highest_version' in queryset.query.annotations

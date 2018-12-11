@@ -488,5 +488,7 @@ else:  # pragma: no cover
         def get_queryset(self):
             return QueryablePropertiesQuerySet(self.model, using=self._db)
 
+        get_query_set = get_queryset
+
         def select_properties(self, *names):
             return self.get_queryset().select_properties(*names)
