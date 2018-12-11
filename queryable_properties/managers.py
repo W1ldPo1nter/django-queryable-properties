@@ -172,7 +172,7 @@ class QueryablePropertiesQueryMixin(object):
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
         return self.annotations[prop.name]
 
-    def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):
+    def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
         # This method is called in older versions to add an aggregation or
         # annotation. Since both might be based on a queryable property, an
         # auto-annotation has to occur here.
@@ -434,42 +434,50 @@ class QueryablePropertiesQuerySetMixin(object):
         kwargs = self._resolve_update_kwargs(**kwargs)
         return super(QueryablePropertiesQuerySetMixin, self).update(**kwargs)
 
-    def _fetch_all(self):
+    def iterator(self, *args, **kwargs):
         # Annotation caching magic happens here: If this queryset is about to
-        # actually perform an SQL query (i.e. there are no cached results yet)
-        # and this queryset returns model instances, the queryable property
-        # annotations need to be renamed so Django doesn't call their setter.
-        super_method = super(QueryablePropertiesQuerySetMixin, self)._fetch_all
-        if self._result_cache is not None or not self._returns_model_instances:
-            super_method()
-            return
-
+        # actually perform an SQL query and this queryset returns model
+        # instances, the queryable property annotations need to be renamed so
+        # Django doesn't call their setter.
+        changed_aliases = {}
         original_query = self.query
+
         try:
             # Do the renaming and the actual query execution on a clone of the
             # current query object. That way, the query object can then be
             # changed back to the original one where nothing was renamed and
             # can be used for the constructions of further querysets based on
             # this one.
-            self.query = getattr(original_query, 'chain', original_query.clone)()
-            changed_aliases = self._change_queryable_property_aliases()
-            super_method()
+            if self._returns_model_instances:
+                self.query = getattr(original_query, 'chain', original_query.clone)()
+                changed_aliases = self._change_queryable_property_aliases()
+
+            for obj in super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs):
+                # Retrieve the annotation values from each renamed attribute
+                # and use it to populate the cache for the corresponding
+                # queryable property on each object while removing the weird,
+                # renamed attributes.
+                for prop, changed_name in six.iteritems(changed_aliases):
+                    value = getattr(obj, changed_name)
+                    delattr(obj, changed_name)
+                    # The following check is only required for older Django
+                    # versions, where all annotations were necessarily
+                    # selected. Therefore values that have been selected only
+                    # due to this will simply be discarded.
+                    if self.query._queryable_property_annotations[prop]:
+                        prop._set_cached_value(obj, value)
+                yield obj
         finally:
             self.query = original_query
 
-        # Retrieve the annotation values from each renamed attribute and use it
-        # to populate the cache for the corresponding queryable property on
-        # each object. Remove the weird, renamed attributes afterwards.
-        for prop, changed_name in six.iteritems(changed_aliases):
-            for obj in self._result_cache:
-                value = getattr(obj, changed_name)
-                delattr(obj, changed_name)
-                # The following check is only required for older Django
-                # versions, where all annotations were necessarily selected.
-                # Therefore values that have been selected only due to this
-                # will simply be discarded.
-                if self.query._queryable_property_annotations[prop]:
-                    prop._set_cached_value(obj, value)
+    def _fetch_all(self):
+        # Make sure the overridden iterator() implementation is used to
+        # populate the cache (which isn't what happens by default in all Django
+        # versions).
+        # TODO: Swap to a solution that doesn't require this.
+        if self._result_cache is None:
+            self._result_cache = list(self.iterator())
+        super(QueryablePropertiesQuerySetMixin, self)._fetch_all()
 
 
 class QueryablePropertiesQuerySet(QueryablePropertiesQuerySetMixin, QuerySet):
