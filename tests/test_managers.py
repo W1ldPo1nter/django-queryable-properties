@@ -19,20 +19,27 @@ from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecorat
 @pytest.mark.django_db
 class TestQueryFilters(object):
 
-    @pytest.mark.parametrize('model, major_minor, expected_count', [
-        (VersionWithClassBasedProperties, '1.2', 2),
-        (VersionWithClassBasedProperties, '1.3', 4),
-        (VersionWithClassBasedProperties, '2.0', 2),
-        (VersionWithDecoratorBasedProperties, '1.2', 2),
-        (VersionWithDecoratorBasedProperties, '1.3', 4),
-        (VersionWithDecoratorBasedProperties, '2.0', 2),
-    ])
-    def test_simple_filter(self, versions, model, major_minor, expected_count):
+    @pytest.mark.parametrize('model, filters, expected_count, expected_major_minor', [
+        # All querysets are expected to return objects with the same
+        # major_minor value (major_minor parameter).
+        (VersionWithClassBasedProperties, models.Q(major_minor='1.2'), 2, '1.2'),
+        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.2'), 2, '1.2'),
         # Also test that using non-property filters still work and can be used
         # together with filters for queryable properties
-        queryset = model.objects.filter(major_minor=major_minor, major=major_minor[0])
+        (VersionWithClassBasedProperties, models.Q(major_minor='1.3') & models.Q(major=1), 4, '1.3'),
+        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.3') & models.Q(major=1), 4, '1.3'),
+        (VersionWithClassBasedProperties, models.Q(major_minor='1.3') | models.Q(patch=1), 4, '1.3'),
+        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.3') | models.Q(patch=1), 4, '1.3'),
+        # Also test nested filters
+        (VersionWithClassBasedProperties, (models.Q(major_minor='2.0') | models.Q(patch=0)) & models.Q(minor=0),
+         2, '2.0'),
+        (VersionWithDecoratorBasedProperties, (models.Q(major_minor='2.0') | models.Q(patch=0)) & models.Q(minor=0),
+         2, '2.0'),
+    ])
+    def test_simple_filter(self, versions, model, filters, expected_count, expected_major_minor):
+        queryset = model.objects.filter(filters)
         assert len(queryset) == expected_count
-        assert all(obj.major_minor == major_minor for obj in queryset)
+        assert all(obj.major_minor == expected_major_minor for obj in queryset)
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_filter_without_required_annotation(self, versions, model):
@@ -162,6 +169,14 @@ class TestQueryAnnotations(object):
     def test_aggregation_based_on_queryable_property(self, versions, model):
         result = model.objects.aggregate(total_version_count=models.Sum('version_count'))
         assert result['total_version_count'] == len(versions) / 2  # List contains objects for both approaches
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_iterator(self, versions, model):
+        queryset = model.objects.filter(major_minor='2.0').select_properties('version')
+        for version in queryset.iterator():
+            assert model.version._has_cached_value(version)
+            assert version.version == '2.0.0'
+        assert queryset._result_cache is None
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_annotater(self, model):
