@@ -6,17 +6,10 @@ from contextlib import contextmanager
 import uuid
 
 from django.db.models import Manager
-from django.db.models.constants import LOOKUP_SEP
 from django.db.models.query import QuerySet
 from django.utils import six
 
-try:  # pragma: no cover
-    from django.db.models.query import ModelIterable
-    ValuesQuerySet = None
-except ImportError:  # pragma: no cover
-    from django.db.models.query import ValuesQuerySet
-    ModelIterable = None
-
+from .compat import LOOKUP_SEP, ModelIterable, ValuesQuerySet
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, inject_mixin
 
@@ -184,7 +177,7 @@ class QueryablePropertiesQueryMixin(object):
         model = model or self.model
         return super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, model, alias, is_summary)
 
-    def add_filter(self, *args, **kwargs):
+    def add_filter(self, *args, **kwargs):  # pragma: no cover
         base = super(QueryablePropertiesQueryMixin, self)
         # The build_filter method was called add_filter in very old Django
         # versions. Since recent versions still have an add_filter method (for

@@ -3,9 +3,9 @@
 from __future__ import unicode_literals
 
 from django.db.models import Q
-from django.db.models.constants import LOOKUP_SEP
 from django.utils import six
 
+from .compat import LOOKUP_SEP
 from .utils import inject_mixin, reset_queryable_property
 
 RESET_METHOD_NAME = 'reset_property'
