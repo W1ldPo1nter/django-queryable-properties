@@ -1,4 +1,6 @@
 # encoding: utf-8
+"""Tests for the compat, managers and query modules that perform actual queries."""
+
 import pytest
 
 from django import VERSION as DJANGO_VERSION
@@ -14,6 +16,16 @@ from queryable_properties.exceptions import QueryablePropertyError
 
 from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+
+
+@pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+def test_query_attributes(model):
+    queryset = model.objects.all()
+    # Also test the initializer of the QueryMixin by creating a new instance
+    queries = (queryset.query, queryset.query.__class__(queryset.model))
+    for query in queries:
+        assert query._queryable_property_annotations == {}
+        assert query._required_annotation_stack == []
 
 
 @pytest.mark.django_db
@@ -179,6 +191,17 @@ class TestQueryAnnotations(object):
         assert queryset._result_cache is None
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_removed_annotation(self, versions, model):
+        """
+        Test that queries can still be performed even if queryable property annotations have been manually removed from
+        the queryset.
+        """
+        queryset = model.objects.select_properties('version')
+        del queryset.query.annotations['version']
+        assert bool(queryset)
+        assert all(not model.version._has_cached_value(obj) for obj in queryset)
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_annotater(self, model):
         with pytest.raises(QueryablePropertyError):
             model.objects.select_properties('major_minor')
@@ -229,7 +252,7 @@ class TestUpdateQueries(object):
 
 
 @pytest.mark.django_db
-class TestOrdering(object):
+class TestQueryOrdering(object):
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
