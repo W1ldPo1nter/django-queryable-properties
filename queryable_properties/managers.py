@@ -136,7 +136,7 @@ class QueryablePropertiesQuerySetMixin(object):
 
             # Older Django versions only work with the annotation select dict
             # when it comes to ordering, so queryable property annotations used
-            # for ordering must be renamed in the queries ordering as well.
+            # for ordering must be renamed in the query's ordering as well.
             if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:  # pragma: no cover
                 for i, field_name in enumerate(self.query.order_by):
                     if field_name == prop.name or field_name[1:] == prop.name:

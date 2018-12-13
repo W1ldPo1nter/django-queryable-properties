@@ -62,17 +62,13 @@ class QueryablePropertiesQueryMixin(object):
         :return: The queryable property (if one could be resolved) or None.
         :rtype: queryable_properties.properties.QueryableProperty | None
         """
+        # Currently, only properties defined directly at the model associated
+        # with this query are supported. Therefore only check the first part
+        # of the path.
         try:
-            prop = get_queryable_property(self.model, path[0])
+            return get_queryable_property(self.model, path[0])
         except QueryablePropertyDoesNotExist:
             return None
-
-        # Currently, only properties defined directly at the model associated
-        # with this query are supported.
-        if len(path) > 2:
-            raise QueryablePropertyError('Cannot resolve queryable property filter "{}". It may only consist of '
-                                         'the property name and a single lookup.'.format(path))
-        return prop
 
     def _auto_annotate(self, path):
         """
@@ -190,16 +186,6 @@ class QueryablePropertiesQueryMixin(object):
             # versions (see comment on the constant definition).
             method = getattr(self, ADD_Q_METHOD_NAME)
             return method(q_object, **convert_build_filter_to_add_q_kwargs(**kwargs))
-
-    def names_to_path(self, names, *args, **kwargs):
-        # This method is called when Django tries to resolve field names. If
-        # a queryable property is used, it needs to be auto-annotated and its
-        # infos must be returned instead of calling Django's default
-        # implementation.
-        property_annotation = self._auto_annotate(names)
-        if property_annotation:
-            return [], property_annotation.output_field, (property_annotation.output_field,), []
-        return super(QueryablePropertiesQueryMixin, self).names_to_path(names, *args, **kwargs)
 
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False):
         # This method is used to resolve field names in complex expressions. If
