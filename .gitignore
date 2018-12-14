@@ -31,18 +31,14 @@ coverage.xml
 *,cover
 .hypothesis/
 .pytest_cache
+queryable_properties.db
 
 # Translations
 *.mo
 *.pot
 
-# Complexity
-reports/*.html
-reports/*/index.html
-
 # Sphinx
 docs/_build
-docs/queryable_properties.rst
 
 # IDE
 .idea/
