@@ -89,3 +89,6 @@ ApplicationVersion.objects.filter(version_str='1.1')
 ApplicationVersion.objects.exclude(version_str='1.2')
 ...
 ```
+
+These filters may also be combined with filters for other fields or queryable properties and can also be used in nested
+filter expressions using `Q` objects, i.e. the queryable properties can be treated like a regular model field.

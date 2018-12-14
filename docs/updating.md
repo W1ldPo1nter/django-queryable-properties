@@ -37,7 +37,7 @@ class ApplicationVersion(models.Model):
 
 Using the class-based approach, the same thing can be achieved by implementing the `get_update_kwargs` method of the
 property class.
-It is recommended to use the `UpdaterMixin` for class-based queryable properties that are supposed to be used in
+It is recommended to use the `UpdateMixin` for class-based queryable properties that are supposed to be used in
 queryset updates because it defines the actual stub for the `get_update_kwargs` method.
 However, using this mixin is not required - a queryable property can be used for queryset updates as long as the 
 `get_update_kwargs` method is implemented correctly.

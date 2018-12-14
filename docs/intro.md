@@ -4,10 +4,10 @@
 1) Properties are added to a model class which are based on model field values of its instances.
    These properties may even be based on some related model objects and therefore perform additional database queries.
 2) The code base grows and needs to be able to satisfy new demands.
-3) The logic of the properties from step 1 is now required in batch operations (read: queryset operations), making the
-   current implementation not feasible anymore, as it would likely perform additional queries per object or filtering
-   by a property is not possible.
-   
+3) The logic of the properties from step 1 would now be useful in batch operations (read: queryset operations), making
+   the current implementation less feasible, as it would likely perform additional queries per object in a queryset
+   operation. Also, regular properties do of course not offer queryset features like filtering, ordering, etc.
+
 Since Django offers a lot of powerful options when working with querysets (like `select_related`, annotations, etc.),
 it is generally not an issue to solve these problems and implement a solution, which will likely be based on one of the
 following options (from bad to good):
@@ -16,7 +16,7 @@ following options (from bad to good):
 - Implementing functions/methods that perform the annotations to avoid duplicating code.
 - Implementing a custom model manager/queryset class to allow the usage of these special annotations whenever dealing
   with a queryset.
-  
+
 While especially the latter options are not *wrong*, they do require some boilerplate and will likely split up the
 business logic into multiple parts (e.g. the property for single objects is implemented on the model class while
 the corresponding annotation for batch operations is part of a queryset class), making it harder to apply changes to
