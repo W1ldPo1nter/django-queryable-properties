@@ -71,9 +71,9 @@ class QueryableProperty(object):
     descriptors with some added methods for queryset interaction.
     """
 
-    cached = False  # Determines if the result of the getter is cached, like Django's cached_property
-    setter_cache_behavior = CLEAR_CACHE  # Determines what happens if the setter of a cached property is used
-    filter_requires_annotation = False  # Determines if using the property to filter requires annotating first
+    cached = False  #: Determines if the result of the getter is cached, like Django's cached_property.
+    setter_cache_behavior = CLEAR_CACHE  #: Determines what happens if the setter of a cached property is used.
+    filter_requires_annotation = False  #: Determines if using the property to filter requires annotating first.
 
     # Set the attributes of mixin methods to None for easier checks if a
     # property implements them
