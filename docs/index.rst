@@ -14,7 +14,6 @@ Use Django model properties in database queries.
    annotations
    updating
    api
-   license
 
 Indices and tables
 ==================
