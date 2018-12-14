@@ -1,0 +1,10 @@
+# Common requirements for envs created by tox
+# Additional, version-dependent requirements can be found in tox.ini
+coverage==4.5.1
+flake8==3.5.0
+mock==2.0.0
+pydocstyle==2.1.1
+pytest==3.6.2
+pytest-pep8==1.0.6
+pytest-cov==2.5.1
+pytest-pythonpath==0.7.2
