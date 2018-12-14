@@ -350,8 +350,9 @@ class queryable_property(QueryableProperty):
     def getter(self, method=None, cached=False):
         """
         Decorator for a function or method that is used as the getter of this
-        queryable property. May be used as a parameter-less decorator (@getter)
-        or as a decorator with keyword args (@getter(cached=True)).
+        queryable property. May be used as a parameter-less decorator
+        (``@getter``) or as a decorator with keyword args
+        (``@getter(cached=True)``).
 
         :param method: The method to decorate. If it is None, the parameterized
                        usage of this decorator is assumed, so this method
@@ -370,9 +371,9 @@ class queryable_property(QueryableProperty):
     def setter(self, method=None, cache_behavior=CLEAR_CACHE):
         """
         Decorator for a function or method that is used as the setter of this
-        queryable property. May be used as a parameter-less decorator (@setter)
-        or as a decorator with keyword args
-        (@setter(cache_behavior=DO_NOTHING)).
+        queryable property. May be used as a parameter-less decorator
+        (``@setter``) or as a decorator with keyword args
+        (``@setter(cache_behavior=DO_NOTHING)``).
 
         :param method: The method to decorate.
         :param cache_behavior: A function that defines how the setter interacts
@@ -390,8 +391,8 @@ class queryable_property(QueryableProperty):
         """
         Decorator for a function or method that is used to generate a filter
         for querysets to emulate filtering by this queryable property. May be
-        used as a parameter-less decorator (@filter) or as a decorator with
-        keyword args (@filter(requires_annotation=False)).
+        used as a parameter-less decorator (``@filter``) or as a decorator with
+        keyword args (``@filter(requires_annotation=False)``).
 
         :param method: The method to decorate. If it is None, the parameterized
                        usage of this decorator is assumed, so this method
