@@ -12,7 +12,7 @@ from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRI
                      LOOKUP_SEP, ModelIterable, ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QueryablePropertiesQueryMixin
-from .utils import get_queryable_property, inject_mixin
+from .utils import get_queryable_property, MixinInjector
 
 
 class QueryablePropertiesModelIterable(object):
@@ -154,15 +154,16 @@ class QueryablePropertiesQuerySetMixin(object):
         if not isinstance(self.query, QueryablePropertiesQueryMixin):
             self.query = chain_query(self.query)
             class_name = 'QueryableProperties' + self.query.__class__.__name__
-            inject_mixin(self.query, QueryablePropertiesQueryMixin, class_name,
-                         _queryable_property_annotations={}, _required_annotation_stack=[])
+            MixinInjector.inject_into_object(self.query, QueryablePropertiesQueryMixin, class_name,
+                                             _queryable_property_annotations={}, _required_annotation_stack=[])
         # Mix the QueryablePropertiesModelIterable into the iterable class of
         # this queryset if it is a ModelIterable in recent Django versions.
         # That way, other custom iterables based on ModelIterable should also
         # work.
         if ModelIterable and issubclass(self._iterable_class, ModelIterable):
-            class_name = str('QueryableProperties' + self._iterable_class.__name__)
-            self._iterable_class = type(class_name, (QueryablePropertiesModelIterable, self._iterable_class), {})
+            class_name = 'QueryableProperties' + self._iterable_class.__name__
+            self._iterable_class = MixinInjector.create_class(self._iterable_class, QueryablePropertiesModelIterable,
+                                                              class_name)
 
     def _clone(self, *args, **kwargs):
         clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
@@ -172,7 +173,7 @@ class QueryablePropertiesQuerySetMixin(object):
         # functionality.
         if not isinstance(clone, QueryablePropertiesQuerySetMixin):  # pragma: no cover
             class_name = 'QueryableProperties' + clone.__class__.__name__
-            inject_mixin(clone, QueryablePropertiesQuerySetMixin, class_name)
+            MixinInjector.inject_into_object(clone, QueryablePropertiesQuerySetMixin, class_name)
         return clone
 
     def _resolve_update_kwargs(self, **kwargs):
