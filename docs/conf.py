@@ -12,11 +12,25 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
 
 from recommonmark.transform import AutoStructify
 from recommonmark.parser import CommonMarkParser
+from recommonmark.states import DummyStateMachine
+
+original_run_role = DummyStateMachine.run_role
+
+
+def run_role(self, name, options=None, content=None):
+    if name == 'doc':
+        name = 'any'
+    return original_run_role(self, name, options, content)
+
+
+# Monkey patch to fix recommonmark 0.4 doc reference issues.
+DummyStateMachine.run_role = run_role
+
 
 # If extensions (or modules to document with autodoc) are in another
 # directory, add these directories to sys.path here. If the directory is
@@ -70,7 +84,7 @@ source_suffix = ['.rst', '.md']
 master_doc = 'index'
 
 # General information about the project.
-project = u'Queryable Properties'
+project = u'django-queryable-properties'
 copyright = u'2018, Marcus Klöpfel'
 
 # The version info for the project you're documenting, acts as replacement
@@ -94,7 +108,7 @@ release = meta['__version__']
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build', '**/migrations', '**/south_migrations']
+exclude_patterns = ['_build']
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -223,9 +237,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ('index', 'queryable_properties.tex',
-     u'Queryable Properties Documentation',
-     u'Marcus Klöpfel', 'manual'),
+    ('index', 'queryable_properties.tex', u'django-queryable-properties Documentation', u'Marcus Klöpfel', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at
@@ -254,9 +266,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'queryable_properties',
-     u'Queryable Properties Documentation',
-     [u'Marcus Klöpfel'], 1)
+    ('index', 'queryable_properties', u'django-queryable-properties Documentation', [u'Marcus Klöpfel'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -269,8 +279,9 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    ('index', 'queryable_properties',
-     u'Queryable Properties Documentation',
+    ('index',
+     'queryable_properties',
+     u'django-queryable-properties Documentation',
      u'Marcus Klöpfel',
      'queryable_properties',
      'Use Django model properties in database queries.',
@@ -291,4 +302,5 @@ texinfo_documents = [
 
 
 def setup(app):
+    app.add_config_value('recommonmark_config', {'enable_eval_rst': True}, True)
     app.add_transform(AutoStructify)

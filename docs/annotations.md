@@ -87,7 +87,7 @@ implement filtering on its own.
 For decorator-based properties using the `annotater` decorator, it also automatically sets `filter_requires_annotation`
 to `True` unless another value was specified (see the following example).
 
-If the filter implementation shown in the (TODO: ref) chapter (which does not require the annotation and should
+If the filter implementation shown in the [filtering chapter](filters.md) (which does not require the annotation and should
 therefore be configured accordingly) was to be retained despite annotating being implemented, the implementation could
 look like this using the decorator-based approach (note the `requires_annotation=False`):
 ```python
@@ -196,7 +196,7 @@ for version in ApplicationVersion.objects.select_properties('version_str'):
 ```
 
 To be able to make use of this performance-oriented feature, **all explicitly selected queryable properties will always
-behave like cached queryable properties** (TODO: ref) on the model instances returned by the queryset.
+behave like [cached queryable properties](standard_features.md)** on the model instances returned by the queryset.
 If this wasn't the case, accessing uncached queryable properties on model instances would always execute their default
 behavior: calling the getter.
 This would make the selection of the annotations useless to begin with, as the getter would called regardless and no
@@ -204,4 +204,4 @@ performance gain could be achieved by the queryset operation.
 By instead behaving like cached queryable properties, one can make use of the queried values, which will be cached for
 any number of consecutive accesses of the property on model objects returned by the queryset.
 If it is desired to not access the cached values anymore, the cached value can always be cleared as described in
-TODO: ref.
+[Resetting a cached property](standard_features.md).

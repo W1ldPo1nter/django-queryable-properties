@@ -1,4 +1,4 @@
-# Queryset updates
+# Update queries
 
 Queryable properties offer the option to use the names of properties in batch updates (i.e. when using the `update`
 method of querysets).

@@ -12,7 +12,7 @@ implementing it, as long as we don't try to filter a queryset by such a property
 .. note::
    Implementing how to filter by a queryable property is not necessary for properties that also implement annotating,
    because an annotated field in a queryset natively supports filtering. Read more about this in the documentation for
-   annotatable queryable properties (TODO: ref).
+   :doc:`annotatable queryable properties <annotations>`.
 ```
 
 To implement (custom) filtering using the decorator-based approach, the property's `filter` method must be used.
