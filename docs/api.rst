@@ -26,7 +26,7 @@ Module ``queryable_properties.utils``
 
 .. automodule:: queryable_properties.utils
    :members:
-   :exclude-members: inject_mixin
+   :exclude-members: MixinInjector
 
 Module ``queryable_properties.exceptions``
 ------------------------------------------
