@@ -1,7 +1,11 @@
 # encoding: utf-8
 
-from .properties import (  # noqa
-    AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING, QueryableProperty, queryable_property,
-    SetterMixin, UpdateMixin
-)
-from .version import __version__  # noqa
+from __future__ import unicode_literals
+
+__version__ = '0.1.0'
+__author__ = 'Marcus Klöpfel'
+__copyright__ = 'Copyright 2018, Marcus Klöpfel'
+__license__ = 'BSD'
+__maintainer__ = 'Marcus Klöpfel'
+__email__ = 'marcus.kloepfel@gmail.com'
+__status__ = 'Pre-Alpha'

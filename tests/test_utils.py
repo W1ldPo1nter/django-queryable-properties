@@ -2,8 +2,8 @@
 from mock import Mock
 import pytest
 
-from queryable_properties import QueryableProperty
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
+from queryable_properties.properties import QueryableProperty
 from queryable_properties.utils import get_queryable_property, MixinInjector
 
 from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties

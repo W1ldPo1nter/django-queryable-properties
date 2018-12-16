@@ -5,8 +5,9 @@ try:
 except ImportError:
     Concat = None
 
-from queryable_properties import AnnotationMixin, QueryableProperty, queryable_property, SetterMixin, UpdateMixin
 from queryable_properties.managers import QueryablePropertiesManager
+from queryable_properties.properties import (AnnotationMixin, QueryableProperty, queryable_property, SetterMixin,
+                                             UpdateMixin)
 
 
 class DummyProperty(SetterMixin, QueryableProperty):
