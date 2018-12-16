@@ -8,7 +8,7 @@ Queryable properties define their getter method the same way as regular properti
 approach:
 
 ```python
-from queryable_properties import queryable_property
+from queryable_properties.properties import queryable_property
 
 
 class ApplicationVersion(models.Model):
@@ -24,7 +24,7 @@ Using the class-based approach, the queryable property's method `get_value` must
 model object to retrieve the value from as its only parameter:
 
 ```python
-from queryable_properties import QueryableProperty
+from queryable_properties.properties import QueryableProperty
 
 
 class VersionStringProperty(QueryableProperty):
@@ -44,7 +44,7 @@ will retrieve the cached value (unless the property is reset on a model object, 
 To use this feature with the decorator-based approach, simply pass the `cached` parameter with the value `True` to the
 `queryable_property` constructor:
 ```python
-from queryable_properties import queryable_property
+from queryable_properties.properties import queryable_property
 
 
 class ApplicationVersion(models.Model):
@@ -59,7 +59,7 @@ class ApplicationVersion(models.Model):
 Using the class-based approach, the class attribute `cached` can be set to `True` instead (it would also be possible
 to set this attribute on individual instances of the queryable property instead):
 ```python
-from queryable_properties import QueryableProperty
+from queryable_properties.properties import QueryableProperty
 
 
 class VersionStringProperty(QueryableProperty):
@@ -107,7 +107,7 @@ reset_queryable_property(obj, 'version_str')
 Setter methods can be defined in the exact same way as they would be on regular properties when using the
 decorator-based approach:
 ```python
-from queryable_properties import queryable_property
+from queryable_properties.properties import queryable_property
 
 
 class ApplicationVersion(models.Model):
@@ -132,7 +132,7 @@ the actual stub for the `set_value` method.
 However, using this mixin is not required - a queryable property can be set as long as the `set_value` method is
 implemented correctly.
 ```python
-from queryable_properties import QueryableProperty, SetterMixin
+from queryable_properties.properties import QueryableProperty, SetterMixin
 
 
 class VersionStringProperty(SetterMixin, QueryableProperty):
@@ -184,7 +184,7 @@ Instead, `CACHE_RETURN_VALUE` will be used to ensure the correct getter format f
 To achieve this using the decorator-based approach, the `cache_behavior` parameter of the `setter` decorator must be
 used:
 ```python
-from queryable_properties import CACHE_RETURN_VALUE, queryable_property
+from queryable_properties.properties import CACHE_RETURN_VALUE, queryable_property
 
 
 class ApplicationVersion(models.Model):
@@ -207,7 +207,7 @@ class ApplicationVersion(models.Model):
 
 For the class-based approach, the class (or instance) attribute `setter_cache_behavior` must be set:
 ```python
-from queryable_properties import CACHE_RETURN_VALUE, QueryableProperty, SetterMixin
+from queryable_properties.properties import CACHE_RETURN_VALUE, QueryableProperty, SetterMixin
 
 
 class VersionStringProperty(SetterMixin, QueryableProperty):

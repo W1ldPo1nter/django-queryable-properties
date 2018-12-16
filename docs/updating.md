@@ -10,7 +10,7 @@ Let's use the `version_str` of the `ApplicationVersion` model as an example once
 To allow the usage of this queryable property in queryset updates using the decorator-based approach, the property's
 `updater` method must be used.
 ```python
-from queryable_properties import queryable_property
+from queryable_properties.properties import queryable_property
 
 
 class ApplicationVersion(models.Model):
@@ -42,7 +42,7 @@ queryset updates because it defines the actual stub for the `get_update_kwargs` 
 However, using this mixin is not required - a queryable property can be used for queryset updates as long as the 
 `get_update_kwargs` method is implemented correctly.
 ```python
-from queryable_properties import QueryableProperty, UpdateMixin
+from queryable_properties.properties import QueryableProperty, UpdateMixin
 
 
 class VersionStringProperty(UpdateMixin, QueryableProperty):

@@ -14,7 +14,8 @@ same result.
 
 Using the decorator-based approach (looks just like a regular property):
 ```python
-from queryable_properties import queryable_property
+from django.db import models
+from queryable_properties.properties import queryable_property
 
 
 class ApplicationVersion(models.Model):
@@ -32,7 +33,8 @@ class ApplicationVersion(models.Model):
 
 Using the class-based approach:
 ```python
-from queryable_properties import QueryableProperty, SetterMixin
+from django.db import models
+from queryable_properties.properties import QueryableProperty, SetterMixin
 
 
 class VersionStringProperty(SetterMixin, QueryableProperty):

@@ -19,7 +19,7 @@ To implement (custom) filtering using the decorator-based approach, the property
 The following code block contains an example for the `version_str` property from previous examples:
 ```python
 from django.db.models import Q
-from queryable_properties import queryable_property
+from queryable_properties.properties import queryable_property
 
 
 class ApplicationVersion(models.Model):
@@ -50,7 +50,7 @@ To implement (custom) filtering using the class-based apprach, the `get_filter` 
 following code block contains an example for the `version_str` property from previous examples:
 ```python
 from django.db.models import Q
-from queryable_properties import QueryableProperty
+from queryable_properties.properties import QueryableProperty
 
 
 class VersionStringProperty(QueryableProperty):
@@ -91,4 +91,4 @@ ApplicationVersion.objects.exclude(version_str='1.2')
 ```
 
 These filters may also be combined with filters for other fields or queryable properties and can also be used in nested
-filter expressions using `Q` objects, i.e. the queryable properties can be treated like a regular model field.
+filter expressions using `Q` objects, i.e. the queryable properties can be treated like regular model fields.

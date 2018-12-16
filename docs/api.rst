@@ -4,10 +4,6 @@ API
 Module ``queryable_properties.properties``
 ------------------------------------------
 
-.. note::
-   All of the shown entities can be directly imported from ``queryable_properties`` as well as from
-   ``queryable_properties.properties``.
-
 .. automodule:: queryable_properties.properties
    :members:
    :member-order: bysource

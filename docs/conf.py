@@ -56,7 +56,7 @@ if 'setup' in dir(django):
 # exec version.py instead of importing it. Importing may trigger unwanted
 # side-effects (if autodoc is used, the pypackage may be imported anyway).
 meta = {}
-exec(open(os.path.join(project_root, 'queryable_properties', 'version.py')).read(), {}, meta)
+exec(open(os.path.join(project_root, 'queryable_properties', '__init__.py')).read(), {}, meta)
 
 # -- General configuration ---------------------------------------------
 
@@ -85,7 +85,10 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'django-queryable-properties'
-copyright = u'2018, Marcus Klöpfel'
+title = u'{} Documentation'.format(project)
+copyright = meta['__copyright__'].replace('Copyright', '').strip()
+author = meta['__author__']
+description = meta['__doc__']
 
 # The version info for the project you're documenting, acts as replacement
 # for |version| and |release|, also used in various other places throughout
@@ -237,7 +240,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ('index', 'queryable_properties.tex', u'django-queryable-properties Documentation', u'Marcus Klöpfel', 'manual'),
+    ('index', 'queryable_properties.tex', title, author, 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at
@@ -266,7 +269,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'queryable_properties', u'django-queryable-properties Documentation', [u'Marcus Klöpfel'], 1)
+    ('index', 'queryable_properties', title, [author], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -279,13 +282,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    ('index',
-     'queryable_properties',
-     u'django-queryable-properties Documentation',
-     u'Marcus Klöpfel',
-     'queryable_properties',
-     'Use Django model properties in database queries.',
-     'Miscellaneous'),
+    ('index', 'queryable_properties', title, author, 'queryable_properties', description, 'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.

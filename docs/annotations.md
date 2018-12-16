@@ -14,7 +14,7 @@ the property's `annotater` method must be used.
 ```python
 from django.db.models import Model, Value
 from django.db.models.functions import Concat
-from queryable_properties import queryable_property
+from queryable_properties.properties import queryable_property
 
 
 class ApplicationVersion(Model):
@@ -45,7 +45,7 @@ be used.
 ```python
 from django.db.models import Value
 from django.db.models.functions import Concat
-from queryable_properties import AnnotationMixin, QueryableProperty
+from queryable_properties.properties import AnnotationMixin, QueryableProperty
 
 
 class VersionStringProperty(AnnotationMixin, QueryableProperty):
@@ -93,7 +93,7 @@ look like this using the decorator-based approach (note the `requires_annotation
 ```python
 from django.db.models import Model, Q, Value
 from django.db.models.functions import Concat
-from queryable_properties import queryable_property
+from queryable_properties.properties import queryable_property
 
 
 class ApplicationVersion(Model):
@@ -123,7 +123,7 @@ For the class-based approach, the class (or instance) attribute `filter_requires
 ```python
 from django.db.models import Q, Value
 from django.db.models.functions import Concat
-from queryable_properties import AnnotationMixin, QueryableProperty
+from queryable_properties.properties import AnnotationMixin, QueryableProperty
 
 
 class VersionStringProperty(AnnotationMixin, QueryableProperty):
