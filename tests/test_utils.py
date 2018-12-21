@@ -1,10 +1,9 @@
 # encoding: utf-8
-from mock import Mock
 import pytest
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
-from queryable_properties.utils import get_queryable_property, MixinInjector
+from queryable_properties.utils import get_queryable_property, InjectableMixin
 
 from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 
@@ -16,7 +15,7 @@ class DummyClass(object):
         self.attr2 = attr2
 
 
-class DummyMixin(object):
+class DummyMixin(InjectableMixin):
 
     def __init__(self, attr1, attr2, mixin_attr1, mixin_attr2):
         super(DummyMixin, self).__init__(attr1, attr2)
@@ -49,32 +48,28 @@ class TestGetQueryableProperty(object):
 
 class TestMixinInjector(object):
 
-    @pytest.fixture
-    def injector(self, monkeypatch):
-        monkeypatch.setattr(MixinInjector, '_class_cache', {})
-        return Mock(wraps=MixinInjector)
-
     @pytest.mark.parametrize('class_name, expected_class_name', [
         (None, DummyClass.__name__),
         ('TestClass', 'TestClass'),
     ])
-    def test_create_class(self, injector, class_name, expected_class_name):
-        assert not injector._class_cache.keys()
+    def test_create_class(self, monkeypatch, class_name, expected_class_name):
+        monkeypatch.setattr(DummyMixin, '_created_classes', {})
+        assert not DummyMixin._created_classes
         created_classes = set()
 
         # Execute the code twice to test the cache
         for _ in range(2):
-            cls = injector.create_class(DummyClass, DummyMixin, class_name)
+            cls = DummyMixin.mix_with_class(DummyClass, class_name)
             created_classes.add(cls)
             assert issubclass(cls, DummyClass)
             assert issubclass(cls, DummyMixin)
             assert cls.__name__ == expected_class_name
-            assert len(injector._class_cache.keys()) == 1
+            assert len(DummyMixin._created_classes) == 1
             assert len(created_classes) == 1
 
-    def test_inject_into_object(self, injector):
+    def test_inject_into_object(self):
         obj = DummyClass(5, 'abc')
-        injector.inject_into_object(obj, DummyMixin, mixin_attr1=None, mixin_attr2=1.337)
+        DummyMixin.inject_into_object(obj, mixin_attr1=None, mixin_attr2=1.337)
         assert isinstance(obj, DummyClass)
         assert isinstance(obj, DummyMixin)
         assert obj.attr1 == 5
