@@ -39,23 +39,22 @@ def reset_queryable_property(obj, name):
     prop._clear_cached_value(obj)
 
 
-class MixinInjector(object):
+class InjectableMixin(object):
     """
-    A utility class to dynamically generate classes based on a base class and
-    a mixin and optionally changing an object's class to the generated class.
-    The injector also caches all of its created classes to speed up the process
-    if injection operations are called with the same parameters more than once.
+    A base class for mixin classes that are used to dynamically created classes
+    based on a base class and the mixin class.
     """
 
-    _class_cache = {}
+    # Intentionally use a single cache for all subclasses since it is in no way
+    # harmful to use a shared cache.
+    _created_classes = {}
 
     @classmethod
-    def create_class(cls, base_class, mixin_class, class_name=None):
+    def mix_with_class(cls, base_class, class_name=None):
         """
-        Create a new class based on the given base class and mixin class.
+        Create a new class based on the given base class and this mixin class.
 
         :param type base_class: The base class to mix the mixin into.
-        :param type mixin_class: The mixin class to add to the base class.
         :param class_name: An optional name for the dynamically created class.
                            If None is supplied (default), the class name of the
                            dynamically created class will be the one of the
@@ -64,22 +63,20 @@ class MixinInjector(object):
         :rtype: type
         """
         class_name = str(class_name or base_class.__name__)
-        cache_key = (base_class, mixin_class, class_name)
-        created_class = cls._class_cache.get(cache_key)
+        cache_key = (base_class, cls, class_name)
+        created_class = cls._created_classes.get(cache_key)
         if created_class is None:
-            created_class = cls._class_cache[cache_key] = type(class_name, (mixin_class, base_class), {})
+            created_class = cls._created_classes[cache_key] = type(class_name, (cls, base_class), {})
         return created_class
 
     @classmethod
-    def inject_into_object(cls, obj, mixin_class, class_name=None, **attrs):
+    def inject_into_object(cls, obj, class_name=None, **attrs):
         """
         Update the given object's class by dynamically generating a new class
-        based on the object's original class and the given mixin class and
-        changing the given object into an object of this new class.
+        based on the object's original class and this mixin class and changing
+        the given object into an object of this new class.
 
         :param obj: The object whose class should be changed.
-        :param type mixin_class: The mixin to inject into the class of the
-                                 given object.
         :param str class_name: An optional name for the dynamically created
                                class. If None is supplied (default), the class
                                name of the dynamically created class will be
@@ -89,6 +86,6 @@ class MixinInjector(object):
                       their initializer, which is not called when changing the
                       class of an object.
         """
-        obj.__class__ = cls.create_class(obj.__class__, mixin_class, class_name)
+        obj.__class__ = cls.mix_with_class(obj.__class__, class_name)
         for name, value in six.iteritems(attrs):
             setattr(obj, name, value)

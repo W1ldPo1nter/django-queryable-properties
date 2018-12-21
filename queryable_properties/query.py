@@ -5,10 +5,10 @@ from contextlib import contextmanager
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
                      convert_build_filter_to_add_q_kwargs, LOOKUP_SEP)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from .utils import get_queryable_property
+from .utils import get_queryable_property, InjectableMixin
 
 
-class QueryablePropertiesQueryMixin(object):
+class QueryablePropertiesQueryMixin(InjectableMixin):
     """
     A mixin for :class:`django.db.models.sql.Query` objects that extends the
     original Django objects to deal with queryable properties, e.g. managing

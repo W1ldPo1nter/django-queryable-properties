@@ -12,10 +12,10 @@ from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRI
                      LOOKUP_SEP, ModelIterable, ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QueryablePropertiesQueryMixin
-from .utils import get_queryable_property, MixinInjector
+from .utils import get_queryable_property, InjectableMixin
 
 
-class QueryablePropertiesModelIterable(object):
+class QueryablePropertiesModelIterable(InjectableMixin):
     """
     An iterable that yields model instances for each returned database row
     while correctly processing columns of queryable properties. It is closely
@@ -41,7 +41,7 @@ class QueryablePropertiesModelIterable(object):
         """
         self.queryset = queryset
         # Only perform the super call if the class is used as a mixin
-        if self.__class__.__bases__ != (object,):
+        if self.__class__.__bases__ != (InjectableMixin,):
             super(QueryablePropertiesModelIterable, self).__init__(queryset, **kwargs)
         self.iterable = iterable or super(QueryablePropertiesModelIterable, self).__iter__()
 
@@ -139,7 +139,7 @@ class QueryablePropertiesModelIterable(object):
         return changed_aliases
 
 
-class QueryablePropertiesQuerySetMixin(object):
+class QueryablePropertiesQuerySetMixin(InjectableMixin):
     """
     A mixin for Django's :class:`django.db.models.QuerySet` objects that allows
     to use queryable properties in filters, annotations and update queries.
@@ -154,16 +154,15 @@ class QueryablePropertiesQuerySetMixin(object):
         if not isinstance(self.query, QueryablePropertiesQueryMixin):
             self.query = chain_query(self.query)
             class_name = 'QueryableProperties' + self.query.__class__.__name__
-            MixinInjector.inject_into_object(self.query, QueryablePropertiesQueryMixin, class_name,
-                                             _queryable_property_annotations={}, _required_annotation_stack=[])
+            QueryablePropertiesQueryMixin.inject_into_object(self.query, class_name, _required_annotation_stack=[],
+                                                             _queryable_property_annotations={})
         # Mix the QueryablePropertiesModelIterable into the iterable class of
         # this queryset if it is a ModelIterable in recent Django versions.
         # That way, other custom iterables based on ModelIterable should also
         # work.
         if ModelIterable and issubclass(self._iterable_class, ModelIterable):
             class_name = 'QueryableProperties' + self._iterable_class.__name__
-            self._iterable_class = MixinInjector.create_class(self._iterable_class, QueryablePropertiesModelIterable,
-                                                              class_name)
+            self._iterable_class = QueryablePropertiesModelIterable.mix_with_class(self._iterable_class, class_name)
 
     def _clone(self, *args, **kwargs):
         clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
@@ -173,7 +172,7 @@ class QueryablePropertiesQuerySetMixin(object):
         # functionality.
         if not isinstance(clone, QueryablePropertiesQuerySetMixin):  # pragma: no cover
             class_name = 'QueryableProperties' + clone.__class__.__name__
-            MixinInjector.inject_into_object(clone, QueryablePropertiesQuerySetMixin, class_name)
+            QueryablePropertiesQuerySetMixin.inject_into_object(clone, class_name)
         return clone
 
     def _resolve_update_kwargs(self, **kwargs):

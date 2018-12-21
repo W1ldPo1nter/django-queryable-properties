@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils import six
 
 from .compat import LOOKUP_SEP
-from .utils import MixinInjector, reset_queryable_property
+from .utils import InjectableMixin, reset_queryable_property
 
 RESET_METHOD_NAME = 'reset_property'
 
@@ -205,7 +205,7 @@ class SetterMixin(object):
         raise NotImplementedError()
 
 
-class AnnotationMixin(object):
+class AnnotationMixin(InjectableMixin):
     """
     A mixin for queryable properties that allow to add an annotation to
     represent them to querysets.
@@ -427,7 +427,7 @@ class queryable_property(QueryableProperty):
         # properties defining an annotater are automatically filterable while
         # still having the option to register a custom filter method.
         if not clone.get_filter:
-            MixinInjector.inject_into_object(clone, AnnotationMixin)
+            AnnotationMixin.inject_into_object(clone)
         # If the programmer didn't explicitly set a value for
         # filter_requires_annotation, set it to True since the default filter
         # implementation of the annotation mixin does require the annotation.
