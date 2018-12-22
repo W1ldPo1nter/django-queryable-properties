@@ -1,9 +1,11 @@
 # encoding: utf-8
 import pytest
 
+from django.utils.six.moves import cPickle
+
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
-from queryable_properties.utils import get_queryable_property, InjectableMixin
+from queryable_properties.utils import get_queryable_property, InjectableMixin, InjectionOnlyMixin
 
 from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 
@@ -15,10 +17,18 @@ class DummyClass(object):
         self.attr2 = attr2
 
 
-class DummyMixin(InjectableMixin):
+class DummyInjectableMixin(InjectableMixin):
 
     def __init__(self, attr1, attr2, mixin_attr1, mixin_attr2):
-        super(DummyMixin, self).__init__(attr1, attr2)
+        super(DummyInjectableMixin, self).__init__(attr1, attr2)
+        self.mixin_attr1 = mixin_attr1
+        self.mixin_attr2 = mixin_attr2
+
+
+class DummyInjectionOnlyMixin(InjectionOnlyMixin):
+
+    def __init__(self, attr1, attr2, mixin_attr1, mixin_attr2):
+        super(DummyInjectionOnlyMixin, self).__init__(attr1, attr2)
         self.mixin_attr1 = mixin_attr1
         self.mixin_attr2 = mixin_attr2
 
@@ -46,33 +56,50 @@ class TestGetQueryableProperty(object):
             get_queryable_property(model, property_name)
 
 
-class TestMixinInjector(object):
+class TestInjectableMixin(object):
 
     @pytest.mark.parametrize('class_name, expected_class_name', [
         (None, DummyClass.__name__),
         ('TestClass', 'TestClass'),
     ])
     def test_create_class(self, monkeypatch, class_name, expected_class_name):
-        monkeypatch.setattr(DummyMixin, '_created_classes', {})
-        assert not DummyMixin._created_classes
+        monkeypatch.setattr(DummyInjectableMixin, '_created_classes', {})
+        assert not DummyInjectableMixin._created_classes
         created_classes = set()
 
         # Execute the code twice to test the cache
         for _ in range(2):
-            cls = DummyMixin.mix_with_class(DummyClass, class_name)
+            cls = DummyInjectableMixin.mix_with_class(DummyClass, class_name)
             created_classes.add(cls)
             assert issubclass(cls, DummyClass)
-            assert issubclass(cls, DummyMixin)
+            assert issubclass(cls, DummyInjectableMixin)
             assert cls.__name__ == expected_class_name
-            assert len(DummyMixin._created_classes) == 1
+            assert len(DummyInjectableMixin._created_classes) == 1
             assert len(created_classes) == 1
 
     def test_inject_into_object(self):
         obj = DummyClass(5, 'abc')
-        DummyMixin.inject_into_object(obj, mixin_attr1=None, mixin_attr2=1.337)
+        DummyInjectableMixin.inject_into_object(obj, mixin_attr1=None, mixin_attr2=1.337)
         assert isinstance(obj, DummyClass)
-        assert isinstance(obj, DummyMixin)
+        assert isinstance(obj, DummyInjectableMixin)
         assert obj.attr1 == 5
         assert obj.attr2 == 'abc'
         assert obj.mixin_attr1 is None
         assert obj.mixin_attr2 == 1.337
+
+
+class TestInjectionOnlyMixin(object):
+
+    def test_pickle_unpickle(self):
+        base_obj = DummyClass('xyz', 42.42)
+        DummyInjectionOnlyMixin.inject_into_object(base_obj, mixin_attr1='test', mixin_attr2=None)
+        serialized_obj = cPickle.dumps(base_obj)
+        deserialized_obj = cPickle.loads(serialized_obj)
+
+        for obj in (base_obj, deserialized_obj):
+            assert isinstance(obj, DummyClass)
+            assert isinstance(obj, DummyInjectionOnlyMixin)
+            assert obj.attr1 == 'xyz'
+            assert obj.attr2 == 42.42
+            assert obj.mixin_attr1 == 'test'
+            assert obj.mixin_attr2 is None
