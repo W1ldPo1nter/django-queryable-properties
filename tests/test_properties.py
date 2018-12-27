@@ -257,7 +257,7 @@ class TestDecorators(object):
         self.assert_cloned_property(original, clone,
                                     {'filter': func, 'filter_requires_annotation': expected_requires_annotation})
 
-    @pytest.mark.parametrize('init_kwargs, should_use_mixin, expected_requires_annotation', [
+    @pytest.mark.parametrize('init_kwargs, should_copy_filter_implementation, expected_requires_annotation', [
         ({'annotater': lambda: F('dummy')}, True, True),
         ({}, True, True),
         ({'filter_requires_annotation': False}, True, False),
@@ -266,7 +266,7 @@ class TestDecorators(object):
         ({'filter': lambda: Q(), 'filter_requires_annotation': False}, False, False),
         ({'filter': lambda: Q(), 'filter_requires_annotation': True}, False, True),
     ])
-    def test_annotater(self, init_kwargs, should_use_mixin, expected_requires_annotation):
+    def test_annotater(self, init_kwargs, should_copy_filter_implementation, expected_requires_annotation):
         original = queryable_property(**init_kwargs)
 
         def func():
@@ -274,10 +274,10 @@ class TestDecorators(object):
 
         clone = self.decorate_function(func, original.annotater)
         changed_attrs = {'annotater': func, 'filter_requires_annotation': expected_requires_annotation}
-        if should_use_mixin:
-            changed_attrs['filter'] = clone.get_filter
+        if should_copy_filter_implementation:
+            changed_attrs['filter'] = six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter),
+                                                              clone)
         self.assert_cloned_property(original, clone, changed_attrs)
-        assert isinstance(clone, AnnotationMixin) is should_use_mixin
 
     @pytest.mark.parametrize('old_value', [None, lambda: {}])
     def test_updater(self, old_value):

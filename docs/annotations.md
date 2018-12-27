@@ -81,9 +81,9 @@ Unlike the `SetterMixin` and the `UpdateMixin`, the `AnnotationMixin` does a bit
   filter and is therefore automatically set to `True` to make the default filter implementation mentioned in the
   previous point work.
 
-Because of this, the `AnnotationMixin` is not only relevant for the class-based approach.
-It will also be dynamically mixed into any decorator-based property that uses the `annotater` decorator and doesn't
-implement filtering on its own.
+Because of this, the functionality of the `AnnotationMixin` is not only relevant for the class-based approach.
+Decorator-based properties that use the `annotater` decorator and don't implement filtering on its own will act in the
+same way (although they don't use the mixin directly).
 For decorator-based properties using the `annotater` decorator, it also automatically sets `filter_requires_annotation`
 to `True` unless another value was specified (see the following example).
 

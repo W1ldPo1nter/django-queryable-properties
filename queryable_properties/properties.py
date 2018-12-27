@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils import six
 
 from .compat import LOOKUP_SEP
-from .utils import InjectableMixin, reset_queryable_property
+from .utils import reset_queryable_property
 
 RESET_METHOD_NAME = 'reset_property'
 
@@ -205,7 +205,7 @@ class SetterMixin(object):
         raise NotImplementedError()
 
 
-class AnnotationMixin(InjectableMixin):
+class AnnotationMixin(object):
     """
     A mixin for queryable properties that allow to add an annotation to
     represent them to querysets.
@@ -421,16 +421,16 @@ class queryable_property(QueryableProperty):
         :rtype: queryable_property
         """
         clone = self._clone(annotater=method)
-        # If an annotater is defined but a filter isn't, inject the
-        # AnnotationMixin into the clone to automatically use the default
-        # filter implementation based on an annotation. This way, all
-        # properties defining an annotater are automatically filterable while
-        # still having the option to register a custom filter method.
+        # If an annotater is defined but a filter isn't, use the default filter
+        # implementation based on an annotation from the AnnotationMixin. This
+        # way, all properties defining an annotater are automatically
+        # filterable while still having the option to register a custom filter
+        # method.
         if not clone.get_filter:
-            AnnotationMixin.inject_into_object(clone)
-        # If the programmer didn't explicitly set a value for
-        # filter_requires_annotation, set it to True since the default filter
-        # implementation of the annotation mixin does require the annotation.
+            clone.get_filter = six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter), clone)
+        # If no value was explicitly set a for filter_requires_annotation, set
+        # it to True since the default filter implementation of the
+        # AnnotationMixin acts the same way.
         if clone.filter_requires_annotation is None:
             clone.filter_requires_annotation = True
         return clone
