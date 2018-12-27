@@ -106,6 +106,12 @@ class TestBasics(object):
         with pytest.raises(KeyError):
             property_instance._get_cached_value(model_instance)
 
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_pickle_unpickle(self, model):
+        serialized_prop = six.moves.cPickle.dumps(model.version)
+        deserialized_prop = six.moves.cPickle.loads(serialized_prop)
+        assert deserialized_prop is model.version
+
 
 class TestAnnotationMixin(object):
 

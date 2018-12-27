@@ -25,6 +25,9 @@ def get_queryable_property(model, name):
     return prop
 
 
+get_queryable_property.__safe_for_unpickling__ = True
+
+
 def reset_queryable_property(obj, name):
     """
     Reset the cached value of the queryable property with the given name on the

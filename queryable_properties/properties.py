@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils import six
 
 from .compat import LOOKUP_SEP
-from .utils import reset_queryable_property
+from .utils import get_queryable_property, reset_queryable_property
 
 RESET_METHOD_NAME = 'reset_property'
 
@@ -109,6 +109,14 @@ class QueryableProperty(object):
         # a current cache value, invoke the configured setter cache behavior.
         if self.cached or self._has_cached_value(obj):
             self.setter_cache_behavior(self, obj, value, return_value)
+
+    def __reduce__(self):
+        # Since queryable property instances only make sense in the context of
+        # model classes, they can simply be pickled using their model class and
+        # name and loaded back from the model class when unpickling. This also
+        # saves memory as unpickled properties will be the exact same object as
+        # the one on the model class.
+        return get_queryable_property, (self.model, self.name)
 
     def get_value(self, obj):  # pragma: no cover
         """
