@@ -18,16 +18,6 @@ from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecorat
                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 
-@pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-def test_query_attributes(model):
-    queryset = model.objects.all()
-    # Also test the initializer of the QueryMixin by creating a new instance
-    queries = (queryset.query, queryset.query.__class__(queryset.model))
-    for query in queries:
-        assert query._queryable_property_annotations == {}
-        assert query._required_annotation_stack == []
-
-
 @pytest.mark.django_db
 class TestQueryFilters(object):
 
