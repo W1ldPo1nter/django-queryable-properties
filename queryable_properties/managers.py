@@ -156,16 +156,31 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
             class_name = 'QueryableProperties' + self.query.__class__.__name__
             QueryablePropertiesQueryMixin.inject_into_object(self.query, class_name, _required_annotation_stack=[],
                                                              _queryable_property_annotations={})
-        # Mix the QueryablePropertiesModelIterable into the iterable class of
-        # this queryset if it is a ModelIterable in recent Django versions.
-        # That way, other custom iterables based on ModelIterable should also
-        # work.
-        if ModelIterable and issubclass(self._iterable_class, ModelIterable):
-            class_name = 'QueryableProperties' + self._iterable_class.__name__
-            self._iterable_class = QueryablePropertiesModelIterable.mix_with_class(self._iterable_class, class_name)
+
+    @property
+    def _iterable_class(self):
+        # Override the regular _iterable_class attribute of recent Django
+        # versions with a property that also stores the value in the instance
+        # dict, but automatically mixes the QueryablePropertiesModelIterable
+        # into the base class on getter access if the base class yields model
+        # instances. That way, the queryable properties extensions stays
+        # compatible to custom iterable classes while querysets can still be
+        # pickled due to the base class being in the instance dict.
+        cls = self.__dict__['_iterable_class']
+        if not issubclass(cls, ModelIterable):
+            return cls
+        return QueryablePropertiesModelIterable.mix_with_class(cls, 'QueryableProperties' + cls.__name__)
+
+    @_iterable_class.setter
+    def _iterable_class(self, value):
+        self.__dict__['_iterable_class'] = value
 
     def _clone(self, *args, **kwargs):
         clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
+        # Since the _iterable_class property may return a dynamically created
+        # class, the value of a clone must be reset to the base class.
+        if '_iterable_class' in self.__dict__:
+            clone._iterable_class = self.__dict__['_iterable_class']
         # In older Django versions, the class of the property may be completely
         # replaced while cloning (e.g when using .values()). Therefore this
         # mixin might need to be re-injected to enable queryable properties
