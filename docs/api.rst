@@ -22,7 +22,7 @@ Module ``queryable_properties.utils``
 
 .. automodule:: queryable_properties.utils
    :members:
-   :exclude-members: InjectableMixin, InjectionOnlyMixin, _unpickle_injection_only_mixin
+   :exclude-members: InjectableMixin, _unpickle_injected_object
 
 Module ``queryable_properties.exceptions``
 ------------------------------------------

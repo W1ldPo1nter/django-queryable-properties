@@ -53,6 +53,8 @@ class InjectableMixin(object):
     def mix_with_class(cls, base_class, class_name=None):
         """
         Create a new class based on the given base class and this mixin class.
+        The created class will also receive a custom :meth:`__reduce__`
+        implementation to make its objects picklable.
 
         :param type base_class: The base class to mix the mixin into.
         :param class_name: An optional name for the dynamically created class.
@@ -66,7 +68,12 @@ class InjectableMixin(object):
         cache_key = (base_class, cls, class_name)
         created_class = cls._created_classes.get(cache_key)
         if created_class is None:
-            created_class = cls._created_classes[cache_key] = type(class_name, (cls, base_class), {})
+            # Make sure objects of a dynamically created class can be pickled.
+            def __reduce__(self):
+                return _unpickle_injected_object, (base_class, cls, class_name), self.__dict__
+
+            created_class = cls._created_classes[cache_key] = type(class_name, (cls, base_class),
+                                                                   {'__reduce__': __reduce__})
         return created_class
 
     @classmethod
@@ -91,36 +98,14 @@ class InjectableMixin(object):
             setattr(obj, name, value)
 
 
-class InjectionOnlyMixin(InjectableMixin):
-    """
-    A base class for mixin classes that are *only* used by being part of
-    dynamically created classes. Since objects of these dynamically created
-    classes cannot be pickled by default, this mixin implements special pickle
-    treatment for them.
-    """
-
-    def __reduce__(self):
-        unpickle_args = (
-            self._injection_meta['base_class'], self._injection_meta['mixin_class'], self.__class__.__name__)
-        return _unpickle_injection_only_mixin, unpickle_args, self.__dict__
-
-    @classmethod
-    def mix_with_class(cls, base_class, class_name=None):
-        created_class = super(InjectionOnlyMixin, cls).mix_with_class(base_class, class_name)
-        # Add some infos to the created class: when pickling, the orignal base
-        # class as well as the mixin class need to be known.
-        created_class._injection_meta = {'base_class': base_class, 'mixin_class': cls}
-        return created_class
-
-
 # This must be a standalone function for Python 2, where it could not be
-# pickled being a static method on the InjectionOnlyMixin, even if the
-# underlying function had the __safe_for_unpickling__ flag.
-def _unpickle_injection_only_mixin(base_class, mixin_class, class_name=None):
+# pickled being a static method on the InjectableMixin, even if the underlying
+# function had the __safe_for_unpickling__ flag.
+def _unpickle_injected_object(base_class, mixin_class, class_name=None):
     """
-    Callable for the pickler to unpickle and object that uses this mixin. It
-    creates the base object from the original base class and re-injects the
-    mixin class when unpickling an object.
+    Callable for the pickler to unpickle objects of a dynamically created class
+    based on the InjectableMixin. It creates the base object from the original
+    base class and re-injects the mixin class when unpickling an object.
 
     :param type base_class: The base class of the pickled object before adding
                             the mixin via injection.
@@ -136,4 +121,4 @@ def _unpickle_injection_only_mixin(base_class, mixin_class, class_name=None):
     return obj
 
 
-_unpickle_injection_only_mixin.__safe_for_unpickling__ = True
+_unpickle_injected_object.__safe_for_unpickling__ = True
