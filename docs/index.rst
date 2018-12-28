@@ -1,7 +1,7 @@
 django-queryable-properties
 ===========================
 
-Use Django model properties in database queries.
+Write Django model properties that can be used in database queries.
 
 .. toctree::
    :maxdepth: 1
