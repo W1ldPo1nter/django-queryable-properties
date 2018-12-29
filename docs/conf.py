@@ -12,7 +12,6 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import io
 import os
 import sys
 
@@ -57,7 +56,7 @@ if 'setup' in dir(django):
 # exec version.py instead of importing it. Importing may trigger unwanted
 # side-effects (if autodoc is used, the pypackage may be imported anyway).
 meta = {}
-exec(io.open(os.path.join(project_root, 'queryable_properties', '__init__.py'), encoding='utf-8').read(), {}, meta)
+exec(open(os.path.join(project_root, 'queryable_properties', '__init__.py'), 'rb').read(), {}, meta)
 
 # -- General configuration ---------------------------------------------
 
