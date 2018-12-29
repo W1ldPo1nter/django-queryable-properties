@@ -15,6 +15,8 @@
 import os
 import sys
 
+import django
+
 from recommonmark.transform import AutoStructify
 from recommonmark.parser import CommonMarkParser
 from recommonmark.states import DummyStateMachine
@@ -45,9 +47,6 @@ project_root = os.path.dirname(os.getcwd())
 # This lets us ensure that the source package is imported when autodoc is used
 # and that the django settings of the source package are imported.
 sys.path.insert(0, project_root)
-
-# Setup Django
-import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tests.settings')
 if 'setup' in dir(django):
