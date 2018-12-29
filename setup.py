@@ -3,25 +3,28 @@
 
 from __future__ import unicode_literals
 
-import distutils
+from distutils.cmd import Command
+from distutils.core import setup
+import os
 import subprocess
-from os.path import dirname, join
 
-from setuptools import setup, find_packages
-
-
-def read(*args):
-    return open(join(dirname(__file__), *args)).read()
+HERE = os.path.abspath(os.path.dirname(__file__))
 
 
-class ToxTestCommand(distutils.cmd.Command):
+def read_file(*path_parts):
+    with open(os.path.join(HERE, *path_parts), 'rb') as f:
+        return f.read()
+
+
+META = {}
+exec(read_file('queryable_properties', '__init__.py'), {}, META)
+
+
+class PytestCommand(Command):
     """
-    Distutils command to run tests via tox with 'python setup.py test'.
-
-    See https://docs.python.org/3/distutils/apiref.html#creating-a-new-distutils-command
-    for more documentation on custom distutils commands.
+    Distutils command to run tests via pytest in the current environment.
     """
-    description = "Run tests via 'tox'."
+    description = 'Run tests in the current environment using pytest.'
     user_options = []
 
     def initialize_options(self):
@@ -31,68 +34,83 @@ class ToxTestCommand(distutils.cmd.Command):
         pass
 
     def run(self):
-        self.announce("Running tests with 'tox'...", level=distutils.log.INFO)
+        import py
+        return py.test.cmdline.main([])
+
+
+class ToxCommand(Command):
+    """
+    Distutils command to run tests via tox, which must be installed and be able
+    to access all supported python versions.
+    """
+    description = ('Run tests using tox, which must already be installed and be able to access all supported python'
+                   'versions to create its environments.')
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
         return subprocess.call(['tox'])
 
 
-exec(read('queryable_properties', 'version.py'))
-
-classifiers = """
-# The next line is important: it prevents accidental upload to PyPI!
-Private :: Do Not Upload
-Development Status :: 2 - Pre-Alpha
-Programming Language :: Python
-Programming Language :: Python :: 2.7
-Programming Language :: Python :: 3.5
-Programming Language :: Python :: 3.6
-Programming Language :: Python :: 3.7
-Framework :: Django
-Framework :: Django :: 1.11
-Framework :: Django :: 2.0
-Framework :: Django :: 2.1
-Intended Audience :: Developers
-License :: Other/Proprietary License
-Operating System :: Microsoft :: Windows
-Operating System :: POSIX
-Operating System :: MacOS :: MacOS X
-Topic :: Internet
-"""
-
-install_requires = [
-    # 'six',
-]
-
-tests_require = [
-    'coverage',
-    'flake8',
-    'pydocstyle',
-    'pylint',
-    'pytest-django',
-    'pytest-pep8',
-    'pytest-cov',
-    'pytest-pythonpath',
-    'pytest',
-]
-
 setup(
-    name='Queryable Properties',
-    version=__version__,  # noqa
-    description='Use Django model properties in database queries.',
-    long_description=read('README.rst'),
-    author='Marcus Klöpfel',
-    author_email='marcus.kloepfel@gmail.com',
-    maintainer='Marcus Klöpfel',
-    maintainer_email='marcus.kloepfel@gmail.com',
-    url='https://autorelat1ve.po1nter.com/WildPointer/django-queryable-properties',
-    license='Proprietary',
-    classifiers=[c.strip() for c in classifiers.splitlines()
-                 if c.strip() and not c.startswith('#')],
-    packages=find_packages(exclude=['tests']),
+    name='django-queryable-properties',
+    version=META['__version__'],
+    description=META['__doc__'],
+    long_description='\n\n'.join((read_file('README.rst').decode('utf-8'), read_file('CHANGELOG.rst').decode('utf-8'))),
+    author=META['__author__'],
+    author_email=META['__email__'],
+    maintainer=META['__maintainer__'],
+    maintainer_email=META['__email__'],
+    url='https://github.com/W1ldPo1nter/django-queryable-properties',
+    license='BSD',
+    classifiers=[
+        'Private :: Do Not Upload',
+        'Development Status :: 2 - Pre-Alpha',
+        'Environment :: Web Environment',
+        'Framework :: Django',
+        'Framework :: Django :: 1.4',
+        'Framework :: Django :: 1.5',
+        'Framework :: Django :: 1.6',
+        'Framework :: Django :: 1.7',
+        'Framework :: Django :: 1.8',
+        'Framework :: Django :: 1.9',
+        'Framework :: Django :: 1.10',
+        'Framework :: Django :: 1.11',
+        'Framework :: Django :: 2.0',
+        'Framework :: Django :: 2.1',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: BSD License',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Topic :: Internet'
+    ],
+    packages=['queryable_properties'],
     include_package_data=True,
-    test_suite='tests',
-    install_requires=install_requires,
-    tests_require=tests_require,
+    install_requires=['Django>=1.4,<2.2'],
+    tests_require=[
+        'Django>=1.4,<2.2',
+        'coverage',
+        'flake8',
+        'mock',
+        'pydocstyle',
+        'pytest',
+        'pytest-cov',
+        'pytest-django',
+        'pytest-pep8',
+        'pytest-pythonpath',
+    ],
     cmdclass={
-        'test': ToxTestCommand,
+        'test': PytestCommand,
+        'tox': ToxCommand,
     }
 )
