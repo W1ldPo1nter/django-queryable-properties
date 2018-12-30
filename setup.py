@@ -4,20 +4,21 @@
 from __future__ import unicode_literals
 
 from distutils.cmd import Command
-from distutils.core import setup
+import io
 import os
+from setuptools import setup
 import subprocess
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
 
-def read_file(*path_parts):
-    with open(os.path.join(HERE, *path_parts), 'rb') as f:
+def read_file(*path_parts, **kwargs):
+    with io.open(os.path.join(HERE, *path_parts), **kwargs) as f:
         return f.read()
 
 
 META = {}
-exec(read_file('queryable_properties', '__init__.py'), {}, META)
+exec(read_file('queryable_properties', '__init__.py', mode='rb'), {}, META)
 
 
 class PytestCommand(Command):
@@ -61,7 +62,8 @@ setup(
     name='django-queryable-properties',
     version=META['__version__'],
     description=META['__doc__'],
-    long_description='\n\n'.join((read_file('README.rst').decode('utf-8'), read_file('CHANGELOG.rst').decode('utf-8'))),
+    long_description='\n\n'.join((read_file('README.rst', encoding='utf-8'),
+                                  read_file('CHANGELOG.rst', encoding='utf-8'))),
     author=META['__author__'],
     author_email=META['__email__'],
     maintainer=META['__maintainer__'],
@@ -69,8 +71,7 @@ setup(
     url='https://github.com/W1ldPo1nter/django-queryable-properties',
     license='BSD',
     classifiers=[
-        'Private :: Do Not Upload',
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 5 - Production/Stable',
         'Environment :: Web Environment',
         'Framework :: Django',
         'Framework :: Django :: 1.4',
