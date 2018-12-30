@@ -278,12 +278,18 @@ class TestDecorators(object):
         def func():
             pass
 
-        clone = self.decorate_function(func, original.annotater)
-        changed_attrs = {'annotater': func, 'filter_requires_annotation': expected_requires_annotation}
-        if should_copy_filter_implementation:
-            changed_attrs['filter'] = six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter),
-                                                              clone)
-        self.assert_cloned_property(original, clone, changed_attrs)
+        prop = self.decorate_function(func, original.annotater)
+        common_attrs = {'annotater': func, 'filter_requires_annotation': expected_requires_annotation}
+
+        # Also test that a copied filter implementation will be correctly re-
+        # copied on subsequent _clone() calls by creating another clone without
+        # changing anything.
+        for clone in (prop, prop._clone()):
+            changed_attrs = dict(common_attrs)
+            if should_copy_filter_implementation:
+                changed_attrs['filter'] = six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter),
+                                                                  clone)
+            self.assert_cloned_property(original, clone, changed_attrs)
 
     @pytest.mark.parametrize('old_value', [None, lambda: {}])
     def test_updater(self, old_value):

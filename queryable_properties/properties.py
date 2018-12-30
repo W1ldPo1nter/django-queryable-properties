@@ -303,6 +303,11 @@ class queryable_property(QueryableProperty):
             self.set_value = setter
         if filter:
             self.get_filter = self._extract_function(filter)
+            # The filter function may be automatically set to the get_filter
+            # method of the AnnotationMixin, in which case the method has to
+            # be bound to the current instance.
+            if self.get_filter is self._extract_function(AnnotationMixin.get_filter):
+                self.get_filter = six.create_bound_method(self.get_filter, self)
         if annotater:
             self.get_annotation = self._extract_function(annotater)
         if updater:
@@ -428,20 +433,20 @@ class queryable_property(QueryableProperty):
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
-        clone = self._clone(annotater=method)
+        kwargs = {'annotater': method}
         # If an annotater is defined but a filter isn't, use the default filter
         # implementation based on an annotation from the AnnotationMixin. This
         # way, all properties defining an annotater are automatically
         # filterable while still having the option to register a custom filter
         # method.
-        if not clone.get_filter:
-            clone.get_filter = six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter), clone)
+        if not self.get_filter:
+            kwargs['filter'] = AnnotationMixin.get_filter
         # If no value was explicitly set a for filter_requires_annotation, set
         # it to True since the default filter implementation of the
         # AnnotationMixin acts the same way.
-        if clone.filter_requires_annotation is None:
-            clone.filter_requires_annotation = True
-        return clone
+        if self.filter_requires_annotation is None:
+            kwargs['filter_requires_annotation'] = True
+        return self._clone(**kwargs)
 
     def updater(self, method):
         """
