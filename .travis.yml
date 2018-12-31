@@ -14,3 +14,12 @@ matrix:
 install: pip install tox-travis codecov
 script: tox
 after_success: codecov
+deploy:
+  provider: pypi
+  user: W1ldPo1nter
+  distributions: sdist bdist_wheel
+  on:
+    tags: true
+    python: 3.6
+  password:
+    secure: MGbJkih+2LyG1/QThmjHS4MT37JOrTiXWJZ/f8tuuGz/uJiVap5k52B/QxUyehALr/DJ072Mj3h5wMca7JTPWwP1AoZtW895Xa+xBT4I9ZGJhzxlC9xAnREOU/H+86xSdCNV4GatwqbPh0ogwzohFBBPl3eg9GI+7RvDmUHdevlQFOSHhN4sQm6hrIrLCbYJFu0eLmURzJebO7XLM8J0D0/Msx8UWB96gEVT7evLOVhSLOPzFYvL1IvjNzLJ9YXyW4ULrfLCnvCot3fqxavtajhZv/yixSTmxEHGO/vLlBt4LSRGa162I0Egxg8MHaqs3U36HUgQq5fn/LtIOe/ToLtjUoypvtVFDewoien0XzQE6JqNTLbJi603AbgVWqVaRqg9ijq2fpwNFn0vPxauWRfvD4L3RGBKhex98mjcRI1TGxVM64i8Mx3VTFnwslaym/hN77kqSNUcmD3yh4DRNqWA7m17qBwlo8ypk1897eYz9IzHH3fQv4qFrUo2eL8/BYIGizjayPg4x9/0ZRnooI0L6u6ErWw2zwfgmA1mX7/Pj7OXkJIXikappM5wsDeenj2JGw+kltG7m78yVz97OJHjR+H3Sv+l+LfdfVwBOlJHQJZXV/UYAQizi6acPwKhtO21d0ntNFLthE/ems2xdGlVQxK0nV26Aah/+psF0L0=
