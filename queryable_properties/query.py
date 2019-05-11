@@ -187,7 +187,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             method = getattr(self, ADD_Q_METHOD_NAME)
             return method(q_object, **convert_build_filter_to_add_q_kwargs(**kwargs))
 
-    def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False):
+    def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
         # This method is used to resolve field names in complex expressions. If
         # a queryable property is used in such an expression, it needs to be
         # auto-annotated and returned here.
@@ -195,12 +195,12 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         if property_annotation:
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
-                # the inner queries
+                # the inner queries.
                 from django.db.models.expressions import Ref
                 return Ref(name, property_annotation)
-            else:
-                return property_annotation
-        return super(QueryablePropertiesQueryMixin, self).resolve_ref(name, allow_joins, reuse, summarize)
+            return property_annotation
+        return super(QueryablePropertiesQueryMixin, self).resolve_ref(name, allow_joins, reuse, summarize,
+                                                                      *args, **kwargs)
 
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
