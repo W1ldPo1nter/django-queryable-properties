@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
                      convert_build_filter_to_add_q_kwargs, LOOKUP_SEP)
-from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
+from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin
 
 
@@ -56,19 +56,43 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         Resolve the given path into a queryable property on the model
         associated with this query.
 
-        :param collections.Sequence path: The path to resolve (a string of
-                                          Django's query expression split up
-                                          by the lookup separator).
-        :return: The queryable property (if one could be resolved) or None.
-        :rtype: queryable_properties.properties.QueryableProperty | None
+        :param collections.Sequence[str] path: The path to resolve (a string of
+                                               Django's query expression split
+                                               up by the lookup separator).
+        :return: A 3-tuple containing the queryable property, a list containing
+                 the parts of the path that are relations to reach the property
+                 and a list containing the parts of the path that represent
+                 lookups. The first item will be None and both lists will be
+                 empty if no queryable property could be resolved.
+        :rtype: (queryable_properties.properties.QueryableProperty | None, list[str], list[str])
         """
-        # Currently, only properties defined directly at the model associated
-        # with this query are supported. Therefore only check the first part
-        # of the path.
-        try:
-            return get_queryable_property(self.model, path[0])
-        except QueryablePropertyDoesNotExist:
-            return None
+        model = self.model
+        prop, relation_path, lookups = None, [], []
+        # Try to follow the given path to allow to use queryable properties
+        # across relations.
+        for index, name in enumerate(path):
+            try:
+                field = model._meta.get_field(name)
+            except FieldDoesNotExist:
+                try:
+                    prop = get_queryable_property(model, name)
+                except QueryablePropertyDoesNotExist:
+                    # Neither a field nor a queryable property, so likely an
+                    # invalid name. Do nothing and let Django deal with it.
+                    pass
+                else:
+                    relation_path = path[:index]
+                    lookups = path[index + 1:]
+                # The current name was not a field and either a queryable
+                # property or invalid. Either way, resolving ends here.
+                break
+            else:
+                if not field.is_relation:
+                    # A regular model field that doesn't represent a relation,
+                    # meaning that no queryable property is involved.
+                    break
+                model = field.remote_field.model
+        return prop, relation_path, lookups
 
     def _auto_annotate(self, path):
         """
@@ -83,7 +107,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         :return: The resolved annotation or None if the path couldn't be
                  resolved.
         """
-        prop = self._resolve_queryable_property(path)
+        prop = self._resolve_queryable_property(path)[0]
         return prop and self.add_queryable_property_annotation(prop)
 
     def add_queryable_property_annotation(self, prop, select=False):
@@ -147,10 +171,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         except ValueError:
             # Invalid value - just treat it as "no queryable property found",
             # delegate it to Django and let it generate the exception.
-            path = prop = None
+            prop = None
         else:
-            path = arg.split(LOOKUP_SEP)
-            prop = self._resolve_queryable_property(path)
+            prop, relation_path, lookups = self._resolve_queryable_property(arg.split(LOOKUP_SEP))
 
         # If no queryable property could be determined for the filter
         # expression (either because a regular/non-existent field is referenced
@@ -176,7 +199,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         if prop.filter_requires_annotation:
             self.add_queryable_property_annotation(prop)
             required_annotation_prop = prop
-        lookup = path[1] if len(path) > 1 else 'exact'
+        lookup = LOOKUP_SEP.join(lookups) if lookups else 'exact'
         q_object = prop.get_filter(self.model, lookup, value)
         # Luckily, build_filter and _add_q use the same return value
         # structure, so an _add_q call can be used to actually create the
