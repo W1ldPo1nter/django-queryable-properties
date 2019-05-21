@@ -50,7 +50,18 @@ class TestQueryFilters(object):
         # on each other
         queryset = model.objects.filter(version='1.2.3')
         assert 'version' not in queryset.query.annotations
+        assert len(queryset) == 2
         assert all(obj.version == '1.2.3' for obj in queryset)
+
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_filter_without_required_annotation_across_relation(self, versions, model):
+        # Filtering the 'version' property is also based on filtering the
+        # 'major_minor' property, so this test also tests properties that build
+        # on each other
+        queryset = model.objects.filter(versions__version='1.2.3')
+        assert 'versions__version' not in queryset.query.annotations
+        assert len(queryset) == 2
+        assert all(obj.versions.filter(version='1.2.3').exists() for obj in queryset)
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_with_required_annotation(self, versions, model):

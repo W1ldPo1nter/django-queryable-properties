@@ -3,9 +3,9 @@
 from contextlib import contextmanager
 
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
-                     convert_build_filter_to_add_q_kwargs, LOOKUP_SEP)
+                     convert_build_filter_to_add_q_kwargs, get_related_model, LOOKUP_SEP)
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
-from .utils import get_queryable_property, InjectableMixin
+from .utils import get_queryable_property, InjectableMixin, modify_tree_node
 
 
 class QueryablePropertiesQueryMixin(InjectableMixin):
@@ -72,7 +72,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # across relations.
         for index, name in enumerate(path):
             try:
-                field = model._meta.get_field(name)
+                related_model = get_related_model(model, name)
             except FieldDoesNotExist:
                 try:
                     prop = get_queryable_property(model, name)
@@ -87,11 +87,11 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 # property or invalid. Either way, resolving ends here.
                 break
             else:
-                if not field.is_relation:
+                if not related_model:
                     # A regular model field that doesn't represent a relation,
                     # meaning that no queryable property is involved.
                     break
-                model = field.remote_field.model
+                model = related_model
         return prop, relation_path, lookups
 
     def _auto_annotate(self, path):
@@ -201,6 +201,11 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             required_annotation_prop = prop
         lookup = LOOKUP_SEP.join(lookups) if lookups else 'exact'
         q_object = prop.get_filter(self.model, lookup, value)
+        if relation_path:
+            # If the resolved property belongs to a related model, all actual
+            # conditions in the returned Q object must be modified to use the
+            # current relation path as prefix.
+            q_object = modify_tree_node(q_object, lambda item: (LOOKUP_SEP.join(relation_path + [item[0]]), item[1]))
         # Luckily, build_filter and _add_q use the same return value
         # structure, so an _add_q call can be used to actually create the
         # return value for the current call.
