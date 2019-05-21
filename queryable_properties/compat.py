@@ -103,3 +103,29 @@ def chain_query(query, *args, **kwargs):
     """
     method = getattr(query, QUERY_CHAIN_METHOD_NAME)
     return method(*args, **kwargs)
+
+
+def get_related_model(model, relation_field_name):
+    """
+    Get the related model of the (presumed) relation field with the given name
+    on the given model.
+
+    :param type model: The model class to inspect the field on.
+    :param str relation_field_name: The field name of the (presumed) relation
+                                    field.
+    :return: The model class reached via the relation field or None if the
+             field is not actually a relation field.
+    :rtype: type | None
+    """
+    if hasattr(model._meta, 'get_field_by_name'):  # pragma: no cover
+        # Older Django versions (<1.8) only allowed to find reverse relation
+        # objects as well as fields via the get_field_by_name method, which
+        # doesn't exist in recent versions anymore.
+        field_or_rel, _, direct, _ = model._meta.get_field_by_name(relation_field_name)
+        # Unlike in recent Django versions, the reverse relation objects and
+        # fields also didn't provide the same attributes, which is why they
+        # need to be treated differently.
+        if not direct:  # direct=False means a reverse relation object
+            return field_or_rel.field.model
+        return field_or_rel.rel and field_or_rel.rel.to
+    return model._meta.get_field(relation_field_name).related_model
