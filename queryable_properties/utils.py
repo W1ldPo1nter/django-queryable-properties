@@ -1,6 +1,8 @@
 # encoding: utf-8
 
-from django.utils import six
+from copy import deepcopy
+
+from django.utils import six, tree
 
 from .exceptions import QueryablePropertyDoesNotExist
 
@@ -60,10 +62,10 @@ class InjectableMixin(object):
         implementation to make its objects picklable.
 
         :param type base_class: The base class to mix the mixin into.
-        :param class_name: An optional name for the dynamically created class.
-                           If None is supplied (default), the class name of the
-                           dynamically created class will be the one of the
-                           object's original class.
+        :param str class_name: An optional name for the dynamically created
+                               class. If None is supplied (default), the class
+                               name of the dynamically created class will be
+                               the one of the object's original class.
         :return: The generated class.
         :rtype: type
         """
@@ -112,7 +114,7 @@ def _unpickle_injected_object(base_class, mixin_class, class_name=None):
 
     :param type base_class: The base class of the pickled object before adding
                             the mixin via injection.
-    :param type mixin_class: The :class:`InjectionOnlyMixin` subclass that was
+    :param type mixin_class: The :class:`InjectableMixin` subclass that was
                              injected into the pickled object.
     :param str class_name: The class name of the pickled object's dynamically
                            created class.
@@ -125,3 +127,31 @@ def _unpickle_injected_object(base_class, mixin_class, class_name=None):
 
 
 _unpickle_injected_object.__safe_for_unpickling__ = True
+
+
+def modify_tree_node(node, func, copy=True):
+    """
+    Modify a tree node and all of its subnodes using the given transformation
+    callable.
+
+    :param tree.Node node: The node to modify.
+    :param callable func: A callable that will be called for every encountered
+                          actual node value (not subnodes) with that value as
+                          its only parameter. It must returned the replacement
+                          value for the given value.
+    :param bool copy: Whether to create a copy of the original node and modify
+                      this copy instead of modifying the original node in
+                      place.
+    :return: The modified node or node copy.
+    :rtype: tree.Node
+    """
+    if copy:
+        node = deepcopy(node)
+
+    for index, child in enumerate(node.children):
+        if isinstance(child, tree.Node):
+            modify_tree_node(child, func, copy=False)
+        else:
+            node.children[index] = func(child)
+
+    return node

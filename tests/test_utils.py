@@ -1,11 +1,12 @@
 # encoding: utf-8
 import pytest
 
+from django.db.models import Q
 from django.utils.six.moves import cPickle
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
-from queryable_properties.utils import get_queryable_property, InjectableMixin
+from queryable_properties.utils import get_queryable_property, InjectableMixin, modify_tree_node
 
 from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 
@@ -92,3 +93,15 @@ class TestInjectableMixin(object):
             assert obj.attr2 == 42.42
             assert obj.mixin_attr1 == 'test'
             assert obj.mixin_attr2 is None
+
+
+@pytest.mark.parametrize('copy', [True, False])
+def test_modify_tree_node(copy):
+    q = Q(Q(a=1) | Q(b=2), c=3)
+    result = modify_tree_node(q, lambda item: ('prefix_{}_suffix'.format(item[0]), item[1] + 1), copy=copy)
+    assert (result is q) is not copy
+    children = list(result.children)
+    assert ('prefix_c_suffix', 4) in children
+    children.remove(('prefix_c_suffix', 4))
+    assert ('prefix_a_suffix', 2) in children[0].children
+    assert ('prefix_b_suffix', 3) in children[0].children
