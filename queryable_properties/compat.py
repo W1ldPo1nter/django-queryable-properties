@@ -1,6 +1,11 @@
 # encoding: utf-8
 """A stable import interface for Django classes that were moved in between versions and compatibility constants."""
 
+try:  # pragma: no cover
+    from contextlib import ExitStack as dummy_context  # noqa: F401
+except ImportError:  # pragma: no cover
+    from contextlib import nested as dummy_context  # noqa: F401
+
 from django.db.models.query import QuerySet
 from django.db.models.sql.query import Query
 from django.utils import six

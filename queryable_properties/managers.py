@@ -11,7 +11,7 @@ from django.utils import six
 from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, chain_query, chain_queryset,
                      LOOKUP_SEP, ModelIterable, ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from .query import QueryablePropertiesQueryMixin
+from .query import QueryablePropertiesQueryMixin, QueryablePropertyReference
 from .utils import get_queryable_property, InjectableMixin
 
 
@@ -70,15 +70,15 @@ class QueryablePropertiesModelIterable(InjectableMixin):
                 # and use it to populate the cache for the corresponding
                 # queryable property on each object while removing the weird,
                 # renamed attributes.
-                for prop, changed_name in six.iteritems(changed_aliases):
+                for property_ref, changed_name in six.iteritems(changed_aliases):
                     value = getattr(obj, changed_name)
                     delattr(obj, changed_name)
                     # The following check is only required for older Django
                     # versions, where all annotations were necessarily
                     # selected. Therefore values that have been selected only
                     # due to this will simply be discarded.
-                    if self.queryset.query._queryable_property_annotations[prop]:
-                        prop._set_cached_value(obj, value)
+                    if self.queryset.query._queryable_property_annotations[property_ref]:
+                        property_ref.property._set_cached_value(obj, value)
                 yield obj
         finally:
             self.queryset.query = original_query
@@ -93,16 +93,17 @@ class QueryablePropertiesModelIterable(InjectableMixin):
         the setter of the queryable properties. This way, Django can populate
         attributes with different names and avoid using the setter methods.
 
-        :return: A dictionary mapping the queryable properties that selected
-                 annotations are based on to the changed aliases.
-        :rtype: dict[queryable_properties.properties.QueryableProperty, str]
+        :return: A dictionary mapping references to queryable properties that
+                 selected annotations are based on to the changed aliases.
+        :rtype: dict[QueryablePropertyReference, str]
         """
         query = self.queryset.query
         changed_aliases = {}
         select = dict(query.annotation_select)
 
-        for prop, requires_selection in query._queryable_property_annotations.items():
-            if prop.name not in select:
+        for property_ref, requires_selection in query._queryable_property_annotations.items():
+            annotation_name = property_ref.full_path
+            if annotation_name not in select:
                 continue  # Annotations may have been removed somehow
 
             # Older Django versions didn't make a clear distinction between
@@ -110,27 +111,27 @@ class QueryablePropertiesModelIterable(InjectableMixin):
             # annotations can only be removed from the annotation select dict
             # in newer versions (to no unnecessarily query fields).
             if not requires_selection and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
-                select.pop(prop.name, None)
+                select.pop(annotation_name, None)
                 continue
 
-            changed_name = prop.name
+            changed_name = annotation_name
             # Suffix the original annotation names with random UUIDs until an
             # available name can be found. Since the suffix is delimited by
             # the lookup separator, these names are guaranteed to not clash
             # with names of model fields, which don't allow the separator in
             # their names.
             while changed_name in query.annotations:
-                changed_name = LOOKUP_SEP.join((prop.name, uuid.uuid4().hex))
-            changed_aliases[prop] = changed_name
-            select[changed_name] = select.pop(prop.name)
+                changed_name = LOOKUP_SEP.join((annotation_name, uuid.uuid4().hex))
+            changed_aliases[property_ref] = changed_name
+            select[changed_name] = select.pop(annotation_name)
 
             # Older Django versions only work with the annotation select dict
             # when it comes to ordering, so queryable property annotations used
             # for ordering must be renamed in the query's ordering as well.
             if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:  # pragma: no cover
                 for i, field_name in enumerate(query.order_by):
-                    if field_name == prop.name or field_name[1:] == prop.name:
-                        query.order_by[i] = field_name.replace(prop.name, changed_name)
+                    if field_name == annotation_name or field_name[1:] == annotation_name:
+                        query.order_by[i] = field_name.replace(annotation_name, changed_name)
 
         # Patch the correct select property on the query with the new names,
         # since this property is used by the SQL compiler to build the actual
@@ -239,13 +240,14 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         """
         queryset = chain_queryset(self)
         for name in names:
-            prop = get_queryable_property(self.model, name)
-            queryset.query.add_queryable_property_annotation(prop, select=True)
-        if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP and isinstance(self, ValuesQuerySet):  # pragma: no cover
-            # In older Django versions, the annotation mask was changed by the
-            # queryset itself when applying annotations to a ValuesQuerySet.
-            # Therefore the same must be done here in this case.
-            queryset.query.set_aggregate_mask((queryset.query.aggregate_select_mask or set()) | set(names))
+            property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, ())
+            with queryset.query.add_queryable_property_annotation(property_ref, select=True):
+                if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP and isinstance(self, ValuesQuerySet):  # pragma: no cover
+                    # In older Django versions, the annotation mask was changed
+                    # by the queryset itself when applying annotations to a
+                    # ValuesQuerySet. Therefore the same must be done here in
+                    # this case.
+                    queryset.query.set_aggregate_mask((queryset.query.aggregate_select_mask or set()) | {name})
         return queryset
 
     def iterator(self, *args, **kwargs):

@@ -4,7 +4,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
-                     convert_build_filter_to_add_q_kwargs, get_related_model, LOOKUP_SEP)
+                     convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP)
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin, modify_tree_node
 
@@ -27,7 +27,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         """
         if not self.relation_path:
             return self.property.name
-        return LOOKUP_SEP.join(self.relation_path + [self.property.name])
+        return LOOKUP_SEP.join(self.relation_path + (self.property.name,))
 
     def get_filter(self, lookup, value):
         """
@@ -53,7 +53,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
             # If the resolved property belongs to a related model, all actual
             # conditions in the returned Q object must be modified to use the
             # current relation path as prefix.
-            q_obj = modify_tree_node(q_obj, lambda item: (LOOKUP_SEP.join(self.relation_path + [item[0]]), item[1]))
+            q_obj = modify_tree_node(q_obj, lambda item: (LOOKUP_SEP.join(self.relation_path + (item[0],)), item[1]))
         return q_obj
 
 
@@ -76,28 +76,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # Stores queryable properties used as annotations in this query along
         # with the information if the annotated value should be selected.
         self._queryable_property_annotations = {}
-        # A stack for queryable properties whose annotations are currently
-        # required while filtering.
-        self._required_annotation_stack = []
-
-    @contextmanager
-    def _required_annotation(self, prop=None):
-        """
-        Context manager to add the given queryable property to the top of the
-        required annotation stack when entering and removing it again when
-        exiting. Intended to be used when queryable properties with
-        filter_requires_annotation=True are used to filter. The given property
-        may be None (which won't change the stack at all) to simplify any code
-        using the context manager.
-
-        :param queryable_properties.properties.QueryableProperty prop:
-            The property that should act as the current context.
-        """
-        if prop:
-            self._required_annotation_stack.append(prop)
-        yield self
-        if prop:
-            self._required_annotation_stack.pop()
+        # A stack for queryable properties who are currently being annotated.
+        # Required to correctly resolve dependencies and perform annotations.
+        self._queryable_property_stack = []
 
     def _resolve_queryable_property(self, path):
         """
@@ -129,7 +110,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                     # invalid name. Do nothing and let Django deal with it.
                     pass
                 else:
-                    property_ref = QueryablePropertyReference(prop, model, path[:index])
+                    property_ref = QueryablePropertyReference(prop, model, tuple(path[:index]))
                     lookups = path[index + 1:]
                 # The current name was not a field and either a queryable
                 # property or invalid. Either way, resolving ends here.
@@ -156,34 +137,64 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                  resolved.
         """
         property_ref = self._resolve_queryable_property(path)[0]
-        return property_ref and self.add_queryable_property_annotation(property_ref.property)
+        if not property_ref:
+            return None
+        with self.add_queryable_property_annotation(property_ref) as annotation:
+            return annotation
 
-    def add_queryable_property_annotation(self, prop, select=False):
+    def _annotate_queryable_property(self, property_ref):
         """
-        Add an annotation for the given queryable property to this query (if
-        it wasn't annotated already). An exception will be raised if the
-        property to add does not support annotation creation.
+        Internal routine to add the annotation of the queryable property to
+        this query.
 
-        :param queryable_properties.properties.QueryableProperty prop:
-            The property to add an annotation for.
+        :param QueryablePropertyReference property_ref: A reference containing
+                                                        the queryable property
+                                                        to annotate.
+        """
+        prop = property_ref.property
+        if not prop.get_annotation:
+            raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
+                                         'implement annotation creation.'.format(prop.name))
+
+        self.add_annotation(prop.get_annotation(property_ref.model), alias=property_ref.full_path, is_summary=False)
+        # Perform the required GROUP BY setup if the annotation contained
+        # aggregates, which is normally done by QuerySet.annotate. In older
+        # Django versions, the contains_aggregate attribute didn't exist,
+        # but aggregates are always assumed in this case since annotations
+        # were strongly tied to aggregates.
+        if getattr(self.annotations[property_ref.full_path], 'contains_aggregate', True) and self.group_by is not True:
+            self.set_group_by()
+
+    @contextmanager
+    def add_queryable_property_annotation(self, property_ref, select=False):
+        """
+        A context manager that adds a queryable property annotation to this
+        query and performs management tasks around the annotation (stores the
+        information if the queryable property annotation should be selected
+        and populates the queryable property stack correctly). The context
+        manager yields the actual resolved and applied annotation while the
+        stack is still populated.
+
+        :param QueryablePropertyReference property_ref: A reference containing
+                                                        the queryable property
+                                                        to annotate.
         :param bool select: Signals whether the annotation should be selected
                             or not.
-        :return: The resolved annotation.
         """
-        if prop not in self._queryable_property_annotations:
-            if not prop.get_annotation:
-                raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
-                                             'implement annotation creation.'.format(prop.name))
-            self.add_annotation(prop.get_annotation(self.model), alias=prop.name, is_summary=False)
-            # Perform the required GROUP BY setup if the annotation contained
-            # aggregates, which is normally done by QuerySet.annotate. In older
-            # Django versions, the contains_aggregate attribute didn't exist,
-            # but aggregates are always assumed in this case since annotations
-            # were strongly tied to aggregates.
-            if getattr(self.annotations[prop.name], 'contains_aggregate', True) and self.group_by is not True:
-                self.set_group_by()
-        self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
-        return self.annotations[prop.name]
+        if property_ref in self._queryable_property_stack:
+            raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
+                                         .format(property_ref.property.name))
+
+        self._queryable_property_stack.append(property_ref)
+        try:
+            if property_ref not in self._queryable_property_annotations:
+                self._annotate_queryable_property(property_ref)
+            else:
+                select = select or self._queryable_property_annotations[property_ref]
+            self._queryable_property_annotations[property_ref] = select
+            yield self.annotations[property_ref.full_path]
+        finally:
+            self._queryable_property_stack.pop()
 
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
         # This method is called in older versions to add an aggregation or
@@ -227,10 +238,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # expression (either because a regular/non-existent field is referenced
         # or because the expression was an invalid value), call Django's
         # default implementation, which may in turn raise an exception. Act the
-        # same way if the current top of the required annotation stack is used
-        # to avoid endless recursions.
-        if not property_ref or (self._required_annotation_stack and
-                                self._required_annotation_stack[-1] == property_ref.property):
+        # same way if the current top of the stack is used to avoid infinite
+        # recursions.
+        if not property_ref or (self._queryable_property_stack and self._queryable_property_stack[-1] == property_ref):
             # The base method has different names in different Django versions
             # (see comment on the constant definition).
             base_method = getattr(super(QueryablePropertiesQueryMixin, self), BUILD_FILTER_METHOD_NAME)
@@ -243,17 +253,16 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # the property signals the need of its own annotation to function.
         # If so, add the annotation first to avoid endless recursion, since
         # resolved filter will likely contain the same property name again.
-        required_annotation_prop = None
+        context = dummy_context()
         if property_ref.property.filter_requires_annotation:
-            self.add_queryable_property_annotation(property_ref.property)
-            required_annotation_prop = property_ref.property
+            context = self.add_queryable_property_annotation(property_ref)
 
-        # Luckily, build_filter and _add_q use the same return value
-        # structure, so an _add_q call can be used to actually create the
-        # return value for the current call.
-        with self._required_annotation(required_annotation_prop):
-            # The (_)add_q method has different names in different Django
-            # versions (see comment on the constant definition).
+        with context:
+            # Luckily, build_filter and _add_q use the same return value
+            # structure, so an _add_q call can be used to actually create the
+            # return value for the current call. The (_)add_q method has
+            # different names in different Django versions (see comment on the
+            # constant definition).
             method = getattr(self, ADD_Q_METHOD_NAME)
             return method(q_obj, **convert_build_filter_to_add_q_kwargs(**kwargs))
 
@@ -274,6 +283,6 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
 
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
-        obj._queryable_property_annotations = dict(self._queryable_property_annotations)
-        obj._required_annotation_stack = list(self._required_annotation_stack)
+        obj.init_injected_attrs()
+        obj._queryable_property_annotations.update(self._queryable_property_annotations)
         return obj
