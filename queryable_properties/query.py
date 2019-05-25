@@ -18,15 +18,6 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
     used properties or automatically add required properties as annotations.
     """
 
-    def __init__(self, *args, **kwargs):
-        super(QueryablePropertiesQueryMixin, self).__init__(*args, **kwargs)
-        # Stores queryable properties used as annotations in this query along
-        # with the information if the annotated value should be selected.
-        self._queryable_property_annotations = {}
-        # A stack for queryable properties whose annotations are currently
-        # required while filtering.
-        self._required_annotation_stack = []
-
     def __getattr__(self, name):  # pragma: no cover
         # Redirect some attribute accesses for older Django versions (where
         # annotations were tied to aggregations, hence "aggregation" in the
@@ -34,6 +25,14 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         if name in ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
             return getattr(self, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP[name])
         raise AttributeError()
+
+    def init_injected_attrs(self):
+        # Stores queryable properties used as annotations in this query along
+        # with the information if the annotated value should be selected.
+        self._queryable_property_annotations = {}
+        # A stack for queryable properties whose annotations are currently
+        # required while filtering.
+        self._required_annotation_stack = []
 
     @contextmanager
     def _required_annotation(self, prop=None):

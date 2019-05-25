@@ -20,10 +20,9 @@ class DummyClass(object):
 
 class DummyMixin(InjectableMixin):
 
-    def __init__(self, attr1, attr2, mixin_attr1, mixin_attr2):
-        super(DummyMixin, self).__init__(attr1, attr2)
-        self.mixin_attr1 = mixin_attr1
-        self.mixin_attr2 = mixin_attr2
+    def init_injected_attrs(self):
+        self.mixin_attr1 = 1.337
+        self.mixin_attr2 = 'test'
 
 
 class TestGetQueryableProperty(object):
@@ -55,7 +54,7 @@ class TestInjectableMixin(object):
         (None, DummyClass.__name__),
         ('TestClass', 'TestClass'),
     ])
-    def test_create_class(self, monkeypatch, class_name, expected_class_name):
+    def test_mix_with_class(self, monkeypatch, class_name, expected_class_name):
         monkeypatch.setattr(DummyMixin, '_created_classes', {})
         assert not DummyMixin._created_classes
         created_classes = set()
@@ -69,20 +68,25 @@ class TestInjectableMixin(object):
             assert cls.__name__ == expected_class_name
             assert len(DummyMixin._created_classes) == 1
             assert len(created_classes) == 1
+            # Test that the __init__ method of the new class correctly
+            # initializes the injected attributes.
+            obj = cls(5, 'abc')
+            assert obj.mixin_attr1 == 1.337
+            assert obj.mixin_attr2 == 'test'
 
     def test_inject_into_object(self):
         obj = DummyClass(5, 'abc')
-        DummyMixin.inject_into_object(obj, mixin_attr1=None, mixin_attr2=1.337)
+        DummyMixin.inject_into_object(obj)
         assert isinstance(obj, DummyClass)
         assert isinstance(obj, DummyMixin)
         assert obj.attr1 == 5
         assert obj.attr2 == 'abc'
-        assert obj.mixin_attr1 is None
-        assert obj.mixin_attr2 == 1.337
+        assert obj.mixin_attr1 == 1.337
+        assert obj.mixin_attr2 == 'test'
 
     def test_pickle_unpickle(self):
         base_obj = DummyClass('xyz', 42.42)
-        DummyMixin.inject_into_object(base_obj, mixin_attr1='test', mixin_attr2=None)
+        DummyMixin.inject_into_object(base_obj)
         serialized_obj = cPickle.dumps(base_obj)
         deserialized_obj = cPickle.loads(serialized_obj)
 
@@ -91,8 +95,8 @@ class TestInjectableMixin(object):
             assert isinstance(obj, DummyMixin)
             assert obj.attr1 == 'xyz'
             assert obj.attr2 == 42.42
-            assert obj.mixin_attr1 == 'test'
-            assert obj.mixin_attr2 is None
+            assert obj.mixin_attr1 == 1.337
+            assert obj.mixin_attr2 == 'test'
 
 
 @pytest.mark.parametrize('copy', [True, False])
