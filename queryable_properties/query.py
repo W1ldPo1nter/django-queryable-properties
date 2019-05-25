@@ -8,7 +8,53 @@ from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, 
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin, modify_tree_node
 
-QueryablePropertyReference = namedtuple('QueryablePropertyReference', 'property relation_path')
+
+class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):
+    """
+    A reference to a queryable property that also holds the path to reach the
+    property across relations.
+    """
+    __slots__ = ()
+
+    @property
+    def full_path(self):
+        """
+        Return the full path to the queryable property (including the relation
+        prefix) in the query filter format.
+
+        :return: The full path to the queryable property.
+        :rtype: str
+        """
+        if not self.relation_path:
+            return self.property.name
+        return LOOKUP_SEP.join(self.relation_path + [self.property.name])
+
+    def get_filter(self, lookup, value):
+        """
+        A wrapper for the get_filter method of the property this reference
+        points to. It checks if the property actually supports filtering and
+        applies the relation path (if any) to the returned Q object.
+
+        :param str lookup: The lookup to use for the filter (e.g. 'exact',
+                           'lt', etc.)
+        :param value: The value passed to the filter condition.
+        :return: A Q object to filter using this property.
+        :rtype: django.db.models.Q
+        """
+        if not self.property.get_filter:
+            raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
+                                         'implement filtering.'.format(self.property.name))
+
+        # Use the model stored on this reference instead of the one on the
+        # property since the query may be happening from a subclass of the
+        # model the property is defined on.
+        q_obj = self.property.get_filter(self.model, lookup, value)
+        if self.relation_path:
+            # If the resolved property belongs to a related model, all actual
+            # conditions in the returned Q object must be modified to use the
+            # current relation path as prefix.
+            q_obj = modify_tree_node(q_obj, lambda item: (LOOKUP_SEP.join(self.relation_path + [item[0]]), item[1]))
+        return q_obj
 
 
 class QueryablePropertiesQueryMixin(InjectableMixin):
@@ -83,7 +129,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                     # invalid name. Do nothing and let Django deal with it.
                     pass
                 else:
-                    property_ref = QueryablePropertyReference(prop, path[:index])
+                    property_ref = QueryablePropertyReference(prop, model, path[:index])
                     lookups = path[index + 1:]
                 # The current name was not a field and either a queryable
                 # property or invalid. Either way, resolving ends here.
@@ -190,9 +236,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             base_method = getattr(super(QueryablePropertiesQueryMixin, self), BUILD_FILTER_METHOD_NAME)
             return base_method(filter_expr, *args, **kwargs)
 
-        if not property_ref.property.get_filter:
-            raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
-                                         'implement filtering.'.format(property_ref.property.name))
+        lookup = LOOKUP_SEP.join(lookups) if lookups else 'exact'
+        q_obj = property_ref.get_filter(lookup, value)
 
         # Before applying the filter implemented by the property, check if
         # the property signals the need of its own annotation to function.
@@ -202,14 +247,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         if property_ref.property.filter_requires_annotation:
             self.add_queryable_property_annotation(property_ref.property)
             required_annotation_prop = property_ref.property
-        lookup = LOOKUP_SEP.join(lookups) if lookups else 'exact'
-        q_object = property_ref.property.get_filter(self.model, lookup, value)
-        if property_ref.relation_path:
-            # If the resolved property belongs to a related model, all actual
-            # conditions in the returned Q object must be modified to use the
-            # current relation path as prefix.
-            q_object = modify_tree_node(q_object,
-                                        lambda item: (LOOKUP_SEP.join(property_ref.relation_path + [item[0]]), item[1]))
+
         # Luckily, build_filter and _add_q use the same return value
         # structure, so an _add_q call can be used to actually create the
         # return value for the current call.
@@ -217,7 +255,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # The (_)add_q method has different names in different Django
             # versions (see comment on the constant definition).
             method = getattr(self, ADD_Q_METHOD_NAME)
-            return method(q_object, **convert_build_filter_to_add_q_kwargs(**kwargs))
+            return method(q_obj, **convert_build_filter_to_add_q_kwargs(**kwargs))
 
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
         # This method is used to resolve field names in complex expressions. If
