@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 
-from django.utils import six, tree
+from django.utils.tree import Node
 
 from .exceptions import QueryablePropertyDoesNotExist
 
@@ -141,7 +141,7 @@ def modify_tree_node(node, func, copy=True):
     Modify a tree node and all of its subnodes using the given transformation
     callable.
 
-    :param tree.Node node: The node to modify.
+    :param Node node: The node to modify.
     :param callable func: A callable that will be called for every encountered
                           actual node value (not subnodes) with that value as
                           its only parameter. It must returned the replacement
@@ -150,13 +150,13 @@ def modify_tree_node(node, func, copy=True):
                       this copy instead of modifying the original node in
                       place.
     :return: The modified node or node copy.
-    :rtype: tree.Node
+    :rtype: Node
     """
     if copy:
         node = deepcopy(node)
 
     for index, child in enumerate(node.children):
-        if isinstance(child, tree.Node):
+        if isinstance(child, Node):
             modify_tree_node(child, func, copy=False)
         else:
             node.children[index] = func(child)
