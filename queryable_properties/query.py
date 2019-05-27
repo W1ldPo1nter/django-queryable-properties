@@ -269,8 +269,11 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
         # This method is used to resolve field names in complex expressions. If
         # a queryable property is used in such an expression, it needs to be
-        # auto-annotated and returned here.
-        property_annotation = self._auto_annotate([name])
+        # auto-annotated (while taking the stack into account) and returned.
+        path = tuple(name.split(LOOKUP_SEP))
+        if self._queryable_property_stack:
+            path = self._queryable_property_stack[-1].relation_path + path
+        property_annotation = self._auto_annotate(path)
         if property_annotation:
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
@@ -281,8 +284,21 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         return super(QueryablePropertiesQueryMixin, self).resolve_ref(name, allow_joins, reuse, summarize,
                                                                       *args, **kwargs)
 
+    def setup_joins(self, names, *args, **kwargs):
+        # This is a central method for resolving field names and joining the
+        # required tables when dealing with paths that involve relations. To
+        # also allow the usage of queryable properties across relations, the
+        # relation path on top of the stack must be prepended to trick Django
+        # into resolving correctly.
+        if self._queryable_property_stack:
+            names = self._queryable_property_stack[-1].relation_path + tuple(names)
+        return super(QueryablePropertiesQueryMixin, self).setup_joins(names, *args, **kwargs)
+
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
-        obj.init_injected_attrs()
+        if not isinstance(obj, QueryablePropertiesQueryMixin):
+            QueryablePropertiesQueryMixin.inject_into_object(obj)
+        else:
+            obj.init_injected_attrs()
         obj._queryable_property_annotations.update(self._queryable_property_annotations)
         return obj
