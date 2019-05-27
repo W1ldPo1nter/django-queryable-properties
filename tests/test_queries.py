@@ -15,6 +15,7 @@ from django.utils import six
 from queryable_properties.exceptions import QueryablePropertyError
 
 from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
+                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 
@@ -76,6 +77,23 @@ class TestQueryFilters(object):
         # lead to a selection of the property annotation
         assert not model.highest_version._has_cached_value(application)
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason='annotations were tied to aggregates before Django 1.8')
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_filter_with_required_annotation_across_relation(self, versions, model):
+        queryset = model.objects.filter(versions__changes_or_default='(No data)')
+        assert 'versions__changes_or_default' in queryset.query.annotations
+        assert len(queryset) == 6
+        assert all(obj.versions.filter(changes_or_default='(No data)').exists() for obj in queryset)
+        assert queryset.distinct().count() == 2
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason='annotations were tied to aggregates before Django 1.8')
+    @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
+    def test_filter_with_required_annotation_and_dependency_across_relation(self, versions, model):
+        queryset = model.objects.filter(applications__lowered_version_changes='amazing new features')
+        assert 'applications__lowered_version_changes' in queryset.query.annotations
+        assert len(queryset) == 3
+        assert queryset.distinct().count() == 2
+
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_filter_implementation_used_despite_present_annotation(self, versions, model):
         queryset = model.objects.select_properties('version').filter(version='2.0.0')
@@ -122,7 +140,7 @@ class TestNonModelInstanceQueries(object):
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_values_before_annotate(self, versions, model):
-        values = model.objects.values('category').select_properties('version_count')
+        values = model.objects.values('common_data').select_properties('version_count')
         assert len(values) == 1
         assert values[0]['version_count'] == len(versions) / 2
 

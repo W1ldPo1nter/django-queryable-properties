@@ -1,9 +1,9 @@
 # encoding: utf-8
 from django.db import models
 try:
-    from django.db.models.functions import Concat
+    from django.db.models.functions import Coalesce, Concat, Lower
 except ImportError:
-    Concat = None
+    Coalesce = Concat = Lower = None
 
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (AnnotationMixin, QueryableProperty, queryable_property, SetterMixin,
@@ -57,6 +57,12 @@ class VersionCountProperty(AnnotationMixin, QueryableProperty):
         return models.Count('versions')
 
 
+class LoweredVersionChangesProperty(AnnotationMixin, QueryableProperty):
+
+    def get_annotation(self, cls):
+        return Lower('versions__changes_or_default')
+
+
 class MajorMinorVersionProperty(UpdateMixin, QueryableProperty):
 
     def get_value(self, obj):
@@ -102,20 +108,53 @@ class FullVersionProperty(UpdateMixin, AnnotationMixin, SetterMixin, QueryablePr
         return dict(major_minor=parts[0], patch=parts[1])
 
 
+class DefaultChangesProperty(AnnotationMixin, QueryableProperty):
+
+    def get_value(self, obj):
+        return obj.changes or '(No data)'
+
+    def get_annotation(self, cls):
+        from django.db.models import Value
+        return Coalesce('changes', Value('(No data)'))
+
+
+class Category(models.Model):
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        abstract = True
+
+
+class CategoryWithClassBasedProperties(Category):
+    objects = QueryablePropertiesManager()
+
+    class Meta:
+        verbose_name = 'Category'
+
+
+class CategoryWithDecoratorBasedProperties(Category):
+    objects = QueryablePropertiesManager()
+
+    class Meta:
+        verbose_name = 'Category'
+
+
 class Application(models.Model):
     name = models.CharField(max_length=255)
-    category = models.CharField(max_length=255, default='Demo apps')
+    common_data = models.IntegerField(default=0)
 
     class Meta:
         abstract = True
 
 
 class ApplicationWithClassBasedProperties(Application):
+    categories = models.ManyToManyField(CategoryWithClassBasedProperties, related_name='applications')
 
     objects = QueryablePropertiesManager()
 
     highest_version = HighestVersionProperty()
     version_count = VersionCountProperty()
+    lowered_version_changes = LoweredVersionChangesProperty()
     dummy = DummyProperty()
 
     class Meta:
@@ -123,6 +162,7 @@ class ApplicationWithClassBasedProperties(Application):
 
 
 class ApplicationWithDecoratorBasedProperties(Application):
+    categories = models.ManyToManyField(CategoryWithDecoratorBasedProperties, related_name='applications')
 
     objects = QueryablePropertiesManager()
 
@@ -162,11 +202,21 @@ class ApplicationWithDecoratorBasedProperties(Application):
     def version_count(cls):
         return models.Count('versions')
 
+    @queryable_property
+    def lowered_version_changes(self):
+        raise NotImplementedError()
+
+    @lowered_version_changes.annotater
+    @classmethod
+    def lowered_version_changes(cls):
+        return Lower('versions__changes_or_default')
+
 
 class Version(models.Model):
     major = models.IntegerField()
     minor = models.IntegerField()
     patch = models.IntegerField()
+    changes = models.TextField(null=True, blank=True)
 
     class Meta:
         abstract = True
@@ -180,6 +230,7 @@ class VersionWithClassBasedProperties(Version):
 
     major_minor = MajorMinorVersionProperty()
     version = FullVersionProperty()
+    changes_or_default = DefaultChangesProperty()
 
     class Meta:
         verbose_name = 'Version'
@@ -243,3 +294,13 @@ class VersionWithDecoratorBasedProperties(Version):
     def version(cls, value):
         parts = value.rsplit('.', 1)
         return dict(major_minor=parts[0], patch=parts[1])
+
+    @queryable_property
+    def changes_or_default(self):
+        return self.changes or '(No data)'
+
+    @changes_or_default.annotater
+    @classmethod
+    def changes_or_default(cls):
+        from django.db.models import Value
+        return Coalesce('changes', Value('(No data)'))
