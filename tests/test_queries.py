@@ -95,7 +95,7 @@ class TestQueryFilters(object):
         assert queryset.distinct().count() == 2
 
     @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
-    def test_filter_without_required_annotation_across_relation(self, versions, model):
+    def test_filter_with_required_annotation_across_relation(self, versions, model):
         queryset = model.objects.filter(applications__version_count=4)
         assert 'applications__version_count' in queryset.query.annotations
         assert len(queryset) == 3
