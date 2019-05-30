@@ -56,6 +56,22 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
             q_obj = modify_tree_node(q_obj, lambda item: (LOOKUP_SEP.join(self.relation_path + (item[0],)), item[1]))
         return q_obj
 
+    def get_annotation(self):
+        """
+        A wrapper for the get_annotation method of the property this reference
+        points to. It checks if the property actually supports annotation
+        creation performs the internal call with the correct model class.
+
+        :return: An annotation object.
+        """
+        if not self.property.get_annotation:
+            raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
+                                         'implement annotation creation.'.format(self.property.name))
+        # Use the model stored on this reference instead of the one on the
+        # property since the query may be happening from a subclass of the
+        # model the property is defined on.
+        return self.property.get_annotation(self.model)
+
 
 class QueryablePropertiesQueryMixin(InjectableMixin):
     """
@@ -142,29 +158,6 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         with self.add_queryable_property_annotation(property_ref) as annotation:
             return annotation
 
-    def _annotate_queryable_property(self, property_ref):
-        """
-        Internal routine to add the annotation of the queryable property to
-        this query.
-
-        :param QueryablePropertyReference property_ref: A reference containing
-                                                        the queryable property
-                                                        to annotate.
-        """
-        prop = property_ref.property
-        if not prop.get_annotation:
-            raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
-                                         'implement annotation creation.'.format(prop.name))
-
-        self.add_annotation(prop.get_annotation(property_ref.model), alias=property_ref.full_path, is_summary=False)
-        # Perform the required GROUP BY setup if the annotation contained
-        # aggregates, which is normally done by QuerySet.annotate. In older
-        # Django versions, the contains_aggregate attribute didn't exist,
-        # but aggregates are always assumed in this case since annotations
-        # were strongly tied to aggregates.
-        if getattr(self.annotations[property_ref.full_path], 'contains_aggregate', True) and self.group_by is not True:
-            self.set_group_by()
-
     @contextmanager
     def add_queryable_property_annotation(self, property_ref, select=False):
         """
@@ -188,7 +181,15 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         self._queryable_property_stack.append(property_ref)
         try:
             if property_ref not in self._queryable_property_annotations:
-                self._annotate_queryable_property(property_ref)
+                self.add_annotation(property_ref.get_annotation(), alias=property_ref.full_path, is_summary=False)
+                # Perform the required GROUP BY setup if the annotation contained
+                # aggregates, which is normally done by QuerySet.annotate. In older
+                # Django versions, the contains_aggregate attribute didn't exist,
+                # but aggregates are always assumed in this case since annotations
+                # were strongly tied to aggregates.
+                if (getattr(self.annotations[property_ref.full_path], 'contains_aggregate', True) and
+                        self.group_by is not True):
+                    self.set_group_by()
             else:
                 select = select or self._queryable_property_annotations[property_ref]
             self._queryable_property_annotations[property_ref] = select
