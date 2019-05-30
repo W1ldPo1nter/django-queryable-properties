@@ -44,7 +44,7 @@ class ToxCommand(Command):
     Distutils command to run tests via tox, which must be installed and be able
     to access all supported python versions.
     """
-    description = ('Run tests using tox, which must already be installed and be able to access all supported python'
+    description = ('Run tests using tox, which must already be installed and be able to access all supported python '
                    'versions to create its environments.')
     user_options = []
 
