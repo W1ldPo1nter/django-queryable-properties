@@ -284,6 +284,18 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         return super(QueryablePropertiesQueryMixin, self).resolve_ref(name, allow_joins, reuse, summarize,
                                                                       *args, **kwargs)
 
+    def set_group_by(self, *args, **kwargs):
+        # This method is just to set up the fields that must be included in a
+        # GROUP BY clause. If it is called while a related queryable property
+        # is on top of the stack, the PK field of the model the property is
+        # defined on must be added to those fields to ensure that aggregates
+        # are applied to the correct records.
+        super(QueryablePropertiesQueryMixin, self).set_group_by(*args, **kwargs)
+        if self._queryable_property_stack and self._queryable_property_stack[-1].relation_path:
+            path = LOOKUP_SEP.join(self._queryable_property_stack[-1].relation_path + ('pk',))
+            if path not in self.group_by:
+                self.group_by += (path,)
+
     def setup_joins(self, names, *args, **kwargs):
         # This is a central method for resolving field names and joining the
         # required tables when dealing with paths that involve relations. To
@@ -296,7 +308,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
 
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
-        if not isinstance(obj, QueryablePropertiesQueryMixin):
+        if not isinstance(obj, QueryablePropertiesQueryMixin):  # pragma: no cover
             QueryablePropertiesQueryMixin.inject_into_object(obj)
         else:
             obj.init_injected_attrs()

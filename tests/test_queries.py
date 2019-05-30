@@ -94,6 +94,14 @@ class TestQueryFilters(object):
         assert len(queryset) == 3
         assert queryset.distinct().count() == 2
 
+    @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
+    def test_filter_without_required_annotation_across_relation(self, versions, model):
+        queryset = model.objects.filter(applications__version_count=4)
+        assert 'applications__version_count' in queryset.query.annotations
+        assert len(queryset) == 3
+        assert queryset.distinct().count() == 2
+        assert not model.objects.filter(applications__version_count=3).exists()
+
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_filter_implementation_used_despite_present_annotation(self, versions, model):
         queryset = model.objects.select_properties('version').filter(version='2.0.0')
@@ -202,6 +210,11 @@ class TestQueryAnnotations(object):
         assert result['total_version_count'] == len(versions) / 2  # List contains objects for both approaches
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_aggregation_based_on_queryable_property_across_relation(self, versions, model):
+        result = model.objects.aggregate(total_version_count=models.Sum('application__version_count'))
+        assert result['total_version_count'] == len(versions) ** 2 / 8  # List contains objects for both approaches
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_iterator(self, versions, model):
         queryset = model.objects.filter(major_minor='2.0').select_properties('version')
         for version in queryset.iterator():
@@ -294,7 +307,7 @@ class TestQueryOrdering(object):
         (VersionWithClassBasedProperties, Concat(models.Value('V'), 'version').desc(), True, True),
         (VersionWithDecoratorBasedProperties, Concat(models.Value('V'), 'version').desc(), True, True),
     ]))
-    def test_order_by_property_with_annotater(self, model, order_by, reverse, with_selection, versions):
+    def test_order_by_property_with_annotater(self, versions, model, order_by, reverse, with_selection):
         queryset = model.objects.all()
         if with_selection:
             queryset = queryset.select_properties('version')
@@ -303,6 +316,12 @@ class TestQueryOrdering(object):
         # Check that ordering by a property annotation does not lead to a
         # selection of the property annotation
         assert all(model.version._has_cached_value(version) is with_selection for version in results)
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_order_by_property_with_annotater_across_relation(self, versions, model):
+        model.objects.all()[0].delete()  # Create a different version count for the application fixtures
+        results = list(model.objects.order_by('application__version_count'))
+        assert results == sorted(results, key=lambda version: version.application.version_count)
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_annotater(self, model):
