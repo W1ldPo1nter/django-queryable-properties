@@ -4,7 +4,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
-                     convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP)
+                     convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP, Ref)
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin, modify_tree_node
 
@@ -201,7 +201,10 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # This method is called in older versions to add an aggregation or
         # annotation. Since both might be based on a queryable property, an
         # auto-annotation has to occur here.
-        self._auto_annotate(aggregate.lookup.split(LOOKUP_SEP))
+        path = tuple(aggregate.lookup.split(LOOKUP_SEP))
+        if self._queryable_property_stack:
+            path = self._queryable_property_stack[-1].relation_path + path
+        self._auto_annotate(path)
         # The overridden method also allows to set a default value for the
         # model parameter, which will be missing if add_annotation calls are
         # redirected to add_aggregate for older Django versions.
@@ -279,7 +282,6 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
                 # the inner queries.
-                from django.db.models.expressions import Ref
                 return Ref(name, property_annotation)
             return property_annotation
         return super(QueryablePropertiesQueryMixin, self).resolve_ref(name, allow_joins, reuse, summarize,
@@ -293,9 +295,14 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # are applied to the correct records.
         super(QueryablePropertiesQueryMixin, self).set_group_by(*args, **kwargs)
         if self._queryable_property_stack and self._queryable_property_stack[-1].relation_path:
-            path = LOOKUP_SEP.join(self._queryable_property_stack[-1].relation_path + ('pk',))
-            if path not in self.group_by:
-                self.group_by += (path,)
+            # Recent Django versions have objects to represent references to
+            # columns, while older versions express this via tuples/strings.
+            if Ref is not None:
+                group_by = self.resolve_ref('pk')
+            else:
+                opts = self._queryable_property_stack[-1].model._meta
+                group_by = (opts.db_table, opts.pk.column)
+            self.group_by += (group_by,)
 
     def setup_joins(self, names, *args, **kwargs):
         # This is a central method for resolving field names and joining the
