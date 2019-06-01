@@ -53,13 +53,15 @@ class TestQueryFilters(object):
         assert all(obj.version == '1.2.3' for obj in queryset)
 
     @pytest.mark.parametrize('model, filters, expected_count', [
-        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}, 2),
-        (ApplicationWithClassBasedProperties, {'version_count': 4, 'name__contains': 'cool'}, 1),
-        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}, 2),
-        (ApplicationWithDecoratorBasedProperties, {'version_count': 4, 'name__contains': 'cool'}, 1),
+        (ApplicationWithClassBasedProperties, models.Q(version_count__gt=3), 2),
+        (ApplicationWithClassBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
+        (ApplicationWithClassBasedProperties, models.Q(version_count=4) | models.Q(name__contains='cool'), 2),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count__gt=3), 2),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count=4) | models.Q(name__contains='cool'), 2),
     ])
     def test_filter_with_required_aggregate_annotation(self, versions, model, filters, expected_count):
-        queryset = model.objects.filter(**filters)
+        queryset = model.objects.filter(filters)
         assert 'version_count' in queryset.query.annotations
         assert len(queryset) == expected_count
         # Check that a property annotation used implicitly by a filter does not
