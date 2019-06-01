@@ -103,3 +103,18 @@ def chain_query(query, *args, **kwargs):
     """
     method = getattr(query, QUERY_CHAIN_METHOD_NAME)
     return method(*args, **kwargs)
+
+
+def contains_aggregate(annotation):
+    """
+    Check if the given annotation contains an aggregate.
+
+    :param annotation: The annotation to check.
+    :return: True if the annotation contains an aggregate; otherwise False.
+    :rtype: bool
+    """
+    # While annotations can mark themselves as containing an aggregate via the
+    # contains_aggregate attribute in recent Django versions, this was not the
+    # case in old versions. Annotations were strongly tied to aggregates in
+    # these versions though, so an aggregate is always assumed in this case.
+    return getattr(annotation, 'contains_aggregate', True)
