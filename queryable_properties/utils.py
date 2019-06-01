@@ -74,7 +74,8 @@ class InjectableMixin(object):
         if created_class is None:
             # Make sure objects of a dynamically created class can be pickled.
             def __reduce__(self):
-                return _unpickle_injected_object, (base_class, cls, class_name), self.__dict__
+                get_state = getattr(self, '__getstate__', lambda: self.__dict__)
+                return _unpickle_injected_object, (base_class, cls, class_name), get_state()
 
             created_class = cls._created_classes[cache_key] = type(class_name, (cls, base_class),
                                                                    {'__reduce__': __reduce__})
