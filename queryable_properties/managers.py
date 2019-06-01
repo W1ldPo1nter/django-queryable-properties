@@ -239,9 +239,13 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         :rtype: QueryablePropertiesQuerySetMixin
         """
         queryset = chain_queryset(self)
+        # A full GROUP BY is required if the query is not limited to certain
+        # fields. Since only certain types of queries had the _fields attribute
+        # in old Django versions, fall back to checking for existing grouping.
+        full_group_by = not getattr(self, '_fields', self.query.group_by is not None)
         for name in names:
             prop = get_queryable_property(self.model, name)
-            queryset.query.add_queryable_property_annotation(prop, select=True)
+            queryset.query.add_queryable_property_annotation(prop, select=True, full_group_by=full_group_by)
         if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP and isinstance(self, ValuesQuerySet):  # pragma: no cover
             # In older Django versions, the annotation mask was changed by the
             # queryset itself when applying annotations to a ValuesQuerySet.

@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
-                     convert_build_filter_to_add_q_kwargs, LOOKUP_SEP)
+                     contains_aggregate, convert_build_filter_to_add_q_kwargs, LOOKUP_SEP)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin
 
@@ -86,7 +86,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         prop = self._resolve_queryable_property(path)
         return prop and self.add_queryable_property_annotation(prop)
 
-    def add_queryable_property_annotation(self, prop, select=False):
+    def add_queryable_property_annotation(self, prop, select=False,
+                                          full_group_by=bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP)):
         """
         Add an annotation for the given queryable property to this query (if
         it wasn't annotated already). An exception will be raised if the
@@ -96,6 +97,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             The property to add an annotation for.
         :param bool select: Signals whether the annotation should be selected
                             or not.
+        :param bool full_group_by: Signals whether to use all fields of the
+                                   query for the GROUP BY clause when dealing
+                                   with an aggregate-based annotation or not.
         :return: The resolved annotation.
         """
         if prop not in self._queryable_property_annotations:
@@ -103,15 +107,23 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
                                              'implement annotation creation.'.format(prop.name))
             self.add_annotation(prop.get_annotation(self.model), alias=prop.name, is_summary=False)
-            # Perform the required GROUP BY setup if the annotation contained
-            # aggregates, which is normally done by QuerySet.annotate. In older
-            # Django versions, the contains_aggregate attribute didn't exist,
-            # but aggregates are always assumed in this case since annotations
-            # were strongly tied to aggregates.
-            if getattr(self.annotations[prop.name], 'contains_aggregate', True) and self.group_by is not True:
+
+        # Perform the required GROUP BY setup if the annotation contained
+        # aggregates, which is normally done by QuerySet.annotate.
+        annotation = self.annotations[prop.name]
+        if contains_aggregate(annotation):
+            if full_group_by and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
+                # In recent Django versions, a full GROUP BY can be achieved by
+                # simply setting group_by to True.
+                self.group_by = True
+            else:
+                if full_group_by:
+                    # In old versions, the fields must be added to the selected
+                    # fields manually and set_group_by must be called after.
+                    self.add_fields([f.attname for f in self.model._meta.concrete_fields], False)
                 self.set_group_by()
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
-        return self.annotations[prop.name]
+        return annotation
 
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
         # This method is called in older versions to add an aggregation or
