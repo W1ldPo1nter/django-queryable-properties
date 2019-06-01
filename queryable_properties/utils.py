@@ -1,6 +1,7 @@
 # encoding: utf-8
 
 from django.utils import six
+from django.utils.tree import Node
 
 from .exceptions import QueryablePropertyDoesNotExist
 
@@ -125,3 +126,34 @@ def _unpickle_injected_object(base_class, mixin_class, class_name=None):
 
 
 _unpickle_injected_object.__safe_for_unpickling__ = True
+
+
+class TreeNodeProcessor(object):
+    """
+    A utility class to simplify working with Django's Node objects.
+    """
+
+    def __init__(self, node):
+        """
+        Initialize a new node processor for the given node.
+
+        :param Node node: The node to process.
+        """
+        self.node = node
+
+    def check_leaves(self, predicate):
+        """
+        Check if any leaf of this processor's node matches the given predicate.
+
+        :param function predicate: A function that the leaves of the node will
+                                   be tested against. Must take a single
+                                   parameter that represents the leaf value.
+        :return: True if any leaf matched the predicate; otherwise False.
+        :rtype: bool
+        """
+        for child in self.node.children:
+            if isinstance(child, Node) and TreeNodeProcessor(child).check_leaves(predicate):
+                return True
+            elif not isinstance(child, Node) and predicate(child):
+                return True
+        return False
