@@ -65,6 +65,17 @@ class TestQueryFilters(object):
         # lead to a selection of the property annotation
         assert not model.highest_version._has_cached_value(application)
 
+    @pytest.mark.parametrize('model, filters, expected_count', [
+        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}, 2),
+        (ApplicationWithClassBasedProperties, {'version_count': 4, 'name__contains': 'cool'}, 1),
+        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}, 2),
+        (ApplicationWithDecoratorBasedProperties, {'version_count': 4, 'name__contains': 'cool'}, 1),
+    ])
+    def test_filter_with_required_aggregate_annotation(self, versions, model, filters, expected_count):
+        queryset = model.objects.filter(**filters)
+        assert 'version_count' in queryset.query.annotations
+        assert queryset.count() == expected_count
+
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_filter_implementation_used_despite_present_annotation(self, versions, model):
         queryset = model.objects.select_properties('version').filter(version='2.0.0')
@@ -168,7 +179,7 @@ class TestQueryAnnotations(object):
             assert not model.version._has_cached_value(version)
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-    def test_aggregation_based_on_queryable_property(self, versions, model):
+    def test_aggregate_based_on_queryable_property(self, versions, model):
         result = model.objects.aggregate(total_version_count=models.Sum('version_count'))
         assert result['total_version_count'] == len(versions) / 2  # List contains objects for both approaches
 
