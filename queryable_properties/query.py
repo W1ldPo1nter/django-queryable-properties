@@ -2,10 +2,12 @@
 
 from contextlib import contextmanager
 
+from django.utils.tree import Node
+
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
                      contains_aggregate, convert_build_filter_to_add_q_kwargs, LOOKUP_SEP)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from .utils import get_queryable_property, InjectableMixin
+from .utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
 
 
 class QueryablePropertiesQueryMixin(InjectableMixin):
@@ -117,7 +119,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 # simply setting group_by to True.
                 self.group_by = True
             else:
-                if full_group_by:
+                if full_group_by:  # pragma: no cover
                     # In old versions, the fields must be added to the selected
                     # fields manually and set_group_by must be called after.
                     self.add_fields([f.attname for f in self.model._meta.concrete_fields], False)
@@ -188,8 +190,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         if prop.filter_requires_annotation:
             self.add_queryable_property_annotation(prop)
             required_annotation_prop = prop
-        lookup = path[1] if len(path) > 1 else 'exact'
-        q_object = prop.get_filter(self.model, lookup, value)
+        q_object = prop.get_filter(self.model, LOOKUP_SEP.join(path[1:]) or 'exact', value)
         # Luckily, build_filter and _add_q use the same return value
         # structure, so an _add_q call can be used to actually create the
         # return value for the current call.
@@ -199,11 +200,43 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             method = getattr(self, ADD_Q_METHOD_NAME)
             return method(q_object, **convert_build_filter_to_add_q_kwargs(**kwargs))
 
+    def need_having(self, obj):  # pragma: no cover
+        # This method is used by older Django versions to figure out if the
+        # filter represented by a Q object must be put in the HAVING clause of
+        # the query. Since a queryable property might add an aggregate-based
+        # annotation during the actual filter application, this method must
+        # return True if a filter condition contains such a property.
+        def is_aggregate_property(item):
+            path = item[0].split(LOOKUP_SEP)
+            prop = self._resolve_queryable_property(path)
+            if not prop:
+                return False
+            if prop.filter_requires_annotation:
+                if not prop.get_annotation:
+                    raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does '
+                                                 'not implement annotation creation.'.format(prop.name))
+                if contains_aggregate(prop.get_annotation(self.model)):
+                    return True
+            # Also check the Q object returned by the property's get_filter
+            # method as it may contain references to other properties that may
+            # add aggregation-based annotations.
+            if not prop.get_filter:
+                raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
+                                             'implement filtering.'.format(prop.name))
+            q_object = prop.get_filter(self.model, LOOKUP_SEP.join(path[1:]) or 'exact', item[1])
+            return TreeNodeProcessor(q_object).check_leaves(is_aggregate_property)
+
+        if isinstance(obj, Node) and TreeNodeProcessor(obj).check_leaves(is_aggregate_property):
+            return True
+        elif not isinstance(obj, Node) and is_aggregate_property(obj):
+            return True
+        return super(QueryablePropertiesQueryMixin, self).need_having(obj)
+
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
         # This method is used to resolve field names in complex expressions. If
         # a queryable property is used in such an expression, it needs to be
         # auto-annotated and returned here.
-        property_annotation = self._auto_annotate([name])
+        property_annotation = self._auto_annotate(name.split(LOOKUP_SEP))
         if property_annotation:
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
