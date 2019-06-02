@@ -33,14 +33,14 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
             return self.property.name
         return LOOKUP_SEP.join(self.relation_path + (self.property.name,))
 
-    def get_filter(self, lookup, value):
+    def get_filter(self, lookups, value):
         """
         A wrapper for the get_filter method of the property this reference
         points to. It checks if the property actually supports filtering and
         applies the relation path (if any) to the returned Q object.
 
-        :param str lookup: The lookup to use for the filter (e.g. 'exact',
-                           'lt', etc.)
+        :param collections.Sequence[str] lookups: The lookups/transforms to use
+                                                  for the filter.
         :param value: The value passed to the filter condition.
         :return: A Q object to filter using this property.
         :rtype: django.db.models.Q
@@ -52,7 +52,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         # Use the model stored on this reference instead of the one on the
         # property since the query may be happening from a subclass of the
         # model the property is defined on.
-        q_obj = self.property.get_filter(self.model, lookup, value)
+        q_obj = self.property.get_filter(self.model, LOOKUP_SEP.join(lookups) or 'exact', value)
         if self.relation_path:
             # If the resolved property belongs to a related model, all actual
             # conditions in the returned Q object must be modified to use the
@@ -267,9 +267,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             base_method = getattr(super(QueryablePropertiesQueryMixin, self), BUILD_FILTER_METHOD_NAME)
             return base_method(filter_expr, *args, **kwargs)
 
-        lookup = LOOKUP_SEP.join(lookups) if lookups else 'exact'
-        q_obj = property_ref.get_filter(lookup, value)
-
+        q_obj = property_ref.get_filter(lookups, value)
         # Before applying the filter implemented by the property, check if
         # the property signals the need of its own annotation to function.
         # If so, add the annotation first to avoid endless recursion, since
@@ -302,23 +300,15 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # return True if a filter condition contains such a property.
         def is_aggregate_property(item):
             path = item[0].split(LOOKUP_SEP)
-            prop = self._resolve_queryable_property(path)
-            if not prop:
+            property_ref, lookups = self._resolve_queryable_property(path)
+            if not property_ref:
                 return False
-            if prop.filter_requires_annotation:
-                if not prop.get_annotation:
-                    raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does '
-                                                 'not implement annotation creation.'.format(prop.name))
-                if contains_aggregate(prop.get_annotation(self.model)):
-                    return True
+            if property_ref.property.filter_requires_annotation and contains_aggregate(property_ref.get_annotation()):
+                return True
             # Also check the Q object returned by the property's get_filter
             # method as it may contain references to other properties that may
             # add aggregation-based annotations.
-            if not prop.get_filter:
-                raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
-                                             'implement filtering.'.format(prop.name))
-            q_object = prop.get_filter(self.model, LOOKUP_SEP.join(path[1:]) or 'exact', item[1])
-            return TreeNodeProcessor(q_object).check_leaves(is_aggregate_property)
+            return TreeNodeProcessor(property_ref.get_filter(lookups, item[1])).check_leaves(is_aggregate_property)
 
         if isinstance(obj, Node) and TreeNodeProcessor(obj).check_leaves(is_aggregate_property):
             return True
@@ -358,7 +348,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # columns, while older versions express this via tuples/strings.
             if Ref is not None:
                 group_by = self.resolve_ref('pk')
-            else:
+            else:  # pragma: no cover
                 opts = self._queryable_property_stack[-1].model._meta
                 group_by = (opts.db_table, opts.pk.column)
             self.group_by += (group_by,)
