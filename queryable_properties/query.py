@@ -14,7 +14,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
     """
     A mixin for :class:`django.db.models.sql.Query` objects that extends the
     original Django objects to deal with queryable properties, e.g. managing
-    used properties or automatically add required properties as annotations.
+    used properties or automatically adding required properties as annotations.
     """
 
     def __init__(self, *args, **kwargs):
@@ -146,7 +146,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # only occur in old versions.
         if BUILD_FILTER_METHOD_NAME == 'add_filter':
             # Simply use the build_filter implementation that does all the
-            # having lifting and is aware of the different methods in different
+            # heavy lifting and is aware of the different methods in different
             # versions and therefore calls the correct super methods if
             # necessary.
             return self.build_filter(*args, **kwargs)

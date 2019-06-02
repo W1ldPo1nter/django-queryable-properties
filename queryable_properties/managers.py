@@ -108,7 +108,7 @@ class QueryablePropertiesModelIterable(InjectableMixin):
             # Older Django versions didn't make a clear distinction between
             # selected an non-selected annotations, therefore non-selected
             # annotations can only be removed from the annotation select dict
-            # in newer versions (to no unnecessarily query fields).
+            # in newer versions (to not unnecessarily query fields).
             if not requires_selection and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
                 select.pop(prop.name, None)
                 continue
@@ -236,7 +236,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
 
         :param names: Names of queryable properties.
         :return: A copy of this queryset with the added annotations.
-        :rtype: QueryablePropertiesQuerySetMixin
+        :rtype: QuerySet
         """
         queryset = chain_queryset(self)
         # A full GROUP BY is required if the query is not limited to certain

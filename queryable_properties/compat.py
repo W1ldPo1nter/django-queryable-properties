@@ -17,7 +17,7 @@ except ImportError:  # pragma: no cover
     from django.db.models.query import ValuesQuerySet  # noqa: F401
     ModelIterable = None
 
-# A dictionary mapping names of build_filter/add_filter keyword argument to
+# A dictionary mapping names of build_filter/add_filter keyword arguments to
 # keyword arguments for an _add_q/add_q call. It contains kwargs names for
 # all Django versions (some do not use all of these). If a keyword argument
 # is not part of this dictionary, it will not be passed through.

@@ -76,7 +76,7 @@ class QueryableProperty(object):
     filter_requires_annotation = False  #: Determines if using the property to filter requires annotating first.
 
     # Set the attributes of mixin methods to None for easier checks if a
-    # property implements them
+    # property implements them.
     set_value = None
     get_annotation = None
     get_update_kwargs = None
@@ -106,7 +106,7 @@ class QueryableProperty(object):
             raise AttributeError("Can't set queryable property.")
         return_value = self.set_value(obj, value)
         # If a value is set and the property is set up to cache values or has
-        # a current cache value, invoke the configured setter cache behavior.
+        # a current cached value, invoke the configured setter cache behavior.
         if self.cached or self._has_cached_value(obj):
             self.setter_cache_behavior(self, obj, value, return_value)
 
@@ -156,7 +156,7 @@ class QueryableProperty(object):
     def _get_cached_value(self, obj):
         """
         Get the cached value for this property from the given object. Requires
-        there to be a cached value.
+        a cached value to be present.
 
         :param django.db.models.Model obj: The object to get the cached value
                                            from.
@@ -188,7 +188,7 @@ class QueryableProperty(object):
     def _clear_cached_value(self, obj):
         """
         Clear the cached value for this property on the given object. Does not
-        require a cached value to exist and will do nothing if no value is
+        require a cached value to be present and will do nothing if no value is
         cached.
 
         :param django.db.models.Model obj: The object to clear the cached value
@@ -207,7 +207,8 @@ class SetterMixin(object):
         Setter method for the queryable property, which will be called when the
         property is write-accessed.
 
-        :param django.db.models.Model obj: The object on which the property was accessed.
+        :param django.db.models.Model obj: The object on which the property was
+                                           accessed.
         :param value: The value to set.
         """
         raise NotImplementedError()
@@ -441,8 +442,8 @@ class queryable_property(QueryableProperty):
         # method.
         if not self.get_filter:
             kwargs['filter'] = AnnotationMixin.get_filter
-        # If no value was explicitly set a for filter_requires_annotation, set
-        # it to True since the default filter implementation of the
+        # If no value was explicitly set for filter_requires_annotation, set it
+        # to True since the default filter implementation of the
         # AnnotationMixin acts the same way.
         if self.filter_requires_annotation is None:
             kwargs['filter_requires_annotation'] = True
