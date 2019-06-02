@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from django.utils.tree import Node
 
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
-                     contains_aggregate, convert_build_filter_to_add_q_kwargs, LOOKUP_SEP)
+                     contains_aggregate, convert_build_filter_to_add_q_kwargs, LOOKUP_SEP, NEED_HAVING_METHOD_NAME)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
 
@@ -122,7 +122,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 if full_group_by:  # pragma: no cover
                     # In old versions, the fields must be added to the selected
                     # fields manually and set_group_by must be called after.
-                    self.add_fields([f.attname for f in self.model._meta.concrete_fields], False)
+                    opts = self.model._meta
+                    self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
                 self.set_group_by()
         self._queryable_property_annotations[prop] = self._queryable_property_annotations.get(prop, False) or select
         return annotation
@@ -200,6 +201,13 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             method = getattr(self, ADD_Q_METHOD_NAME)
             return method(q_object, **convert_build_filter_to_add_q_kwargs(**kwargs))
 
+    def need_force_having(self, q_object):  # pragma: no cover
+        # Same as need_having, but for even older versions. Simply delegate to
+        # need_having, which is aware of the different methods in different
+        # versions and therefore calls the correct super methods if
+        # necessary.
+        return self.need_having(q_object)
+
     def need_having(self, obj):  # pragma: no cover
         # This method is used by older Django versions to figure out if the
         # filter represented by a Q object must be put in the HAVING clause of
@@ -230,7 +238,10 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             return True
         elif not isinstance(obj, Node) and is_aggregate_property(obj):
             return True
-        return super(QueryablePropertiesQueryMixin, self).need_having(obj)
+        # The base method has different names in different Django versions (see
+        # comment on the constant definition).
+        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NEED_HAVING_METHOD_NAME)
+        return base_method(obj)
 
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
         # This method is used to resolve field names in complex expressions. If

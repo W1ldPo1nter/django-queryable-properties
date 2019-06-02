@@ -39,6 +39,16 @@ if not hasattr(Query, 'build_filter'):  # pragma: no cover
     BUILD_FILTER_METHOD_NAME = 'add_filter'
     ADD_Q_METHOD_NAME = 'add_q'
 
+# Old Django versions (<1.9) had a method to check if filter conditions need
+# to be put into the HAVING clause instead of the WHERE clause. To get
+# queryable properties based on aggregates to work, these methods must be
+# intercepted if present.
+NEED_HAVING_METHOD_NAME = None
+if hasattr(Query, 'need_having'):  # pragma: no cover
+    NEED_HAVING_METHOD_NAME = 'need_having'
+elif hasattr(Query, 'need_force_having'):  # pragma: no cover
+    NEED_HAVING_METHOD_NAME = 'need_force_having'
+
 # The annotation-related attributes of Query objects had "aggregate" in their
 # name instead of "annotation" in old django versions (<1.8), because
 # annotations were strongly tied to aggregates.
