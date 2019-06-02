@@ -333,6 +333,7 @@ class queryable_property(QueryableProperty):
         decorators of this property.
 
         :param method_or_function: The decorated method or function.
+        :type method_or_function: function | classmethod | staticmethod
         :return: The actual function object.
         """
         return getattr(method_or_function, '__func__', method_or_function)
@@ -371,8 +372,9 @@ class queryable_property(QueryableProperty):
         :param method: The method to decorate. If it is None, the parameterized
                        usage of this decorator is assumed, so this method
                        returns the actual decorator function.
-        :param cached: If True, values returned by the decorated getter method
-                       will be cached.
+        :type method: function | classmethod | staticmethod
+        :param bool cached: If True, values returned by the decorated getter
+                            method will be cached.
         :return: A cloned queryable property or the actual decorator function.
         :rtype: queryable_property | function
         """
@@ -390,8 +392,9 @@ class queryable_property(QueryableProperty):
         (``@setter(cache_behavior=DO_NOTHING)``).
 
         :param method: The method to decorate.
-        :param cache_behavior: A function that defines how the setter interacts
-                               with cached values.
+        :type method: function | classmethod | staticmethod
+        :param function cache_behavior: A function that defines how the setter
+                                        interacts with cached values.
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
@@ -411,10 +414,12 @@ class queryable_property(QueryableProperty):
         :param method: The method to decorate. If it is None, the parameterized
                        usage of this decorator is assumed, so this method
                        returns the actual decorator function.
+        :type method: function | classmethod | staticmethod
         :param requires_annotation: True if filtering using this queryable
                                     property requires its annotation to be
                                     applied first; otherwise False. None if
                                     this information should not be changed.
+        :type requires_annotation: bool | None
         :return: A cloned queryable property or the actual decorator function.
         :rtype: queryable_property | function
         """
@@ -431,6 +436,7 @@ class queryable_property(QueryableProperty):
         annotation to represent this queryable property in querysets.
 
         :param method: The method to decorate.
+        :type method: function | classmethod | staticmethod
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
@@ -456,6 +462,7 @@ class queryable_property(QueryableProperty):
         keyword arguments.
 
         :param method: The method to decorate.
+        :type method: function | classmethod | staticmethod
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
