@@ -259,6 +259,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
 
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
-        obj._queryable_property_annotations = dict(self._queryable_property_annotations)
-        obj._required_annotation_stack = list(self._required_annotation_stack)
+        if not isinstance(obj, QueryablePropertiesQueryMixin):  # pragma: no cover
+            QueryablePropertiesQueryMixin.inject_into_object(obj)
+        else:
+            obj.init_injected_attrs()
+        obj._queryable_property_annotations.update(self._queryable_property_annotations)
         return obj
