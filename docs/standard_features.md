@@ -82,8 +82,8 @@ class VersionStringProperty(QueryableProperty):
 
 If there's ever a need for an exception from using the cache functionality, the cached value of a queryable property
 on a particular model instance can be reset at any time.
-This means that the getter's code will be executed again on the next access and the result will be used as a cached
-value again (since it's still a queryable property marked as cached).
+This means that the getter's code will be executed again on the next access and the result will be used as the new
+cached value (since it's still a queryable property marked as cached).
 To make this as simple as possible, a method `reset_property`, which takes the name of a defined queryable property as
 parameter, is automatically added to each model class that defines at least one queryable property.
 If a model class already defines a method with this name, it will *not* be overridden.
@@ -161,9 +161,10 @@ cached values and setters.
 ```
 
 There are 4 options that can be used via constants (which in reality are functions, much like Django's built-in values
-for the `on_delete` option of `ForeignKey` fields), which can be directly imported from `queryable_properties`:
+for the `on_delete` option of `ForeignKey` fields), which can be imported from `queryable_properties.properties`:
 - `CLEAR_CACHE` (default): After the setter is used, a cached value for this property on the model instance is reset.
-  The next use of the getter will therefore execute the getter code again and then cache the new value.
+  The next use of the getter will therefore execute the getter code again and then cache the new value (unless the
+  property isn't actually marked as cached).
 - `CACHE_VALUE`: After the setter is used, the cache for the queryable property on the model instance will be updated
   with the value that was passed to the setter.
 - `CACHE_RETURN_VALUE`: Like `CACHE_VALUE`, but the *return value* of the function decorated with `@<property>.setter`
@@ -178,7 +179,7 @@ To provide a simple example, the setter of the `version_str` property should now
 values starting with `'V'` (e.g. `'V2.0'` instead of just `'2.0'`) and the newly set value should be cached after the
 setter was used.
 Using `CACHE_VALUE` is therefore not a viable option as it would simply cache the value passed to the setter, which may
-or may not be prefixed with `'V'`, making the getter unreliable as it would return these cached values.
+or may not be prefixed with `'V'`, making the getter unreliable as it would return these unprocessed values.
 Instead, `CACHE_RETURN_VALUE` will be used to ensure the correct getter format for cached values.
 
 To achieve this using the decorator-based approach, the `cache_behavior` parameter of the `setter` decorator must be

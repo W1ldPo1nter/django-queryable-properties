@@ -6,7 +6,8 @@
 2) The code base grows and needs to be able to satisfy new demands.
 3) The logic of the properties from step 1 would now be useful in batch operations (read: queryset operations), making
    the current implementation less feasible, as it would likely perform additional queries per object in a queryset
-   operation. Also, regular properties do of course not offer queryset features like filtering, ordering, etc.
+   operation.
+   Also, regular properties do of course not offer queryset features like filtering, ordering, etc.
 
 Since Django offers a lot of powerful options when working with querysets (like `select_related`, annotations, etc.),
 it is generally not an issue to solve these problems and implement a solution, which will likely be based on one of the

@@ -31,8 +31,8 @@ class ApplicationVersion(models.Model):
 
 ```eval_rst
 .. note::
-   The ``classmethod`` decorator is not required, but makes the function look more natural since it takes the model class
-   as its first argument.
+   The ``classmethod`` decorator is not required, but makes the function look more natural since it takes the model
+   class as its first argument.
 ```
 
 Using the class-based approach, the same thing can be achieved by implementing the `get_update_kwargs` method of the

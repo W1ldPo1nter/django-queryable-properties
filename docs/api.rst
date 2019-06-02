@@ -22,7 +22,7 @@ Module ``queryable_properties.utils``
 
 .. automodule:: queryable_properties.utils
    :members:
-   :exclude-members: InjectableMixin, _unpickle_injected_object
+   :exclude-members: InjectableMixin, TreeNodeProcessor, _unpickle_injected_object
 
 Module ``queryable_properties.exceptions``
 ------------------------------------------
