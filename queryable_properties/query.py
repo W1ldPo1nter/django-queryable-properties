@@ -3,10 +3,13 @@
 from collections import namedtuple
 from contextlib import contextmanager
 
+from django.utils.tree import Node
+
 from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
-                     convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP, Ref)
+                     contains_aggregate, convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model,
+                     LOOKUP_SEP, NEED_HAVING_METHOD_NAME, Ref)
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
-from .utils import get_queryable_property, InjectableMixin, modify_tree_node
+from .utils import get_queryable_property, InjectableMixin, modify_tree_node, TreeNodeProcessor
 
 
 class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):
@@ -77,7 +80,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
     """
     A mixin for :class:`django.db.models.sql.Query` objects that extends the
     original Django objects to deal with queryable properties, e.g. managing
-    used properties or automatically add required properties as annotations.
+    used properties or automatically adding required properties as annotations.
     """
 
     def __getattr__(self, name):  # pragma: no cover
@@ -159,7 +162,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             return annotation
 
     @contextmanager
-    def add_queryable_property_annotation(self, property_ref, select=False):
+    def add_queryable_property_annotation(self, property_ref, select=False,
+                                          full_group_by=bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP)):
         """
         A context manager that adds a queryable property annotation to this
         query and performs management tasks around the annotation (stores the
@@ -173,6 +177,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                                                         to annotate.
         :param bool select: Signals whether the annotation should be selected
                             or not.
+        :param bool full_group_by: Signals whether to use all fields of the
+                                   query for the GROUP BY clause when dealing
+                                   with an aggregate-based annotation or not.
         """
         if property_ref in self._queryable_property_stack:
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
@@ -183,17 +190,24 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             if property_ref not in self._queryable_property_annotations:
                 self.add_annotation(property_ref.get_annotation(), alias=property_ref.full_path, is_summary=False)
                 # Perform the required GROUP BY setup if the annotation contained
-                # aggregates, which is normally done by QuerySet.annotate. In older
-                # Django versions, the contains_aggregate attribute didn't exist,
-                # but aggregates are always assumed in this case since annotations
-                # were strongly tied to aggregates.
-                if (getattr(self.annotations[property_ref.full_path], 'contains_aggregate', True) and
-                        self.group_by is not True):
-                    self.set_group_by()
+                # aggregates, which is normally done by QuerySet.annotate.
             else:
                 select = select or self._queryable_property_annotations[property_ref]
             self._queryable_property_annotations[property_ref] = select
-            yield self.annotations[property_ref.full_path]
+            annotation = self.annotations[property_ref.full_path]
+            if contains_aggregate(annotation):
+                if full_group_by and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
+                    # In recent Django versions, a full GROUP BY can be achieved by
+                    # simply setting group_by to True.
+                    self.group_by = True
+                else:
+                    if full_group_by:  # pragma: no cover
+                        # In old versions, the fields must be added to the selected
+                        # fields manually and set_group_by must be called after.
+                        opts = self.model._meta
+                        self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
+                    self.set_group_by()
+            yield annotation
         finally:
             self._queryable_property_stack.pop()
 
@@ -269,6 +283,48 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # constant definition).
             method = getattr(self, ADD_Q_METHOD_NAME)
             return method(q_obj, **convert_build_filter_to_add_q_kwargs(**kwargs))
+
+    def need_force_having(self, q_object):  # pragma: no cover
+        # Same as need_having, but for even older versions. Simply delegate to
+        # need_having, which is aware of the different methods in different
+        # versions and therefore calls the correct super methods if
+        # necessary.
+        return self.need_having(q_object)
+
+    def need_having(self, obj):  # pragma: no cover
+        # This method is used by older Django versions to figure out if the
+        # filter represented by a Q object must be put in the HAVING clause of
+        # the query. Since a queryable property might add an aggregate-based
+        # annotation during the actual filter application, this method must
+        # return True if a filter condition contains such a property.
+        def is_aggregate_property(item):
+            path = item[0].split(LOOKUP_SEP)
+            prop = self._resolve_queryable_property(path)
+            if not prop:
+                return False
+            if prop.filter_requires_annotation:
+                if not prop.get_annotation:
+                    raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does '
+                                                 'not implement annotation creation.'.format(prop.name))
+                if contains_aggregate(prop.get_annotation(self.model)):
+                    return True
+            # Also check the Q object returned by the property's get_filter
+            # method as it may contain references to other properties that may
+            # add aggregation-based annotations.
+            if not prop.get_filter:
+                raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
+                                             'implement filtering.'.format(prop.name))
+            q_object = prop.get_filter(self.model, LOOKUP_SEP.join(path[1:]) or 'exact', item[1])
+            return TreeNodeProcessor(q_object).check_leaves(is_aggregate_property)
+
+        if isinstance(obj, Node) and TreeNodeProcessor(obj).check_leaves(is_aggregate_property):
+            return True
+        elif not isinstance(obj, Node) and is_aggregate_property(obj):
+            return True
+        # The base method has different names in different Django versions (see
+        # comment on the constant definition).
+        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NEED_HAVING_METHOD_NAME)
+        return base_method(obj)
 
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
         # This method is used to resolve field names in complex expressions. If

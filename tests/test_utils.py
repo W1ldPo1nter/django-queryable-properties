@@ -6,7 +6,7 @@ from django.utils.six.moves import cPickle
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
-from queryable_properties.utils import get_queryable_property, InjectableMixin, modify_tree_node
+from queryable_properties.utils import get_queryable_property, InjectableMixin, modify_tree_node, TreeNodeProcessor
 
 from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 
@@ -97,6 +97,19 @@ class TestInjectableMixin(object):
             assert obj.attr2 == 42.42
             assert obj.mixin_attr1 == 1.337
             assert obj.mixin_attr2 == 'test'
+
+
+class TestTreeNodeProcessor(object):
+
+    @pytest.mark.parametrize('node, expected_result', [
+        (Q(a=1), True),
+        (Q(b=2), False),
+        (Q(Q(a=1) | Q(b=2), c=3), True),
+        (Q(Q(d=1) | Q(b=2), c=3), False),
+    ])
+    def test_check_leaves(self, node, expected_result):
+        # The predicate checks if a leaf for field 'a' exists
+        assert TreeNodeProcessor(node).check_leaves(lambda item: item[0] == 'a') is expected_result
 
 
 @pytest.mark.parametrize('copy', [True, False])

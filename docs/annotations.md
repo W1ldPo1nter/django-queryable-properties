@@ -27,14 +27,14 @@ class ApplicationVersion(Model):
     
     @version_str.annotater
     @classmethod
-    def version_str(cls, lookup, value):
+    def version_str(cls):
         return Concat('major', Value('.'), 'minor')
 ```
 
 ```eval_rst
 .. note::
-   The ``classmethod`` decorator is not required, but makes the function look more natural since it takes the model class
-   as its first argument.
+   The ``classmethod`` decorator is not required, but makes the function look more natural since it takes the model
+   class as its first argument.
 ```
 
 For the same implementation with the class-based approach, the `get_annotation` method of the property class must be
@@ -60,7 +60,7 @@ class VersionStringProperty(AnnotationMixin, QueryableProperty):
 
 In both cases, the function/method takes the model class as the single argument (useful to implement custom logic in
 inheritance scenarios) and must return an annotation - anything that would normally be passed to a `QuerySet.annotate`
-call, like simple `F` objects, aggregations, `Case` expressions, `Subquery` expressions, etc.
+call, like simple `F` objects, aggregates, `Case` expressions, `Subquery` expressions, etc.
 
 ```eval_rst
 .. note::
@@ -87,9 +87,9 @@ the same way (although they don't use the mixin directly).
 For decorator-based properties using the `annotater` decorator, it also automatically sets `filter_requires_annotation`
 to `True` unless another value was specified (see the following example).
 
-If the filter implementation shown in the [filtering chapter](filters.md) (which does not require the annotation and should
-therefore be configured accordingly) was to be retained despite annotating being implemented, the implementation could
-look like this using the decorator-based approach (note the `requires_annotation=False`):
+If the filter implementation shown in the [filtering chapter](filters.md) (which does not require the annotation and
+should therefore be configured accordingly) was to be retained despite annotating being implemented, the implementation
+could look like this using the decorator-based approach (note the `requires_annotation=False`):
 ```python
 from django.db.models import Model, Q, Value
 from django.db.models.functions import Concat
@@ -115,7 +115,7 @@ class ApplicationVersion(Model):
     
     @version_str.annotater
     @classmethod
-    def version_str(cls, lookup, value):
+    def version_str(cls):
         return Concat('major', Value('.'), 'minor')
 ```
 
@@ -173,8 +173,8 @@ These queryset operations include:
    in more recent versions. Queryable property annotations therefore have to be automatically added in a *selecting*
    manner for the scenarios above in those versions (which may have performance implications due to the additional
    columns that are queried), but their values will be discarded when model instances are created. This is done because
-   selected queryable properties behave differently (see below), which shouldn't unexpectedly happen in some Django
-   versions.
+   selected queryable properties behave differently (see below), and this behavior is meant to be consistent across
+   all supported Django versions.
 ```
 
 ## Selecting annotations

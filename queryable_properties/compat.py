@@ -27,7 +27,7 @@ except ImportError:  # pragma: no cover
     from django.db.models.query import ValuesQuerySet  # noqa: F401
     ModelIterable = None
 
-# A dictionary mapping names of build_filter/add_filter keyword argument to
+# A dictionary mapping names of build_filter/add_filter keyword arguments to
 # keyword arguments for an _add_q/add_q call. It contains kwargs names for
 # all Django versions (some do not use all of these). If a keyword argument
 # is not part of this dictionary, it will not be passed through.
@@ -48,6 +48,16 @@ ADD_Q_METHOD_NAME = '_add_q'
 if not hasattr(Query, 'build_filter'):  # pragma: no cover
     BUILD_FILTER_METHOD_NAME = 'add_filter'
     ADD_Q_METHOD_NAME = 'add_q'
+
+# Old Django versions (<1.9) had a method to check if filter conditions need
+# to be put into the HAVING clause instead of the WHERE clause. To get
+# queryable properties based on aggregates to work, these methods must be
+# intercepted if present.
+NEED_HAVING_METHOD_NAME = None
+if hasattr(Query, 'need_having'):  # pragma: no cover
+    NEED_HAVING_METHOD_NAME = 'need_having'
+elif hasattr(Query, 'need_force_having'):  # pragma: no cover
+    NEED_HAVING_METHOD_NAME = 'need_force_having'
 
 # The annotation-related attributes of Query objects had "aggregate" in their
 # name instead of "annotation" in old django versions (<1.8), because
@@ -113,6 +123,21 @@ def chain_query(query, *args, **kwargs):
     """
     method = getattr(query, QUERY_CHAIN_METHOD_NAME)
     return method(*args, **kwargs)
+
+
+def contains_aggregate(annotation):
+    """
+    Check if the given annotation contains an aggregate.
+
+    :param annotation: The annotation to check.
+    :return: True if the annotation contains an aggregate; otherwise False.
+    :rtype: bool
+    """
+    # While annotations can mark themselves as containing an aggregate via the
+    # contains_aggregate attribute in recent Django versions, this was not the
+    # case in old versions. Annotations were strongly tied to aggregates in
+    # these versions though, so an aggregate is always assumed in this case.
+    return getattr(annotation, 'contains_aggregate', True)
 
 
 def get_related_model(model, relation_field_name):

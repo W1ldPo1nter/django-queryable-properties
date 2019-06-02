@@ -109,7 +109,7 @@ class QueryablePropertiesModelIterable(InjectableMixin):
             # Older Django versions didn't make a clear distinction between
             # selected an non-selected annotations, therefore non-selected
             # annotations can only be removed from the annotation select dict
-            # in newer versions (to no unnecessarily query fields).
+            # in newer versions (to not unnecessarily query fields).
             if not requires_selection and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
                 select.pop(annotation_name, None)
                 continue
@@ -236,12 +236,17 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
 
         :param names: Names of queryable properties.
         :return: A copy of this queryset with the added annotations.
-        :rtype: QueryablePropertiesQuerySetMixin
+        :rtype: QuerySet
         """
         queryset = chain_queryset(self)
         for name in names:
             property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, ())
-            with queryset.query.add_queryable_property_annotation(property_ref, select=True):
+            # A full GROUP BY is required if the query is not limited to certain
+            # fields. Since only certain types of queries had the _fields attribute
+            # in old Django versions, fall back to checking for existing grouping.
+            full_group_by = not getattr(self, '_fields', self.query.group_by)
+            with queryset.query.add_queryable_property_annotation(property_ref, select=True,
+                                                                  full_group_by=full_group_by):
                 if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP and isinstance(self, ValuesQuerySet):  # pragma: no cover
                     # In older Django versions, the annotation mask was changed
                     # by the queryset itself when applying annotations to a

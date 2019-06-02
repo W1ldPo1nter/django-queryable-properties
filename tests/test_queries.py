@@ -23,6 +23,11 @@ from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecorat
 class TestQueryFilters(object):
 
     @pytest.mark.parametrize('model, filters, expected_count, expected_major_minor', [
+        # Test that filter that don't involve queryable properties still work
+        (VersionWithClassBasedProperties, models.Q(major=2, minor=0), 2, '2.0'),
+        (VersionWithDecoratorBasedProperties, models.Q(major=2, minor=0), 2, '2.0'),
+        (VersionWithClassBasedProperties, models.Q(minor=2) | models.Q(patch=3), 2, '1.2'),
+        (VersionWithDecoratorBasedProperties, models.Q(minor=2) | models.Q(patch=3), 2, '1.2'),
         # All querysets are expected to return objects with the same
         # major_minor value (major_minor parameter).
         (VersionWithClassBasedProperties, models.Q(major_minor='1.2'), 2, '1.2'),
@@ -64,8 +69,29 @@ class TestQueryFilters(object):
         assert len(queryset) == 2
         assert all(obj.versions.filter(version='1.2.3').exists() for obj in queryset)
 
+    @pytest.mark.parametrize('model, filters, expected_count', [
+        (ApplicationWithClassBasedProperties, models.Q(version_count__gt=3), 2),
+        (ApplicationWithClassBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
+        (ApplicationWithClassBasedProperties, models.Q(version_count=4) | models.Q(name__contains='cool'), 2),
+        (ApplicationWithClassBasedProperties, models.Q(version_count__gt=3, major_sum__gt=5), 0),
+        (ApplicationWithClassBasedProperties, models.Q(version_count__gt=3) | models.Q(major_sum__gt=5), 2),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count__gt=3), 2),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count=4) | models.Q(name__contains='cool'), 2),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count__gt=3, major_sum__gt=5), 0),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count__gt=3) | models.Q(major_sum__gt=5), 2),
+    ])
+    def test_filter_with_required_aggregate_annotation(self, versions, model, filters, expected_count):
+        queryset = model.objects.filter(filters)
+        assert 'version_count' in queryset.query.annotations
+        assert len(queryset) == expected_count
+        # Check that a property annotation used implicitly by a filter does not
+        # lead to a selection of the property annotation
+        assert all(not model.version_count._has_cached_value(app) for app in queryset)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-    def test_filter_with_required_annotation(self, versions, model):
+    def test_filter_with_required_subquery_annotation(self, versions, model):
         version_model = model.objects.all()[0].versions.model
         version_model.objects.filter(version='2.0.0')[0].delete()
         queryset = model.objects.filter(highest_version='2.0.0')
@@ -77,23 +103,6 @@ class TestQueryFilters(object):
         # lead to a selection of the property annotation
         assert not model.highest_version._has_cached_value(application)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason='annotations were tied to aggregates before Django 1.8')
-    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-    def test_filter_with_required_annotation_across_relation(self, versions, model):
-        queryset = model.objects.filter(versions__changes_or_default='(No data)')
-        assert 'versions__changes_or_default' in queryset.query.annotations
-        assert len(queryset) == 6
-        assert all(obj.versions.filter(changes_or_default='(No data)').exists() for obj in queryset)
-        assert queryset.distinct().count() == 2
-
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason='annotations were tied to aggregates before Django 1.8')
-    @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
-    def test_filter_with_required_annotation_and_dependency_across_relation(self, versions, model):
-        queryset = model.objects.filter(applications__lowered_version_changes='amazing new features')
-        assert 'applications__lowered_version_changes' in queryset.query.annotations
-        assert len(queryset) == 3
-        assert queryset.distinct().count() == 2
-
     @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
     def test_filter_with_required_aggregate_annotation_across_relation(self, versions, model):
         queryset = model.objects.filter(applications__version_count=4)
@@ -102,8 +111,35 @@ class TestQueryFilters(object):
         assert queryset.distinct().count() == 2
         assert not model.objects.filter(applications__version_count=3).exists()
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_filter_with_required_expression_annotation_across_relation(self, versions, model):
+        queryset = model.objects.filter(versions__changes_or_default='(No data)')
+        assert 'versions__changes_or_default' in queryset.query.annotations
+        assert len(queryset) == 6
+        assert all(obj.versions.filter(changes_or_default='(No data)').exists() for obj in queryset)
+        assert queryset.distinct().count() == 2
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
+    def test_filter_with_required_expression_annotation_and_dependency_across_relation(self, versions, model):
+        queryset = model.objects.filter(applications__lowered_version_changes='amazing new features')
+        assert 'applications__lowered_version_changes' in queryset.query.annotations
+        assert len(queryset) == 3
+        assert queryset.distinct().count() == 2
+
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_filter_implementation_used_despite_present_annotation(self, monkeypatch, versions, model):
+        # Patch the property to have a filter that is always True, then use a
+        # condition that would be False without the patch.
+        monkeypatch.setattr(model.version_count, 'get_filter', lambda cls, lookup, value: models.Q(pk__gt=0))
+        queryset = model.objects.select_properties('version_count').filter(version_count__gt=5)
+        assert '"id" > 0' in six.text_type(queryset.query)
+        assert queryset.count() == 2
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-    def test_filter_implementation_used_despite_present_annotation(self, versions, model):
+    def test_filter_implementation_used_despite_present_expression_annotation(self, versions, model):
         queryset = model.objects.select_properties('version').filter(version='2.0.0')
         pseudo_sql = six.text_type(queryset.query)
         assert '"major" = 2' in pseudo_sql
@@ -134,6 +170,21 @@ class TestQueryFilters(object):
 @pytest.mark.django_db
 class TestNonModelInstanceQueries(object):
 
+    @pytest.mark.parametrize('model, filters, expected_version_counts', [
+        (ApplicationWithClassBasedProperties, {}, {3, 4}),
+        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}, {4}),
+        (ApplicationWithClassBasedProperties, {'version_count': 5}, {}),
+        (ApplicationWithDecoratorBasedProperties, {}, {3, 4}),
+        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}, {4}),
+        (ApplicationWithDecoratorBasedProperties, {'version_count': 5}, {}),
+    ])
+    def test_aggregate_values_after_annotate(self, versions, model, filters, expected_version_counts):
+        # Delete one version to create separate version counts
+        model.objects.all()[0].versions.all()[0].delete()
+        queryset = model.objects.filter(**filters).select_properties('version_count').values('version_count')
+        assert all(obj_dict['version_count'] in expected_version_counts for obj_dict in queryset)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, filters, expected_versions', [
         (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
         (VersionWithClassBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
@@ -142,7 +193,7 @@ class TestNonModelInstanceQueries(object):
         (VersionWithDecoratorBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
         (VersionWithDecoratorBasedProperties, {'version': '2.0.0'}, {'2.0.0'}),
     ])
-    def test_values_after_annotate(self, versions, model, filters, expected_versions):
+    def test_expression_values_after_annotate(self, versions, model, filters, expected_versions):
         queryset = model.objects.filter(**filters).select_properties('version').values('version')
         assert all(obj_dict['version'] in expected_versions for obj_dict in queryset)
 
@@ -152,6 +203,20 @@ class TestNonModelInstanceQueries(object):
         assert len(values) == 1
         assert values[0]['version_count'] == len(versions) / 2
 
+    @pytest.mark.parametrize('model, filters, expected_version_counts', [
+        (ApplicationWithClassBasedProperties, {}, {3, 4}),
+        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}, {4}),
+        (ApplicationWithClassBasedProperties, {'version_count': 5}, {}),
+        (ApplicationWithDecoratorBasedProperties, {}, {3, 4}),
+        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}, {4}),
+        (ApplicationWithDecoratorBasedProperties, {'version_count': 5}, {}),
+    ])
+    def test_aggregate_values_list(self, versions, model, filters, expected_version_counts):
+        queryset = model.objects.filter(**filters).select_properties('version_count').values_list('version_count',
+                                                                                                  flat=True)
+        assert all(version_count in expected_version_counts for version_count in queryset)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, filters, expected_versions', [
         (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
         (VersionWithClassBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
@@ -160,7 +225,7 @@ class TestNonModelInstanceQueries(object):
         (VersionWithDecoratorBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
         (VersionWithDecoratorBasedProperties, {'version': '2.0.0'}, {'2.0.0'}),
     ])
-    def test_values_list(self, versions, model, filters, expected_versions):
+    def test_expression_values_list(self, versions, model, filters, expected_versions):
         queryset = model.objects.filter(**filters).select_properties('version').values_list('version', flat=True)
         assert all(version in expected_versions for version in queryset)
 
@@ -169,25 +234,35 @@ class TestNonModelInstanceQueries(object):
 class TestQueryAnnotations(object):
 
     @pytest.mark.parametrize('model, filters', [
+        (ApplicationWithClassBasedProperties, {}),
+        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}),
+        (ApplicationWithDecoratorBasedProperties, {}),
+        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}),
+    ])
+    def test_cached_aggregate_annotation_value(self, versions, model, filters):
+        # Filter both before and after the select_properties call to check if
+        # the annotation gets selected correctly regardless
+        queryset = model.objects.filter(**filters).select_properties('version_count', 'major_sum').filter(**filters)
+        assert 'version_count' in queryset.query.annotations
+        assert 'major_sum' in queryset.query.annotations
+        assert all(model.version_count._has_cached_value(obj) for obj in queryset)
+        assert all(model.major_sum._has_cached_value(obj) for obj in queryset)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('model, filters', [
         (VersionWithClassBasedProperties, {}),
         (VersionWithDecoratorBasedProperties, {}),
         (VersionWithClassBasedProperties, {'version': '1.2.3'}),
         (VersionWithDecoratorBasedProperties, {'version': '1.2.3'}),
     ])
-    def test_cached_annotation_value(self, versions, model, filters):
+    def test_cached_expression_annotation_value(self, versions, model, filters):
         # Filter both before and after the select_properties call to check if
         # the annotation gets selected correctly regardless
         queryset = model.objects.filter(**filters).select_properties('version').filter(**filters)
         assert 'version' in queryset.query.annotations
         assert all(model.version._has_cached_value(obj) for obj in queryset)
 
-    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-    def test_cached_annotation_value_with_group_by(self, versions, model):
-        queryset = model.objects.select_properties('version_count')
-        assert 'version_count' in queryset.query.annotations
-        assert all(model.version_count._has_cached_value(obj) for obj in queryset)
-
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason='F objects could not be used as annotations before Django 1.8')
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, annotation, expected_value', [
         (VersionWithClassBasedProperties, models.F('version'), '{}'),
         (VersionWithDecoratorBasedProperties, models.F('version'), '{}'),
@@ -205,33 +280,42 @@ class TestQueryAnnotations(object):
             assert not model.version._has_cached_value(version)
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-    def test_aggregation_based_on_queryable_property(self, versions, model):
+    def test_aggregate_based_on_queryable_property(self, versions, model):
         result = model.objects.aggregate(total_version_count=models.Sum('version_count'))
         assert result['total_version_count'] == len(versions) / 2  # List contains objects for both approaches
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-    def test_aggregation_based_on_queryable_property_across_relation(self, versions, model):
+    def test_aggregate_based_on_queryable_property_across_relation(self, versions, model):
         result = model.objects.aggregate(total_version_count=models.Sum('application__version_count'))
         assert result['total_version_count'] == len(versions) ** 2 / 8  # List contains objects for both approaches
 
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_iterator_with_aggregate_annotation(self, versions, model):
+        queryset = model.objects.filter(version_count=4).select_properties('version_count')
+        for application in queryset.iterator():
+            assert model.version_count._has_cached_value(application)
+            assert application.version_count == 4
+        assert queryset._result_cache is None
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-    def test_iterator(self, versions, model):
+    def test_iterator_with_expression_annotation(self, versions, model):
         queryset = model.objects.filter(major_minor='2.0').select_properties('version')
         for version in queryset.iterator():
             assert model.version._has_cached_value(version)
             assert version.version == '2.0.0'
         assert queryset._result_cache is None
 
-    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_removed_annotation(self, versions, model):
         """
         Test that queries can still be performed even if queryable property annotations have been manually removed from
         the queryset.
         """
-        queryset = model.objects.select_properties('version')
-        del queryset.query.annotations['version']
+        queryset = model.objects.select_properties('version_count')
+        del queryset.query.annotations['version_count']
         assert bool(queryset)
-        assert all(not model.version._has_cached_value(obj) for obj in queryset)
+        assert all(not model.version_count._has_cached_value(obj) for obj in queryset)
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_annotater(self, model):
@@ -286,6 +370,28 @@ class TestUpdateQueries(object):
 @pytest.mark.django_db
 class TestQueryOrdering(object):
 
+    @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
+        (ApplicationWithClassBasedProperties, 'version_count', False, False),
+        (ApplicationWithDecoratorBasedProperties, 'version_count', False, False),
+        (ApplicationWithClassBasedProperties, 'version_count', False, True),
+        (ApplicationWithDecoratorBasedProperties, 'version_count', False, True),
+        (ApplicationWithClassBasedProperties, '-version_count', True, False),
+        (ApplicationWithDecoratorBasedProperties, '-version_count', True, False),
+        (ApplicationWithClassBasedProperties, '-version_count', True, True),
+        (ApplicationWithDecoratorBasedProperties, '-version_count', True, True),
+    ])
+    def test_order_by_property_with_aggregate_annotation(self, versions, model, order_by, reverse, with_selection):
+        model.objects.all()[0].versions.all()[0].delete()
+        queryset = model.objects.all()
+        if with_selection:
+            queryset = queryset.select_properties('version_count')
+        results = list(queryset.order_by(order_by))
+        assert results == sorted(results, key=lambda application: application.version_count, reverse=reverse)
+        # Check that ordering by a property annotation does not lead to a
+        # selection of the property annotation
+        assert all(model.version_count._has_cached_value(application) is with_selection for application in results)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
         # full version (ASC/DESC depending on the reverse parameter).
