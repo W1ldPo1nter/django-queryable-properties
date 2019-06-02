@@ -22,6 +22,11 @@ from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecorat
 class TestQueryFilters(object):
 
     @pytest.mark.parametrize('model, filters, expected_count, expected_major_minor', [
+        # Test that filter that don't involve queryable properties still work
+        (VersionWithClassBasedProperties, models.Q(major=2, minor=0), 2, '2.0'),
+        (VersionWithDecoratorBasedProperties, models.Q(major=2, minor=0), 2, '2.0'),
+        (VersionWithClassBasedProperties, models.Q(minor=2) | models.Q(patch=3), 2, '1.2'),
+        (VersionWithDecoratorBasedProperties, models.Q(minor=2) | models.Q(patch=3), 2, '1.2'),
         # All querysets are expected to return objects with the same
         # major_minor value (major_minor parameter).
         (VersionWithClassBasedProperties, models.Q(major_minor='1.2'), 2, '1.2'),
