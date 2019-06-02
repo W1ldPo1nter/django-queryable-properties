@@ -53,6 +53,18 @@ class InjectableMixin(object):
     # harmful to use a shared cache.
     _created_classes = {}
 
+    def __init__(self, *args, **kwargs):
+        super(InjectableMixin, self).__init__(*args, **kwargs)
+        self.init_injected_attrs()
+
+    def init_injected_attrs(self):
+        """
+        Initialize the attributes this mixin contributes. This method will be
+        called during :meth:`__init__` and after the mixin was injected into an
+        object.
+        """
+        pass
+
     @classmethod
     def mix_with_class(cls, base_class, class_name=None):
         """
@@ -82,7 +94,7 @@ class InjectableMixin(object):
         return created_class
 
     @classmethod
-    def inject_into_object(cls, obj, class_name=None, **attrs):
+    def inject_into_object(cls, obj, class_name=None):
         """
         Update the given object's class by dynamically generating a new class
         based on the object's original class and this mixin class and changing
@@ -93,14 +105,9 @@ class InjectableMixin(object):
                                class. If None is supplied (default), the class
                                name of the dynamically created class will be
                                the one of the object's original class.
-        :param attrs: Attributes to set on the given object after its class was
-                      changed. This is useful for mixins that add attributes in
-                      their initializer, which is not called when changing the
-                      class of an object.
         """
         obj.__class__ = cls.mix_with_class(obj.__class__, class_name)
-        for name, value in six.iteritems(attrs):
-            setattr(obj, name, value)
+        obj.init_injected_attrs()
 
 
 # This must be a standalone function for Python 2, where it could not be

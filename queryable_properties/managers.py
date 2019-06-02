@@ -154,8 +154,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         if not isinstance(self.query, QueryablePropertiesQueryMixin):
             self.query = chain_query(self.query)
             class_name = 'QueryableProperties' + self.query.__class__.__name__
-            QueryablePropertiesQueryMixin.inject_into_object(self.query, class_name, _required_annotation_stack=[],
-                                                             _queryable_property_annotations={})
+            QueryablePropertiesQueryMixin.inject_into_object(self.query, class_name)
 
     @property
     def _iterable_class(self):
