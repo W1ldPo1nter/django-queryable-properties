@@ -1,6 +1,5 @@
 # encoding: utf-8
 
-from django.utils import six
 from django.utils.tree import Node
 
 from .exceptions import QueryablePropertyDoesNotExist
