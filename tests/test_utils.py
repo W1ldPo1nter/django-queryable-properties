@@ -6,7 +6,7 @@ from django.utils.six.moves import cPickle
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
-from queryable_properties.utils import get_queryable_property, InjectableMixin, modify_tree_node, TreeNodeProcessor
+from queryable_properties.utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
 
 from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 
@@ -111,14 +111,14 @@ class TestTreeNodeProcessor(object):
         # The predicate checks if a leaf for field 'a' exists
         assert TreeNodeProcessor(node).check_leaves(lambda item: item[0] == 'a') is expected_result
 
-
-@pytest.mark.parametrize('copy', [True, False])
-def test_modify_tree_node(copy):
-    q = Q(Q(a=1) | Q(b=2), c=3)
-    result = modify_tree_node(q, lambda item: ('prefix_{}_suffix'.format(item[0]), item[1] + 1), copy=copy)
-    assert (result is q) is not copy
-    children = list(result.children)
-    assert ('prefix_c_suffix', 4) in children
-    children.remove(('prefix_c_suffix', 4))
-    assert ('prefix_a_suffix', 2) in children[0].children
-    assert ('prefix_b_suffix', 3) in children[0].children
+    @pytest.mark.parametrize('copy', [True, False])
+    def test_modify_tree_node(self, copy):
+        q = Q(Q(a=1) | Q(b=2), c=3)
+        result = TreeNodeProcessor(q).modify_leaves(
+            lambda item: ('prefix_{}_suffix'.format(item[0]), item[1] + 1), copy=copy)
+        assert (result is q) is not copy
+        children = list(result.children)
+        assert ('prefix_c_suffix', 4) in children
+        children.remove(('prefix_c_suffix', 4))
+        assert ('prefix_a_suffix', 2) in children[0].children
+        assert ('prefix_b_suffix', 3) in children[0].children

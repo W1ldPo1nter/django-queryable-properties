@@ -5,11 +5,12 @@ from contextlib import contextmanager
 
 from django.utils.tree import Node
 
-from .compat import (ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME,
-                     contains_aggregate, convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model,
-                     LOOKUP_SEP, NEED_HAVING_METHOD_NAME, Ref)
+from .compat import (
+    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, contains_aggregate,
+    convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP, NEED_HAVING_METHOD_NAME, Ref
+)
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
-from .utils import get_queryable_property, InjectableMixin, modify_tree_node, TreeNodeProcessor
+from .utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
 
 
 class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):
@@ -56,7 +57,9 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
             # If the resolved property belongs to a related model, all actual
             # conditions in the returned Q object must be modified to use the
             # current relation path as prefix.
-            q_obj = modify_tree_node(q_obj, lambda item: (LOOKUP_SEP.join(self.relation_path + (item[0],)), item[1]))
+            def prefix_condition(item):
+                return LOOKUP_SEP.join(self.relation_path + (item[0],)), item[1]
+            q_obj = TreeNodeProcessor(q_obj).modify_leaves(prefix_condition)
         return q_obj
 
     def get_annotation(self):

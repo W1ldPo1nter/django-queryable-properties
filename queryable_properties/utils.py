@@ -167,30 +167,27 @@ class TreeNodeProcessor(object):
                 return True
         return False
 
+    def modify_leaves(self, modifier, copy=True):
+        """
+        Modify all leaves of this processor's node modifier callable.
 
-def modify_tree_node(node, func, copy=True):
-    """
-    Modify a tree node and all of its subnodes using the given transformation
-    callable.
+        :param function modifier: A callable that will be called for every
+                                  encountered actual node value (not subnodes)
+                                  with that value as its only parameter. It
+                                  must returned the replacement value for the
+                                  given value.
+        :param bool copy: Whether to create a copy of the original node and
+                          modify this copy instead of modifying the original
+                          node in place.
+        :return: The modified node or node copy.
+        :rtype: Node
+        """
+        if copy:
+            return TreeNodeProcessor(deepcopy(self.node)).modify_leaves(modifier, copy=False)
 
-    :param Node node: The node to modify.
-    :param callable func: A callable that will be called for every encountered
-                          actual node value (not subnodes) with that value as
-                          its only parameter. It must returned the replacement
-                          value for the given value.
-    :param bool copy: Whether to create a copy of the original node and modify
-                      this copy instead of modifying the original node in
-                      place.
-    :return: The modified node or node copy.
-    :rtype: Node
-    """
-    if copy:
-        node = deepcopy(node)
-
-    for index, child in enumerate(node.children):
-        if isinstance(child, Node):
-            modify_tree_node(child, func, copy=False)
-        else:
-            node.children[index] = func(child)
-
-    return node
+        for index, child in enumerate(self.node.children):
+            if isinstance(child, Node):
+                TreeNodeProcessor(child).modify_leaves(modifier, copy=False)
+            else:
+                self.node.children[index] = modifier(child)
+        return self.node
