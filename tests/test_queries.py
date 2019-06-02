@@ -61,9 +61,13 @@ class TestQueryFilters(object):
         (ApplicationWithClassBasedProperties, models.Q(version_count__gt=3), 2),
         (ApplicationWithClassBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
         (ApplicationWithClassBasedProperties, models.Q(version_count=4) | models.Q(name__contains='cool'), 2),
+        (ApplicationWithClassBasedProperties, models.Q(version_count__gt=3, major_sum__gt=5), 0),
+        (ApplicationWithClassBasedProperties, models.Q(version_count__gt=3) | models.Q(major_sum__gt=5), 2),
         (ApplicationWithDecoratorBasedProperties, models.Q(version_count__gt=3), 2),
         (ApplicationWithDecoratorBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
         (ApplicationWithDecoratorBasedProperties, models.Q(version_count=4) | models.Q(name__contains='cool'), 2),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count__gt=3, major_sum__gt=5), 0),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count__gt=3) | models.Q(major_sum__gt=5), 2),
     ])
     def test_filter_with_required_aggregate_annotation(self, versions, model, filters, expected_count):
         queryset = model.objects.filter(filters)
@@ -201,9 +205,11 @@ class TestQueryAnnotations(object):
     def test_cached_aggregate_annotation_value(self, versions, model, filters):
         # Filter both before and after the select_properties call to check if
         # the annotation gets selected correctly regardless
-        queryset = model.objects.filter(**filters).select_properties('version_count').filter(**filters)
+        queryset = model.objects.filter(**filters).select_properties('version_count', 'major_sum').filter(**filters)
         assert 'version_count' in queryset.query.annotations
+        assert 'major_sum' in queryset.query.annotations
         assert all(model.version_count._has_cached_value(obj) for obj in queryset)
+        assert all(model.major_sum._has_cached_value(obj) for obj in queryset)
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, filters', [

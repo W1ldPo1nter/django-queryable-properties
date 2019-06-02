@@ -43,6 +43,15 @@ class VersionCountProperty(AnnotationMixin, QueryableProperty):
         return models.Count('versions')
 
 
+class MajorSumProperty(AnnotationMixin, QueryableProperty):
+
+    def get_value(self, obj):
+        return obj.versions.aggregate(major_sum=models.Sum('major'))['major_sum'] or 0
+
+    def get_annotation(self, cls):
+        return models.Sum('versions__major')
+
+
 class MajorMinorVersionProperty(UpdateMixin, QueryableProperty):
 
     def get_value(self, obj):
@@ -98,6 +107,7 @@ class ApplicationWithClassBasedProperties(Application):
 
     highest_version = HighestVersionProperty()
     version_count = VersionCountProperty()
+    major_sum = MajorSumProperty()
     dummy = DummyProperty()
 
     class Meta:
@@ -133,6 +143,15 @@ class ApplicationWithDecoratorBasedProperties(Application):
     @classmethod
     def version_count(cls):
         return models.Count('versions')
+
+    @queryable_property
+    def major_sum(self):
+        return self.versions.aggregate(major_sum=models.Sum('major'))['major_sum'] or 0
+
+    @major_sum.annotater
+    @classmethod
+    def major_sum(cls):
+        return models.Sum('versions__major')
 
 
 class Version(models.Model):
