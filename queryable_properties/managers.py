@@ -134,7 +134,7 @@ class QueryablePropertiesModelIterable(InjectableMixin):
 
         # Patch the correct select property on the query with the new names,
         # since this property is used by the SQL compiler to build the actual
-        # SQL query (which is where the the changed names should be used).
+        # SQL query (which is where the changed names should be used).
         setattr(query, ANNOTATION_SELECT_CACHE_NAME, select)
         return changed_aliases
 
