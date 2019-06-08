@@ -9,7 +9,7 @@ Since annotations in a queryset behave like regular fields, they automatically o
   computed and returned by the database while still only executing a single query.
   This will lead to huge performance gains for properties whose getter would normally perform additional queries.
 
-Let's make the simple `version_str` property from previous examples annotatable. Using the the decorator-based approach,
+Let's make the simple `version_str` property from previous examples annotatable. Using the decorator-based approach,
 the property's `annotater` method must be used.
 ```python
 from django.db.models import Model, Value

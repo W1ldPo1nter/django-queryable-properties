@@ -11,7 +11,7 @@ django-queryable-properties
 .. image:: https://img.shields.io/pypi/v/django-queryable-properties.svg
    :target: https://pypi.org/project/django-queryable-properties
 
-*django-queryable-properties* is a `Django`_ extension that allows to implement model properties which can be be used
+*django-queryable-properties* is a `Django`_ extension that allows to implement model properties which can be used
 in database queries performed via Django's ORM.
 
 .. _Django: https://www.djangoproject.com/
