@@ -132,7 +132,7 @@ def contains_aggregate(annotation):
     # contains_aggregate attribute in recent Django versions, this was not the
     # case in old versions. Annotations were strongly tied to aggregates in
     # these versions though, so an aggregate is always assumed in this case.
-    return getattr(annotation, 'contains_aggregate', True)
+    return getattr(annotation, 'contains_aggregate', bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP))
 
 
 def get_related_model(model, relation_field_name):

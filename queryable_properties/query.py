@@ -2,6 +2,7 @@
 
 from collections import namedtuple
 from contextlib import contextmanager
+from functools import partial
 
 from django.utils.tree import Node
 
@@ -298,17 +299,20 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # the query. Since a queryable property might add an aggregate-based
         # annotation during the actual filter application, this method must
         # return True if a filter condition contains such a property.
-        def is_aggregate_property(item):
+        def is_aggregate_property(item, ignored_refs=set()):
             path = item[0].split(LOOKUP_SEP)
             property_ref, lookups = self._resolve_queryable_property(path)
-            if not property_ref:
+            if not property_ref or property_ref in ignored_refs:
                 return False
-            if property_ref.property.filter_requires_annotation and contains_aggregate(property_ref.get_annotation()):
-                return True
+            if property_ref.property.filter_requires_annotation:
+                if contains_aggregate(property_ref.get_annotation()):
+                    return True
+                ignored_refs = ignored_refs.union({property_ref})
             # Also check the Q object returned by the property's get_filter
             # method as it may contain references to other properties that may
             # add aggregation-based annotations.
-            return TreeNodeProcessor(property_ref.get_filter(lookups, item[1])).check_leaves(is_aggregate_property)
+            predicate = partial(is_aggregate_property, ignored_refs=ignored_refs)
+            return TreeNodeProcessor(property_ref.get_filter(lookups, item[1])).check_leaves(predicate)
 
         if isinstance(obj, Node) and TreeNodeProcessor(obj).check_leaves(is_aggregate_property):
             return True
