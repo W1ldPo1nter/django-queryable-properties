@@ -197,37 +197,46 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 select = select or self._queryable_property_annotations[property_ref]
             self._queryable_property_annotations[property_ref] = select
             annotation = self.annotations[property_ref.full_path]
-            # Perform the required GROUP BY setup if the annotation contained
-            # aggregates, which is normally done by QuerySet.annotate.
-            if contains_aggregate(annotation):
-                if full_group_by and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
-                    # In recent Django versions, a full GROUP BY can be achieved by
-                    # simply setting group_by to True.
-                    self.group_by = True
-                else:
-                    if full_group_by:  # pragma: no cover
-                        # In old versions, the fields must be added to the selected
-                        # fields manually and set_group_by must be called after.
-                        opts = self.model._meta
-                        self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
-                    self.set_group_by()
             yield annotation
         finally:
             self._queryable_property_stack.pop()
 
+        # Perform the required GROUP BY setup if the annotation contained
+        # aggregates, which is normally done by QuerySet.annotate.
+        if contains_aggregate(annotation):
+            if full_group_by and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
+                # In recent Django versions, a full GROUP BY can be achieved by
+                # simply setting group_by to True.
+                self.group_by = True
+            else:
+                if full_group_by:  # pragma: no cover
+                    # In old versions, the fields must be added to the selected
+                    # fields manually and set_group_by must be called after.
+                    opts = self.model._meta
+                    self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
+                self.set_group_by()
+
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
-        # This method is called in older versions to add an aggregation or
-        # annotation. Since both might be based on a queryable property, an
-        # auto-annotation has to occur here.
+        # This method is called in older versions to add an aggregate, which
+        # may be based on a queryable property annotation, which in turn must
+        # be auto-annotated here.
         path = tuple(aggregate.lookup.split(LOOKUP_SEP))
         if self._queryable_property_stack:
             path = self._queryable_property_stack[-1].relation_path + path
-        self._auto_annotate(path)
-        # The overridden method also allows to set a default value for the
-        # model parameter, which will be missing if add_annotation calls are
-        # redirected to add_aggregate for older Django versions.
-        model = model or self.model
-        return super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, model, alias, is_summary)
+        property_annotation = self._auto_annotate(path)
+        if property_annotation:
+            # If it is based on a queryable property annotation, annotating the
+            # current aggregate cannot be delegated to Django as it couldn't
+            # deal with annotations containing the lookup separator.
+            if hasattr(self, 'append_aggregate_mask'):
+                self.append_aggregate_mask([alias])
+            aggregate.add_to_query(self, alias, LOOKUP_SEP.join(path), property_annotation, is_summary)
+        else:
+            # The overridden method also allows to set a default value for the
+            # model parameter, which will be missing if add_annotation calls are
+            # redirected to add_aggregate for older Django versions.
+            model = model or self.model
+            super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, model, alias, is_summary)
 
     def add_filter(self, *args, **kwargs):  # pragma: no cover
         # The build_filter method was called add_filter in very old Django
