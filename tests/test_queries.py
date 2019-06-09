@@ -281,15 +281,25 @@ class TestQueryAnnotations(object):
             # annotation
             assert not model.version._has_cached_value(version)
 
-    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-    def test_aggregate_based_on_queryable_property(self, versions, model):
-        result = model.objects.aggregate(total_version_count=models.Sum('version_count'))
-        assert result['total_version_count'] == len(versions) / 2  # List contains objects for both approaches
+    @pytest.mark.parametrize('model, limit, expected_total', [
+        (ApplicationWithClassBasedProperties, None, 8),
+        (ApplicationWithClassBasedProperties, 1, 4),
+        (ApplicationWithDecoratorBasedProperties, None, 8),
+        (ApplicationWithDecoratorBasedProperties, 1, 4),
+    ])
+    def test_aggregate_based_on_queryable_property(self, versions, model, limit, expected_total):
+        result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum('version_count'))
+        assert result['total_version_count'] == expected_total
 
-    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-    def test_aggregate_based_on_queryable_property_across_relation(self, versions, model):
-        result = model.objects.aggregate(total_version_count=models.Sum('application__version_count'))
-        assert result['total_version_count'] == len(versions) ** 2 / 8  # List contains objects for both approaches
+    @pytest.mark.parametrize('model, limit, expected_total', [
+        (VersionWithClassBasedProperties, None, 32),
+        (VersionWithClassBasedProperties, 4, 16),
+        (VersionWithDecoratorBasedProperties, None, 32),
+        (VersionWithDecoratorBasedProperties, 4, 16),
+    ])
+    def test_aggregate_based_on_queryable_property_across_relation(self, versions, model, limit, expected_total):
+        result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum('application__version_count'))
+        assert result['total_version_count'] == expected_total
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_iterator_with_aggregate_annotation(self, versions, model):
