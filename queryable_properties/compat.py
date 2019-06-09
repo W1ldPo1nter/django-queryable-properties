@@ -16,11 +16,6 @@ except ImportError:  # pragma: no cover
     from django.db.models.sql.constants import LOOKUP_SEP  # noqa: F401
 
 try:  # pragma: no cover
-    from django.db.models.expressions import Ref  # noqa: F401
-except ImportError:  # pragma: no cover
-    Ref = None  # noqa: F401
-
-try:  # pragma: no cover
     from django.db.models.query import ModelIterable  # noqa: F401
     ValuesQuerySet = None
 except ImportError:  # pragma: no cover

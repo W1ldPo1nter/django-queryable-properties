@@ -105,11 +105,13 @@ class TestQueryFilters(object):
 
     @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
     def test_filter_with_required_aggregate_annotation_across_relation(self, versions, model):
+        # A query containing an aggregate across a relation is still only
+        # grouped by fields of the query's model, so in this case the version
+        # count is the total number of application versions per category.
         queryset = model.objects.filter(applications__version_count=4)
         assert 'applications__version_count' in queryset.query.annotations
-        assert len(queryset) == 3
-        assert queryset.distinct().count() == 2
-        assert not model.objects.filter(applications__version_count=3).exists()
+        assert queryset.count() == 1
+        assert model.objects.filter(applications__version_count=8).count() == 1
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])

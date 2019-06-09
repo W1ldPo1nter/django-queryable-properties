@@ -7,7 +7,7 @@ from django.utils.tree import Node
 
 from .compat import (
     ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, contains_aggregate,
-    convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP, NEED_HAVING_METHOD_NAME, Ref
+    convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP, NEED_HAVING_METHOD_NAME
 )
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
@@ -192,12 +192,12 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         try:
             if property_ref not in self._queryable_property_annotations:
                 self.add_annotation(property_ref.get_annotation(), alias=property_ref.full_path, is_summary=False)
-                # Perform the required GROUP BY setup if the annotation contained
-                # aggregates, which is normally done by QuerySet.annotate.
             else:
                 select = select or self._queryable_property_annotations[property_ref]
             self._queryable_property_annotations[property_ref] = select
             annotation = self.annotations[property_ref.full_path]
+            # Perform the required GROUP BY setup if the annotation contained
+            # aggregates, which is normally done by QuerySet.annotate.
             if contains_aggregate(annotation):
                 if full_group_by and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
                     # In recent Django versions, a full GROUP BY can be achieved by
@@ -331,27 +331,11 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
                 # the inner queries.
+                from django.db.models.expressions import Ref
                 return Ref(name, property_annotation)
             return property_annotation
         return super(QueryablePropertiesQueryMixin, self).resolve_ref(name, allow_joins, reuse, summarize,
                                                                       *args, **kwargs)
-
-    def set_group_by(self, *args, **kwargs):
-        # This method is just to set up the fields that must be included in a
-        # GROUP BY clause. If it is called while a related queryable property
-        # is on top of the stack, the PK field of the model the property is
-        # defined on must be added to those fields to ensure that aggregates
-        # are applied to the correct records.
-        super(QueryablePropertiesQueryMixin, self).set_group_by(*args, **kwargs)
-        if self._queryable_property_stack and self._queryable_property_stack[-1].relation_path:
-            # Recent Django versions have objects to represent references to
-            # columns, while older versions express this via tuples/strings.
-            if Ref is not None:
-                group_by = self.resolve_ref('pk')
-            else:  # pragma: no cover
-                opts = self._queryable_property_stack[-1].model._meta
-                group_by = (opts.db_table, opts.pk.column)
-            self.group_by += (group_by,)
 
     def setup_joins(self, names, *args, **kwargs):
         # This is a central method for resolving field names and joining the
