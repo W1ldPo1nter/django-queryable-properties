@@ -111,6 +111,12 @@ class DefaultChangesProperty(AnnotationMixin, QueryableProperty):
         return Coalesce('changes', Value('(No data)'))
 
 
+class CircularProperty(AnnotationMixin, QueryableProperty):
+
+    def get_annotation(self, cls):
+        return models.F('circular')
+
+
 class Category(models.Model):
     name = models.CharField(max_length=255)
 
@@ -121,6 +127,8 @@ class Category(models.Model):
 class CategoryWithClassBasedProperties(Category):
     objects = QueryablePropertiesManager()
 
+    circular = CircularProperty()
+
     class Meta:
         verbose_name = 'Category'
 
@@ -130,6 +138,15 @@ class CategoryWithDecoratorBasedProperties(Category):
 
     class Meta:
         verbose_name = 'Category'
+
+    @queryable_property
+    def circular(self):
+        raise NotImplementedError()
+
+    @circular.annotater
+    @classmethod
+    def circular(cls):
+        return models.F('circular')
 
 
 class Application(models.Model):

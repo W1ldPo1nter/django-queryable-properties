@@ -8,6 +8,7 @@ from django.db import models
 from queryable_properties.exceptions import FieldError, QueryablePropertyError
 
 from ..models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
+                      CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
                       VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 pytestmark = pytest.mark.django_db
@@ -41,6 +42,14 @@ class TestAnnotation(object):
     def test_exception_on_unimplemented_annotater(self, model):
         with pytest.raises(QueryablePropertyError):
             model.objects.select_properties('major_minor')
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
+    def test_circular_property(self, model):
+        with pytest.raises(QueryablePropertyError, match='circular dependency'):
+            model.objects.filter(circular=1337)
+        with pytest.raises(QueryablePropertyError, match='circular dependency'):
+            model.objects.select_properties('circular')
 
 
 class TestUpdate(object):
