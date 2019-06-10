@@ -1,6 +1,16 @@
 # encoding: utf-8
 
+from mock import Mock
 import pytest
+
+try:
+    from django.db.models import Value
+except ImportError:
+    Value = Mock()
+try:
+    from django.db.models.functions import Concat
+except ImportError:
+    Concat = Mock()
 
 from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                      CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties)
