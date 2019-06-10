@@ -89,20 +89,6 @@ class TestQueryFilters(object):
         # lead to a selection of the property annotation
         assert all(not model.version_count._has_cached_value(app) for app in queryset)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
-    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-    def test_filter_with_required_subquery_annotation(self, versions, model):
-        version_model = model.objects.all()[0].versions.model
-        version_model.objects.filter(version='2.0.0')[0].delete()
-        queryset = model.objects.filter(highest_version='2.0.0')
-        assert 'highest_version' in queryset.query.annotations
-        assert len(queryset) == 1
-        application = queryset[0]
-        assert application.versions.filter(major=2, minor=0, patch=0).exists()
-        # Check that a property annotation used implicitly by a filter does not
-        # lead to a selection of the property annotation
-        assert not model.highest_version._has_cached_value(application)
-
     @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
     def test_filter_with_required_aggregate_annotation_across_relation(self, versions, model):
         # A query containing an aggregate across a relation is still only
@@ -112,6 +98,17 @@ class TestQueryFilters(object):
         assert 'applications__version_count' in queryset.query.annotations
         assert queryset.count() == 1
         assert model.objects.filter(applications__version_count=8).count() == 1
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_filter_with_required_expression_annotation(self, versions, model):
+        queryset = model.objects.filter(changes_or_default='(No data)')
+        assert 'changes_or_default' in queryset.query.annotations
+        assert len(queryset) == 6
+        assert all(obj.changes_or_default == '(No data)' for obj in queryset)
+        # Check that a property annotation used implicitly by a filter does not
+        # lead to a selection of the property annotation
+        assert all(not model.changes_or_default._has_cached_value(version) for version in queryset)
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
@@ -129,6 +126,29 @@ class TestQueryFilters(object):
         assert 'applications__lowered_version_changes' in queryset.query.annotations
         assert len(queryset) == 3
         assert queryset.distinct().count() == 2
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_filter_with_required_subquery_annotation(self, versions, model):
+        version_model = model.objects.all()[0].versions.model
+        version_model.objects.filter(version='2.0.0')[0].delete()
+        queryset = model.objects.filter(highest_version='2.0.0')
+        assert 'highest_version' in queryset.query.annotations
+        assert len(queryset) == 1
+        application = queryset[0]
+        assert application.versions.filter(major=2, minor=0, patch=0).exists()
+        # Check that a property annotation used implicitly by a filter does not
+        # lead to a selection of the property annotation
+        assert not model.highest_version._has_cached_value(application)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_filter_with_required_subquery_annotation_across_relation(self, versions, model):
+        model.objects.filter(version='2.0.0')[0].delete()
+        queryset = model.objects.filter(application__highest_version='2.0.0')
+        assert 'application__highest_version' in queryset.query.annotations
+        assert len(queryset) == 4
+        assert all(obj.application.highest_version == '2.0.0' for obj in queryset)
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_implementation_used_despite_present_annotation(self, monkeypatch, versions, model):
