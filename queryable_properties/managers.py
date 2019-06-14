@@ -208,7 +208,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
                 continue
             if not prop.get_update_kwargs:
                 raise QueryablePropertyError('Queryable property "{}" does not implement queryset updating.'
-                                             .format(original_name))
+                                             .format(prop))
 
             # Call the method recursively since queryable properties can build
             # upon each other.
@@ -221,7 +221,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
                     raise QueryablePropertyError(
                         'Updating queryable property "{prop}" would change field "{field}", but a conflicting value '
                         'was set for this field by another queryable property or explicitly in the update arguments.'
-                        .format(prop=original_name, field=additional_name)
+                        .format(prop=prop, field=additional_name)
                     )
                 kwargs[additional_name] = value
 

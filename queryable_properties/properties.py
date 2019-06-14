@@ -4,8 +4,10 @@ from __future__ import unicode_literals
 
 from django.db.models import Q
 from django.utils import six
+from django.utils.encoding import python_2_unicode_compatible
 
 from .compat import LOOKUP_SEP
+from .exceptions import QueryablePropertyError
 from .utils import get_queryable_property, reset_queryable_property
 
 RESET_METHOD_NAME = 'reset_property'
@@ -65,6 +67,7 @@ def DO_NOTHING(prop, obj, value, return_value):
     pass
 
 
+@python_2_unicode_compatible
 class QueryableProperty(object):
     """
     Base class for all queryable properties, which are basically simple
@@ -118,6 +121,9 @@ class QueryableProperty(object):
         # the one on the model class.
         return get_queryable_property, (self.model, self.name)
 
+    def __str__(self):
+        return '.'.join((self.model._meta.app_label, self.model._meta.object_name, self.name))
+
     def get_value(self, obj):  # pragma: no cover
         """
         Getter method for the queryable property, which will be called when
@@ -144,6 +150,9 @@ class QueryableProperty(object):
         raise NotImplementedError()
 
     def contribute_to_class(self, cls, name):
+        if LOOKUP_SEP in name:
+            raise QueryablePropertyError('The name of a queryable property must not contain the lookup separator "{}".'
+                                         .format(LOOKUP_SEP))
         # Store some useful values on model class initialization.
         self.model = self.model or cls
         self.name = self.name or name

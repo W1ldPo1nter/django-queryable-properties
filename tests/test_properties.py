@@ -1,14 +1,15 @@
 # encoding: utf-8
 import pytest
 
-from django.db.models import F, Q
+from django.db.models import F, Model, Q
 from django.utils import six
 
+from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING,
                                              QueryableProperty, queryable_property)
 from queryable_properties.utils import reset_queryable_property
 
-from .models import (ApplicationWithClassBasedProperties, VersionWithClassBasedProperties,
+from .models import (ApplicationWithClassBasedProperties, DummyProperty, VersionWithClassBasedProperties,
                      VersionWithDecoratorBasedProperties)
 
 
@@ -111,6 +112,14 @@ class TestBasics(object):
         serialized_prop = six.moves.cPickle.dumps(model.version)
         deserialized_prop = six.moves.cPickle.loads(serialized_prop)
         assert deserialized_prop is model.version
+
+    def test_string_representation(self):
+        string_representation = six.text_type(ApplicationWithClassBasedProperties.dummy)
+        assert string_representation == 'tests.ApplicationWithClassBasedProperties.dummy'
+
+    def test_invalid_property_name(self):
+        with pytest.raises(QueryablePropertyError, match='must not contain the lookup separator'):
+            type('BrokenModel', (Model,), {'dummy__dummy': DummyProperty(), '__module__': 'tests.models'})
 
 
 class TestAnnotationMixin(object):

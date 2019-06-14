@@ -48,7 +48,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         """
         if not self.property.get_filter:
             raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
-                                         'implement filtering.'.format(self.property.name))
+                                         'implement filtering.'.format(self.property))
 
         # Use the model stored on this reference instead of the one on the
         # property since the query may be happening from a subclass of the
@@ -73,7 +73,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         """
         if not self.property.get_annotation:
             raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
-                                         'implement annotation creation.'.format(self.property.name))
+                                         'implement annotation creation.'.format(self.property))
         # Use the model stored on this reference instead of the one on the
         # property since the query may be happening from a subclass of the
         # model the property is defined on.
@@ -187,7 +187,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         """
         if property_ref in self._queryable_property_stack:
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
-                                         .format(property_ref.property.name))
+                                         .format(property_ref.property))
 
         self._queryable_property_stack.append(property_ref)
         try:
