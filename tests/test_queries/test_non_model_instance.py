@@ -38,6 +38,7 @@ class TestAggregateAnnotations(object):
         queryset = model.objects.values('pk', 'applications__pk').filter(applications__version_count=4)
         assert len(queryset) == 3
         assert len(set((obj_dict['pk'], obj_dict['applications__pk']) for obj_dict in queryset)) == 3
+        assert all('applications__version_count' not in obj_dict for obj_dict in queryset)
 
     @pytest.mark.parametrize('model, filters, expected_version_counts', [
         (ApplicationWithClassBasedProperties, {}, {3, 4}),

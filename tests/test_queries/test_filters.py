@@ -62,6 +62,23 @@ class TestFilterWithoutAnnotations(object):
         assert len(queryset) == 2
         assert all(obj.versions.filter(version='1.2.3').exists() for obj in queryset)
 
+    @pytest.mark.parametrize('model, filters, expected_remaining_count', [
+        (VersionWithClassBasedProperties, models.Q(major_minor='1.3'), 4),
+        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.3'), 4),
+        (VersionWithClassBasedProperties, models.Q(version='2.0.0'), 6),
+        (VersionWithDecoratorBasedProperties, models.Q(major_minor='2.0.0'), 6),
+        (VersionWithClassBasedProperties, models.Q(major_minor='1.3', patch=1), 6),
+        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.3', patch=1), 6),
+        (VersionWithClassBasedProperties, models.Q(major_minor='1.3') | models.Q(version='2.0.0'), 2),
+        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.3') | models.Q(version='2.0.0'), 2),
+        # Filters across relations
+        (ApplicationWithClassBasedProperties, models.Q(versions__version='2.0.0'), 0),
+        (ApplicationWithDecoratorBasedProperties, models.Q(versions__version='2.0.0'), 0),
+    ])
+    def test_delete_query(self, model, filters, expected_remaining_count):
+        model.objects.filter(filters).delete()
+        assert model.objects.count() == expected_remaining_count
+
 
 class TestFilterWithAggregateAnnotation(object):
 
@@ -94,6 +111,17 @@ class TestFilterWithAggregateAnnotation(object):
         assert 'applications__version_count' in queryset.query.annotations
         assert queryset.count() == 1
         assert model.objects.filter(applications__version_count=8).count() == 1
+
+    @pytest.mark.parametrize('model, filters, expected_remaining_count', [
+        (ApplicationWithClassBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
+        (ApplicationWithDecoratorBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
+        # Filters across relations
+        (CategoryWithClassBasedProperties, models.Q(applications__version_count=4, name__contains='Windows'), 1),
+        (CategoryWithDecoratorBasedProperties, models.Q(applications__version_count=4, name__contains='Windows'), 1),
+    ])
+    def test_delete_query(self, model, filters, expected_remaining_count):
+        model.objects.filter(filters).delete()
+        assert model.objects.count() == expected_remaining_count
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_implementation_used_despite_present_annotation(self, monkeypatch, model):
@@ -133,6 +161,17 @@ class TestFilterWithExpressionAnnotation(object):
         assert len(queryset) == 3
         assert queryset.distinct().count() == 2
 
+    @pytest.mark.parametrize('model, filters, expected_remaining_count', [
+        (VersionWithClassBasedProperties, models.Q(changes_or_default='(No data)', major=1), 2),
+        (VersionWithDecoratorBasedProperties, models.Q(changes_or_default='(No data)', major=1), 2),
+        # Filters across relations
+        (ApplicationWithClassBasedProperties, models.Q(versions__changes_or_default='(No data)'), 0),
+        (ApplicationWithDecoratorBasedProperties, models.Q(versions__changes_or_default='(No data)'), 0),
+    ])
+    def test_delete_query(self, model, filters, expected_remaining_count):
+        model.objects.filter(filters).delete()
+        assert model.objects.count() == expected_remaining_count
+
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_filter_implementation_used_despite_present_annotation(self, model):
         queryset = model.objects.select_properties('version').filter(version='2.0.0')
@@ -166,3 +205,14 @@ class TestFilterWithSubqueryAnnotation(object):
         assert 'application__highest_version' in queryset.query.annotations
         assert len(queryset) == 4
         assert all(obj.application.highest_version == '2.0.0' for obj in queryset)
+
+    @pytest.mark.parametrize('model, filters, expected_remaining_count', [
+        (ApplicationWithClassBasedProperties, models.Q(highest_version='2.0.0', name__contains='cool'), 1),
+        (ApplicationWithDecoratorBasedProperties, models.Q(highest_version='2.0.0', name__contains='cool'), 1),
+        # Filters across relations
+        (CategoryWithClassBasedProperties, models.Q(applications__highest_version='2.0.0'), 0),
+        (CategoryWithDecoratorBasedProperties, models.Q(applications__highest_version='2.0.0'), 0),
+    ])
+    def test_delete_query(self, model, filters, expected_remaining_count):
+        model.objects.filter(filters).delete()
+        assert model.objects.count() == expected_remaining_count
