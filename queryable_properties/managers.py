@@ -2,8 +2,6 @@
 
 from __future__ import unicode_literals
 
-import uuid
-
 from django.db.models import Manager
 from django.db.models.query import QuerySet
 from django.utils import six
@@ -15,13 +13,13 @@ from .query import QueryablePropertiesQueryMixin, QueryablePropertyReference
 from .utils import get_queryable_property, InjectableMixin
 
 
-class QueryablePropertiesModelIterable(InjectableMixin):
+class QueryablePropertiesIterable(InjectableMixin):
     """
-    An iterable that yields model instances for each returned database row
-    while correctly processing columns of queryable properties. It is closely
-    related to Django's ModelIterable and will be used as a mixin for this
-    class in all (recent) Django versions that have it. In all other versions,
-    this class will be used as a standalone iterable.
+    An iterable that yields the actual results of a queryset while correctly
+    processing columns of queryable properties. It is closely related to
+    Django's BaseIterable and will be used as a mixin for its subclasses in all
+    (recent) Django versions that have it. In all other (older) versions, this
+    class will be used as a standalone iterable instead.
     """
 
     def __init__(self, queryset, iterable=None, **kwargs):
@@ -42,8 +40,10 @@ class QueryablePropertiesModelIterable(InjectableMixin):
         self.queryset = queryset
         # Only perform the super call if the class is used as a mixin
         if self.__class__.__bases__ != (InjectableMixin,):
-            super(QueryablePropertiesModelIterable, self).__init__(queryset, **kwargs)
-        self.iterable = iterable or super(QueryablePropertiesModelIterable, self).__iter__()
+            super(QueryablePropertiesIterable, self).__init__(queryset, **kwargs)
+        self.iterable = iterable or super(QueryablePropertiesIterable, self).__iter__()
+        self.yields_model_instances = ((ModelIterable is not None and isinstance(self, ModelIterable)) or
+                                       (ValuesQuerySet is not None and not isinstance(self.queryset, ValuesQuerySet)))
 
     def __iter__(self):
         """
@@ -52,39 +52,31 @@ class QueryablePropertiesModelIterable(InjectableMixin):
 
         :return: A generator that yields the model objects.
         """
-        # Annotation caching magic happens here: If this queryset is about to
-        # actually perform an SQL query, the queryable property annotations
-        # need to be renamed so Django doesn't call their setter. The renaming
-        # and the actual query execution will be performed on a clone of the
-        # current query object. That way, the query object can then be changed
-        # back to the original one where nothing was renamed and can be used
-        # for the constructions of further querysets based on this one.
         original_query = self.queryset.query
-
         try:
             self.queryset.query = chain_query(original_query)
-            changed_aliases = self._change_queryable_property_aliases()
+            final_aliases = self._setup_queryable_properties()
 
             for obj in self.iterable:
-                # Retrieve the annotation values from each renamed attribute
-                # and use it to populate the cache for the corresponding
-                # queryable property on each object while removing the weird,
-                # renamed attributes.
-                for property_ref, changed_name in six.iteritems(changed_aliases):
-                    value = getattr(obj, changed_name)
-                    delattr(obj, changed_name)
-                    # The following check is only required for older Django
-                    # versions, where all annotations were necessarily
-                    # selected. Therefore values that have been selected only
-                    # due to this will simply be discarded.
-                    if self.queryset.query._queryable_property_annotations[property_ref]:
-                        property_ref.property._set_cached_value(obj, value)
+                if self.yields_model_instances:
+                    # Retrieve the annotation values from each renamed
+                    # attribute and use it to populate the cache for the
+                    # corresponding queryable property on each object while
+                    # removing the weird, renamed attributes.
+                    for changed_name, property_ref in six.iteritems(final_aliases):
+                        value = getattr(obj, changed_name)
+                        delattr(obj, changed_name)
+                        if property_ref:
+                            property_ref.property._set_cached_value(obj, value)
                 yield obj
         finally:
             self.queryset.query = original_query
 
-    def _change_queryable_property_aliases(self):
+    def _setup_queryable_properties(self):
         """
+        Perform the required setup to correctly process queryable property
+        values.
+
         Change the internal aliases of the annotations that belong to queryable
         properties in the query of the associated queryset to something unique
         and return a dictionary mapping the queryable properties to the changed
@@ -93,51 +85,56 @@ class QueryablePropertiesModelIterable(InjectableMixin):
         the setter of the queryable properties. This way, Django can populate
         attributes with different names and avoid using the setter methods.
 
-        :return: A dictionary mapping references to queryable properties that
-                 selected annotations are based on to the changed aliases.
-        :rtype: dict[QueryablePropertyReference, str]
+        Also make sure that ordering by queryable properties works in older
+        Django versions.
+
+        :return: A dictionary mapping the final aliases for queryable
+                 properties to the corresponding references to be able to
+                 retrieve the values from the DB and apply them to the correct
+                 property. The property reference may be None, indicating that
+                 the retrieved value should be discarded.
+        :rtype: dict[str, QueryablePropertyReference | None]
         """
         query = self.queryset.query
-        changed_aliases = {}
+        final_aliases = {}
         select = dict(query.annotation_select)
 
-        for property_ref, requires_selection in query._queryable_property_annotations.items():
+        for property_ref in query._queryable_property_annotations:
             annotation_name = property_ref.full_path
-            if annotation_name not in select:
-                continue  # Annotations may have been removed somehow
-
-            # Older Django versions didn't make a clear distinction between
-            # selected an non-selected annotations, therefore non-selected
-            # annotations can only be removed from the annotation select dict
-            # in newer versions (to not unnecessarily query fields).
-            if not requires_selection and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
-                select.pop(annotation_name, None)
-                continue
-
-            changed_name = annotation_name
-            # Suffix the original annotation names with random UUIDs until an
-            # available name can be found. Since the suffix is delimited by
-            # the lookup separator, these names are guaranteed to not clash
-            # with names of model fields, which don't allow the separator in
-            # their names.
-            while changed_name in query.annotations:
-                changed_name = LOOKUP_SEP.join((annotation_name, uuid.uuid4().hex))
-            changed_aliases[property_ref] = changed_name
-            select[changed_name] = select.pop(annotation_name)
 
             # Older Django versions only work with the annotation select dict
             # when it comes to ordering, so queryable property annotations used
-            # for ordering must be renamed in the query's ordering as well.
+            # for ordering need special treatment.
+            order_by_occurrences = []
             if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:  # pragma: no cover
-                for i, field_name in enumerate(query.order_by):
-                    if field_name == annotation_name or field_name[1:] == annotation_name:
-                        query.order_by[i] = field_name.replace(annotation_name, changed_name)
+                order_by_occurrences = [index for index, field_name in enumerate(query.order_by)
+                                        if field_name == annotation_name or field_name[1:] == annotation_name]
+                if order_by_occurrences and annotation_name not in select and annotation_name in query.annotations:
+                    select[annotation_name] = query.annotations[annotation_name]
+                    final_aliases[annotation_name] = None
+
+            if not self.yields_model_instances or annotation_name not in select:
+                # The queryable property annotation does not require selection
+                # or no renaming needs to occur since the queryset doesn't
+                # yield model instances.
+                continue
+
+            # Suffix the original annotation name with the lookup separator to
+            # create a non-clashing name: both model field an queryable
+            # property names are not allowed to contain the separator and a
+            # relation path ending with the separator would be invalid as well.
+            changed_name = ''.join((annotation_name, LOOKUP_SEP))
+            final_aliases[changed_name] = final_aliases.pop(annotation_name, property_ref)
+            select[changed_name] = select.pop(annotation_name)
+            for index in order_by_occurrences:  # pragma: no cover
+                # Apply the changed names to the ORDER BY clause.
+                query.order_by[index] = query.order_by[index].replace(annotation_name, changed_name)
 
         # Patch the correct select property on the query with the new names,
         # since this property is used by the SQL compiler to build the actual
         # SQL query (which is where the changed names should be used).
         setattr(query, ANNOTATION_SELECT_CACHE_NAME, select)
-        return changed_aliases
+        return final_aliases
 
 
 class QueryablePropertiesQuerySetMixin(InjectableMixin):
@@ -167,9 +164,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # compatible to custom iterable classes while querysets can still be
         # pickled due to the base class being in the instance dict.
         cls = self.__dict__['_iterable_class']
-        if not issubclass(cls, ModelIterable):
-            return cls
-        return QueryablePropertiesModelIterable.mix_with_class(cls, 'QueryableProperties' + cls.__name__)
+        return QueryablePropertiesIterable.mix_with_class(cls, 'QueryableProperties' + cls.__name__)
 
     @_iterable_class.setter
     def _iterable_class(self, value):
@@ -245,14 +240,9 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
             # fields. Since only certain types of queries had the _fields attribute
             # in old Django versions, fall back to checking for existing grouping.
             full_group_by = not getattr(self, '_fields', self.query.group_by)
-            with queryset.query.add_queryable_property_annotation(property_ref, select=True,
-                                                                  full_group_by=full_group_by):
-                if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP and isinstance(self, ValuesQuerySet):  # pragma: no cover
-                    # In older Django versions, the annotation mask was changed
-                    # by the queryset itself when applying annotations to a
-                    # ValuesQuerySet. Therefore the same must be done here in
-                    # this case.
-                    queryset.query.set_aggregate_mask((queryset.query.aggregate_select_mask or set()) | {name})
+            with queryset.query._add_queryable_property_annotation(property_ref, select=True,
+                                                                   full_group_by=full_group_by):
+                pass
         return queryset
 
     def iterator(self, *args, **kwargs):
@@ -263,8 +253,8 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # properties processing (as long as this queryset returns model
         # instances).
         iterable = super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
-        if ValuesQuerySet and not isinstance(self, ValuesQuerySet):  # pragma: no cover
-            return iter(QueryablePropertiesModelIterable(self, iterable))
+        if ValuesQuerySet:  # pragma: no cover
+            return iter(QueryablePropertiesIterable(self, iterable))
         return iterable
 
     def order_by(self, *field_names):

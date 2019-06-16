@@ -66,6 +66,8 @@ if not hasattr(Query, 'annotations'):  # pragma: no cover
         'annotations': 'aggregates',
         '_annotation_select_cache': '_aggregate_select_cache',
         'annotation_select': 'aggregate_select',
+        'annotation_select_mask': 'aggregate_select_mask',
+        'set_annotation_mask': 'set_aggregate_mask',
     }
     ANNOTATION_SELECT_CACHE_NAME = '_aggregate_select_cache'
 

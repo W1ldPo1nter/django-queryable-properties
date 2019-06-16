@@ -96,9 +96,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         raise AttributeError()
 
     def init_injected_attrs(self):
-        # Stores queryable properties used as annotations in this query along
-        # with the information if the annotated value should be selected.
-        self._queryable_property_annotations = {}
+        # Stores references to queryable properties used as annotations in this
+        # query.
+        self._queryable_property_annotations = set()
         # A stack for queryable properties who are currently being annotated.
         # Required to correctly resolve dependencies and perform annotations.
         self._queryable_property_stack = []
@@ -146,28 +146,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 model = related_model
         return property_ref, lookups
 
-    def _auto_annotate(self, path):
-        """
-        Try to resolve the given path into a queryable property and annotate
-        the property as a non-selected property (if the property wasn't added
-        as an annotation already). Do nothing if the path does not match a
-        queryable property.
-
-        :param collections.Sequence path: The path to resolve (a string of
-                                          Django's query expression split up
-                                          by the lookup separator).
-        :return: The resolved annotation or None if the path couldn't be
-                 resolved.
-        """
-        property_ref = self._resolve_queryable_property(path)[0]
-        if not property_ref:
-            return None
-        with self.add_queryable_property_annotation(property_ref) as annotation:
-            return annotation
-
     @contextmanager
-    def add_queryable_property_annotation(self, property_ref, select=False,
-                                          full_group_by=bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP)):
+    def _add_queryable_property_annotation(self, property_ref, select=False,
+                                           full_group_by=bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP)):
         """
         A context manager that adds a queryable property annotation to this
         query and performs management tasks around the annotation (stores the
@@ -189,14 +170,18 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
                                          .format(property_ref.property))
 
+        annotation_name = property_ref.full_path
+        annotation_mask = set(self.annotations) if self.annotation_select_mask is None else self.annotation_select_mask
         self._queryable_property_stack.append(property_ref)
         try:
             if property_ref not in self._queryable_property_annotations:
-                self.add_annotation(property_ref.get_annotation(), alias=property_ref.full_path, is_summary=False)
-            else:
-                select = select or self._queryable_property_annotations[property_ref]
-            self._queryable_property_annotations[property_ref] = select
-            annotation = self.annotations[property_ref.full_path]
+                self.add_annotation(property_ref.get_annotation(), alias=annotation_name, is_summary=False)
+                if not select:
+                    self.set_annotation_mask(annotation_mask)
+                self._queryable_property_annotations.add(property_ref)
+            elif select and self.annotation_select_mask is not None:
+                self.set_annotation_mask(annotation_mask.union((annotation_name,)))
+            annotation = self.annotations[annotation_name]
             yield annotation
         finally:
             self._queryable_property_stack.pop()
@@ -216,6 +201,25 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                     self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
                 self.set_group_by()
 
+    def _auto_annotate(self, path):
+        """
+        Try to resolve the given path into a queryable property and annotate
+        the property as a non-selected property (if the property wasn't added
+        as an annotation already). Do nothing if the path does not match a
+        queryable property.
+
+        :param collections.Sequence path: The path to resolve (a string of
+                                          Django's query expression split up
+                                          by the lookup separator).
+        :return: The resolved annotation or None if the path couldn't be
+                 resolved.
+        """
+        property_ref = self._resolve_queryable_property(path)[0]
+        if not property_ref:
+            return None
+        with self._add_queryable_property_annotation(property_ref) as annotation:
+            return annotation
+
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
         # This method is called in older versions to add an aggregate, which
         # may be based on a queryable property annotation, which in turn must
@@ -228,8 +232,6 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # If it is based on a queryable property annotation, annotating the
             # current aggregate cannot be delegated to Django as it couldn't
             # deal with annotations containing the lookup separator.
-            if hasattr(self, 'append_aggregate_mask'):
-                self.append_aggregate_mask([alias])
             aggregate.add_to_query(self, alias, LOOKUP_SEP.join(path), property_annotation, is_summary)
         else:
             # The overridden method also allows to set a default value for the
@@ -237,6 +239,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # redirected to add_aggregate for older Django versions.
             model = model or self.model
             super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, model, alias, is_summary)
+        if self.annotation_select_mask is not None:
+            self.set_annotation_mask(self.annotation_select_mask.union((alias,)))
 
     def add_filter(self, *args, **kwargs):  # pragma: no cover
         # The build_filter method was called add_filter in very old Django
@@ -284,7 +288,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # resolved filter will likely contain the same property name again.
         context = dummy_context()
         if property_ref.property.filter_requires_annotation:
-            context = self.add_queryable_property_annotation(property_ref)
+            context = self._add_queryable_property_annotation(property_ref)
 
         with context:
             # Luckily, build_filter and _add_q use the same return value
@@ -294,6 +298,15 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # constant definition).
             method = getattr(self, ADD_Q_METHOD_NAME)
             return method(q_obj, **convert_build_filter_to_add_q_kwargs(**kwargs))
+
+    def get_aggregation(self, *args, **kwargs):
+        # If the query is to be used as a pure aggregate query (which might use
+        # a subquery), all queryable property annotations must be added to the
+        # select mask to avoid potentially empty SELECT clauses.
+        if self.annotation_select_mask is not None and self._queryable_property_annotations:
+            annotation_names = (property_ref.full_path for property_ref in self._queryable_property_annotations)
+            self.set_annotation_mask(self.annotation_select_mask.union(annotation_names))
+        return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
 
     def need_force_having(self, q_object):  # pragma: no cover
         # Same as need_having, but for even older versions. Simply delegate to
@@ -316,7 +329,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             if property_ref.property.filter_requires_annotation:
                 if contains_aggregate(property_ref.get_annotation()):
                     return True
-                ignored_refs = ignored_refs.union({property_ref})
+                ignored_refs = ignored_refs.union((property_ref,))
             # Also check the Q object returned by the property's get_filter
             # method as it may contain references to other properties that may
             # add aggregation-based annotations.
