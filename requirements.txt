@@ -1,5 +1,5 @@
 -r requirements-tox.txt
-Django>=2.1,<2.2
+Django>=2.2,<3.0
 pytest-django==3.4.3
 recommonmark==0.4.0
 Sphinx==1.8.2
