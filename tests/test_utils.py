@@ -38,8 +38,8 @@ class TestGetQueryableProperty(object):
         assert isinstance(prop, QueryableProperty)
 
     @pytest.mark.parametrize('model, property_name', [
-        (VersionWithClassBasedProperties, 'non_existing'),
-        (VersionWithDecoratorBasedProperties, 'non_existing'),
+        (VersionWithClassBasedProperties, 'non_existent'),
+        (VersionWithDecoratorBasedProperties, 'non_existent'),
         (VersionWithClassBasedProperties, 'major'),  # Existing model field
         (VersionWithDecoratorBasedProperties, 'major'),  # Existing model field
     ])
