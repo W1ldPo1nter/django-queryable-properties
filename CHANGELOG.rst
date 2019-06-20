@@ -4,6 +4,18 @@ Changelog
 master (unreleased)
 -------------------
 
+- Queryable property filters (both annotation-based and custom) can now be used across relations when filtering
+  querysets (i.e. a queryset can now be filtered by a queryable property on a related model)
+- Queryset annotations can now refer to annotatable queryable properties defined on a related model
+- Querysets can now be ordered by annotatable queryable properties defined on a related model
+- Filters and annotations that reference annotatable queryable properties will not select the queryable property
+  annotation anymore in Django versions below 1.8 (ordering by such a property will still lead to a selection in these
+  versions)
+- Fixed unnecessary selections of queryable property annotations in querysets that don't return model instances (i.e.
+  queries with ``.values()`` or ``.values_list()``)
+- Fixed an infinite recursion when constructing the HAVING clause for annotation-based filters that are not an aggregate
+  in Django 1.8
+
 1.0.2 (2019-06-02)
 ------------------
 
