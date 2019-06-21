@@ -147,8 +147,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         return property_ref, lookups
 
     @contextmanager
-    def _add_queryable_property_annotation(self, property_ref, select=False,
-                                           full_group_by=bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP)):
+    def _add_queryable_property_annotation(self, property_ref, full_group_by, select=False):
         """
         A context manager that adds a queryable property annotation to this
         query and performs management tasks around the annotation (stores the
@@ -160,11 +159,11 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         :param QueryablePropertyReference property_ref: A reference containing
                                                         the queryable property
                                                         to annotate.
-        :param bool select: Signals whether the annotation should be selected
-                            or not.
         :param bool full_group_by: Signals whether to use all fields of the
                                    query for the GROUP BY clause when dealing
                                    with an aggregate-based annotation or not.
+        :param bool select: Signals whether the annotation should be selected
+                            or not.
         """
         if property_ref in self._queryable_property_stack:
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
@@ -217,7 +216,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         property_ref = self._resolve_queryable_property(path)[0]
         if not property_ref:
             return None
-        with self._add_queryable_property_annotation(property_ref) as annotation:
+        full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
+        with self._add_queryable_property_annotation(property_ref, full_group_by) as annotation:
             return annotation
 
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
@@ -288,7 +288,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # resolved filter will likely contain the same property name again.
         context = dummy_context()
         if property_ref.property.filter_requires_annotation:
-            context = self._add_queryable_property_annotation(property_ref)
+            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
+            context = self._add_queryable_property_annotation(property_ref, full_group_by)
 
         with context:
             # Luckily, build_filter and _add_q use the same return value

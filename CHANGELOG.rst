@@ -13,6 +13,8 @@ master (unreleased)
   versions)
 - Fixed unnecessary selections of queryable property annotations in querysets that don't return model instances (i.e.
   queries with ``.values()`` or ``.values_list()``)
+- Fixed unnecessary fields in GROUP BY clauses in querysets that don't return model instances (i.e. queries with
+  ``.values()`` or ``.values_list()``) in Django versions below 1.8
 - Fixed an infinite recursion when constructing the HAVING clause for annotation-based filters that are not an aggregate
   in Django 1.8
 

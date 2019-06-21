@@ -170,19 +170,20 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
     def _iterable_class(self, value):
         self.__dict__['_iterable_class'] = value
 
-    def _clone(self, *args, **kwargs):
+    def _clone(self, klass=None, *args, **kwargs):
+        if klass:  # pragma: no cover
+            # In older Django versions, the class of the queryset may be
+            # replaced with a dynamically created class based on the current
+            # class and the value of klass while cloning (e.g when using
+            # .values()). Therefore this needs to be re-injected to be on top
+            # of the MRO again to enable queryable properties functionality.
+            klass = QueryablePropertiesQuerySetMixin.mix_with_class(klass, 'QueryableProperties' + klass.__name__)
+            args = [klass] + list(args)
         clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
         # Since the _iterable_class property may return a dynamically created
         # class, the value of a clone must be reset to the base class.
         if '_iterable_class' in self.__dict__:
             clone._iterable_class = self.__dict__['_iterable_class']
-        # In older Django versions, the class of the property may be completely
-        # replaced while cloning (e.g when using .values()). Therefore this
-        # mixin might need to be re-injected to enable queryable properties
-        # functionality.
-        if not isinstance(clone, QueryablePropertiesQuerySetMixin):  # pragma: no cover
-            class_name = 'QueryableProperties' + clone.__class__.__name__
-            QueryablePropertiesQuerySetMixin.inject_into_object(clone, class_name)
         return clone
 
     def _resolve_update_kwargs(self, **kwargs):
@@ -236,12 +237,12 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         queryset = chain_queryset(self)
         for name in names:
             property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, ())
-            # A full GROUP BY is required if the query is not limited to certain
-            # fields. Since only certain types of queries had the _fields attribute
-            # in old Django versions, fall back to checking for existing grouping.
-            full_group_by = not getattr(self, '_fields', self.query.group_by)
-            with queryset.query._add_queryable_property_annotation(property_ref, select=True,
-                                                                   full_group_by=full_group_by):
+            # A full GROUP BY is required if the query is not limited to
+            # certain fields. Since only certain types of queries had the
+            # _fields attribute in old Django versions, fall back to checking
+            # for existing selection, on which the GROUP BY would be based.
+            full_group_by = not getattr(self, '_fields', self.query.select)
+            with queryset.query._add_queryable_property_annotation(property_ref, full_group_by, select=True):
                 pass
         return queryset
 
