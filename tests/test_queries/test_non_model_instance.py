@@ -68,6 +68,12 @@ class TestAggregateAnnotations(object):
         assert len(set(tuple(obj_dict.items()) for obj_dict in queryset)) == expected_count
         assert all((property_name in obj_dict) is expected_property_selection for obj_dict in queryset)
 
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_distinct_property_values(self, model):
+        queryset = model.objects.select_properties('version_count').values('version_count').distinct()
+        assert queryset.count() == len(queryset) == 1
+        assert queryset[0]['version_count'] == 4
+
     @pytest.mark.parametrize('model, filters, expected_version_counts', [
         (ApplicationWithClassBasedProperties, {}, {3, 4}),
         (ApplicationWithClassBasedProperties, {'name__contains': 'cool'}, {3}),
@@ -104,6 +110,14 @@ class TestExpressionAnnotations(object):
         versions = set(obj_dict['version'] for obj_dict in queryset)
         assert versions == expected_versions
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_group_by_property(self, model):
+        queryset = model.objects.select_properties('highest_version').values('highest_version')
+        queryset = queryset.select_properties('version_count')
+        assert queryset.count() == len(queryset) == 1
+        assert queryset[0]['version_count'] == 8
+
     @pytest.mark.parametrize('model, values, property_name, filter_value, expected_count', [
         (VersionWithClassBasedProperties, ('major',), 'changes_or_default', '(No data)', 6),
         (VersionWithDecoratorBasedProperties, ('major',), 'changes_or_default', '(No data)', 6),
@@ -114,6 +128,12 @@ class TestExpressionAnnotations(object):
         queryset = model.objects.values(*values).filter(**{property_name: filter_value})
         assert len(queryset) == expected_count
         assert all(property_name not in obj_dict for obj_dict in queryset)
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_distinct_property_values(self, model):
+        queryset = model.objects.select_properties('version').values('version').distinct()
+        assert queryset.count() == len(queryset) == 4
+        assert set(obj_dict['version'] for obj_dict in queryset) == {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}
 
     @pytest.mark.parametrize('model, filters, expected_versions', [
         (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),

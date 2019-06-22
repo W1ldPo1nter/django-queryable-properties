@@ -49,6 +49,16 @@ class TestAggregateAnnotations(object):
         result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum('application__version_count'))
         assert result['total_version_count'] == expected_total
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('model, annotation', [
+        (VersionWithClassBasedProperties, models.F('application__version_count')),
+        (VersionWithDecoratorBasedProperties, models.F('application__version_count')),
+    ])
+    def test_annotation_based_on_queryable_property_across_relation(self, model, annotation):
+        model.objects.all()[0].delete()
+        queryset = model.objects.annotate(annotation=annotation)
+        assert all(obj.annotation == obj.application.version_count for obj in queryset)
+
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_iterator(self, model):
         queryset = model.objects.filter(version_count=4).select_properties('version_count')
@@ -85,20 +95,35 @@ class TestExpressionAnnotations(object):
         assert 'version' in queryset.query.annotations
         assert all(model.version._has_cached_value(obj) for obj in queryset)
 
-    @pytest.mark.parametrize('model, annotation, expected_value', [
-        (VersionWithClassBasedProperties, models.F('version'), '{}'),
-        (VersionWithDecoratorBasedProperties, models.F('version'), '{}'),
-        (VersionWithClassBasedProperties, Concat(Value('V'), 'version'), 'V{}'),
-        (VersionWithDecoratorBasedProperties, Concat(Value('V'), 'version'), 'V{}'),
+    @pytest.mark.parametrize('model, property_name, annotation, expected_count, record_checker', [
+        (VersionWithClassBasedProperties, 'version', models.F('version'), 8,
+         lambda obj: obj.annotation == obj.version),
+        (VersionWithDecoratorBasedProperties, 'version', models.F('version'), 8,
+         lambda obj: obj.annotation == obj.version),
+        (VersionWithClassBasedProperties, 'version', Concat(Value('V'), 'version'), 8,
+         lambda obj: obj.annotation == 'V' + obj.version),
+        (VersionWithDecoratorBasedProperties, 'version', Concat(Value('V'), 'version'), 8,
+         lambda obj: obj.annotation == 'V' + obj.version),
+        (ApplicationWithClassBasedProperties, 'versions__version', models.F('versions__version'), 8,
+         lambda obj: obj.annotation in ('1.2.3', '1.3.0', '1.3.1', '2.0.0')),
+        (ApplicationWithDecoratorBasedProperties, 'versions__version', models.F('versions__version'), 8,
+         lambda obj: obj.annotation in ('1.2.3', '1.3.0', '1.3.1', '2.0.0')),
+        (ApplicationWithClassBasedProperties, 'versions__version', Concat(Value('V'), 'versions__version'), 8,
+         lambda obj: obj.annotation in ('V1.2.3', 'V1.3.0', 'V1.3.1', 'V2.0.0')),
+        (ApplicationWithDecoratorBasedProperties, 'versions__version', Concat(Value('V'), 'versions__version'), 8,
+         lambda obj: obj.annotation in ('V1.2.3', 'V1.3.0', 'V1.3.1', 'V2.0.0')),
     ])
-    def test_annotation_based_on_queryable_property(self, model, annotation, expected_value):
+    def test_annotation_based_on_queryable_property(self, model, property_name, annotation, expected_count,
+                                                    record_checker):
         queryset = model.objects.annotate(annotation=annotation)
-        for version in queryset:
-            assert version.annotation == expected_value.format(version.version)
+        assert queryset.count() == len(queryset) == expected_count
+        assert all(record_checker(obj) for obj in queryset)
+        if '__' not in property_name:
             # Check that a property annotation used implicitly by another
             # annotation does not lead to a selection of the property
             # annotation
-            assert not model.version._has_cached_value(version)
+            prop = getattr(model, property_name)
+            assert all(not prop._has_cached_value(obj) for obj in queryset)
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_iterator(self, model):
