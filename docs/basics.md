@@ -90,12 +90,16 @@ logic to other custom querysets: `queryable_properties.managers.QueryablePropert
 A manager class can then be generated from the queryset class using `CustomQuerySet.as_manager()` or
 `CustomManager.from_queryset(CustomQuerySet)`.
 
-```eval_rst
-.. note::
-   The queryset features of queryable properties can only be used on querysets that execute queries for the model they
-   are defined on (and if the required queryset class is used). Queryable properties cannot be used in querysets
-   across relations (so even if the ``version_str`` property above implemented filtering in querysets, it would still
-   **not** be possible to use it across relations like ``Application.objects.filter(versions__version_str='2.0')``).
-   
-   This feature may be added in the future if it can be implemented with reasonable effort.
+Using the special manager/queryset class may not only be important for models that define queryable properties.
+Since most features of queryable properties can also be used on related models in queryset operations, the manager is
+required whenever queryable property functionality should be offered, even if the corresponding model doesn't implement
+its own queryable properties.
+For example, if queryset filtering was implemented for the `version_str` property shown above, it could also be used in
+querysets of the `Application` model like this:
+
+```python
+Application.objects.filter(versions__version_str='1.2')
 ```
+
+To make this work, the `objects` manager of the `Application` model must also be a `QueryablePropertiesManager`, even
+if the model does not define queryable properties of its own.

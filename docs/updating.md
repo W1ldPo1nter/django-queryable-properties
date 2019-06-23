@@ -5,6 +5,8 @@ method of querysets).
 To achieve this, the `update` argument for a queryable property will simply be translated into `update` values for
 actual model fields.
 
+## Implementation
+
 Let's use the `version_str` of the `ApplicationVersion` model as an example once again.
 
 To allow the usage of this queryable property in queryset updates using the decorator-based approach, the property's
@@ -70,6 +72,8 @@ combinations that are actually required to perform the update correctly.
    which will be resolved accordingly in the same manner.
 ```
 
+## Usage
+
 With both implementations, the queryable property can be used in queryset updates like this:
 ```python
 ApplicationVersion.objects.update(version_str='1.1')
@@ -77,3 +81,6 @@ ApplicationVersion.objects.update(version_str='1.1')
 
 The specified value is then translated into actual field values by the implemented function/method and the real,
 underlying `update` call will take place with these values.
+
+Naturally, queryable properties that can be reached via relations can **not** be used as arguments in `update` since
+queries that update records only operate on these records (and not related records).

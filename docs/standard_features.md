@@ -74,8 +74,8 @@ class VersionStringProperty(QueryableProperty):
 ```eval_rst
 .. note::
    All queryable properties that implement annotation will act like cached properties on the result objects of a
-   queryset after they have been explicitly selected. Read more about this in the documentation for
-   :doc:`annotatable queryable properties <annotations>`.
+   queryset after they have been explicitly selected.
+   Read more about this in the documentation for :doc:`annotatable queryable properties <annotations>`.
 ```
 
 #### Resetting a cached property
@@ -154,10 +154,10 @@ cached values and setters.
 
 ```eval_rst
 .. note::
-   The setter cache behavior is not only relevant for queryable properties that have been marked as cached. Explicitly
-   selected queryable property annotations also behave like cached properties, which means they also make use of this
-   option if their setter is used after they were selected. Read more about this in the documentation for
-   :doc:`annotatable queryable properties <annotations>`.
+   The setter cache behavior is not only relevant for queryable properties that have been marked as cached.
+   Explicitly selected queryable property annotations also behave like cached properties, which means they also make
+   use of this option if their setter is used after they were selected.
+   Read more about this in the documentation for :doc:`annotatable queryable properties <annotations>`.
 ```
 
 There are 4 options that can be used via constants (which in reality are functions, much like Django's built-in values

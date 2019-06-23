@@ -42,8 +42,14 @@ While this may not be the best real-world example, it can demonstrate how to wor
 from django.db import models
 
 
+class Category(models.Model):
+    """Represents a category for applications."""
+    name = models.CharField(max_length=255)
+
+
 class Application(models.Model):
     """Represents a named application."""
+    categories = models.ManyToManyField(Category, related_name='applications')
     name = models.CharField(max_length=255)
 
 

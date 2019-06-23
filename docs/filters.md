@@ -11,9 +11,11 @@ implementing it, as long as we don't try to filter a queryset by such a property
 ```eval_rst
 .. note::
    Implementing how to filter by a queryable property is not necessary for properties that also implement annotating,
-   because an annotated field in a queryset natively supports filtering. Read more about this in the documentation for
-   :doc:`annotatable queryable properties <annotations>`.
+   because an annotated field in a queryset natively supports filtering.
+   Read more about this in the documentation for :doc:`annotatable queryable properties <annotations>`.
 ```
+
+## Implementation
 
 To implement (custom) filtering using the decorator-based approach, the property's `filter` method must be used.
 The following code block contains an example for the `version_str` property from previous examples:
@@ -88,12 +90,28 @@ conditions to represent filtering by the queryable property using the given look
    resolved accordingly.
 ```
 
-With both implementations, the queryable property can be used to filter querysets like this:
+## Usage
+
+With both implementations shown above, the queryable property can be used to filter querysets like any regular model
+field:
 ```python
+from django.db.models import Q
+
 ApplicationVersion.objects.filter(version_str='1.1')
 ApplicationVersion.objects.exclude(version_str='1.2')
+ApplicationVersion.objects.filter(application__name='My App', version_str='2.0')
+ApplicationVersion.objects.filter(Q(version_str='1.9') | Q(major=2))
 ...
 ```
 
-These filters may also be combined with filters for other fields or queryable properties and can also be used in nested
-filter expressions using `Q` objects, i.e. the queryable properties can be treated like regular model fields.
+In the same manner, the filter can even be used when filtering on related models, e.g. when making queries from the
+`Application` model:
+```python
+from django.db.models import Q
+
+Application.objects.filter(versions__version_str='1.1')
+Application.objects.exclude(versions__version_str='1.2')
+Application.objects.filter(name='My App', versions__version_str='2.0')
+Application.objects.filter(Q(versions__major=2) | Q(versions__version_str='1.9'))
+...
+```
