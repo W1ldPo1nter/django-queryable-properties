@@ -14,6 +14,7 @@ Write Django model properties that can be used in database queries.
    annotations
    updating
    api
+   changelog
 
 Indices and tables
 ==================
