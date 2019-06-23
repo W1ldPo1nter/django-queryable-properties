@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.1.0 (2019-06-23)
+------------------
+
 - Queryable property filters (both annotation-based and custom) can now be used across relations when filtering
   querysets (i.e. a queryset can now be filtered by a queryable property on a related model)
 - Queryset annotations can now refer to annotatable queryable properties defined on a related model
