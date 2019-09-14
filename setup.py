@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 from distutils.cmd import Command
 import io
 import os
-from setuptools import setup
+from setuptools import find_packages, setup
 import subprocess
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -96,11 +96,15 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Topic :: Internet'
     ],
-    packages=['queryable_properties'],
+    packages=find_packages(include='queryable_properties*'),
     include_package_data=True,
-    install_requires=['Django>=1.4'],
+    install_requires=[
+        'Django>=1.4',
+        'six>=1.9',
+    ],
     tests_require=[
         'Django>=1.4',
+        'six>=1.9',
         'coverage',
         'flake8',
         'mock',
