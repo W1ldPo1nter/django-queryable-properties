@@ -59,7 +59,7 @@ elif hasattr(Query, 'need_force_having'):  # pragma: no cover
 # annotations were strongly tied to aggregates.
 ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP = {}
 ANNOTATION_SELECT_CACHE_NAME = '_annotation_select_cache'
-if not hasattr(Query, 'annotations'):  # pragma: no cover
+if not hasattr(Query, 'annotation_select'):  # pragma: no cover
     ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP = {
         'add_annotation': 'add_aggregate',
         '_annotations': '_aggregates',
