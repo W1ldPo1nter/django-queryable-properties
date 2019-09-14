@@ -2,7 +2,7 @@
 import pytest
 
 from django.db.models import Q
-from django.utils.six.moves import cPickle
+from six.moves import cPickle
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty

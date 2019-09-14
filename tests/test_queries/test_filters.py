@@ -2,9 +2,9 @@
 
 import pytest
 
+import six
 from django import VERSION as DJANGO_VERSION
 from django.db import models
-from django.utils import six
 
 from ..models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                       CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,

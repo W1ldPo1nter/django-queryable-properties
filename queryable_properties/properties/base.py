@@ -2,8 +2,7 @@
 
 from __future__ import unicode_literals
 
-from django.utils import six
-from django.utils.encoding import python_2_unicode_compatible
+import six
 
 from ..compat import LOOKUP_SEP
 from ..exceptions import QueryablePropertyError
@@ -14,7 +13,7 @@ from .mixins import AnnotationMixin
 RESET_METHOD_NAME = 'reset_property'
 
 
-@python_2_unicode_compatible
+@six.python_2_unicode_compatible
 class QueryableProperty(object):
     """
     Base class for all queryable properties, which are basically simple

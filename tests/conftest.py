@@ -1,7 +1,7 @@
 # encoding: utf-8
 
-from mock import Mock
 import pytest
+from mock import Mock
 
 try:
     from django.db.models import Value

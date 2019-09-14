@@ -1,8 +1,8 @@
 # encoding: utf-8
 import pytest
 
+import six
 from django.db.models import F, Model, Q
-from django.utils import six
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING,

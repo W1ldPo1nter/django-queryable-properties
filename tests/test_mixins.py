@@ -3,14 +3,15 @@
 
 import pytest
 
-from django.utils.six.moves import cPickle
+from six.moves import cPickle
 
 from .models import ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures('versions')
 @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-def test_pickle_unpickle(versions, model):
+def test_pickle_unpickle(model):
     queryset1 = model.objects.filter(version_count=4).order_by('name').select_properties('version_count')
     expected_applications = list(queryset1)
     serialized_query = cPickle.dumps(queryset1.query)
