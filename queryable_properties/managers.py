@@ -2,9 +2,9 @@
 
 from __future__ import unicode_literals
 
+import six
 from django.db.models import Manager
 from django.db.models.query import QuerySet
-from django.utils import six
 
 from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, chain_query, chain_queryset,
                      LOOKUP_SEP, ModelIterable, ValuesQuerySet)
@@ -102,7 +102,7 @@ class QueryablePropertiesIterable(InjectableMixin):
         for property_ref in query._queryable_property_annotations:
             annotation_name = property_ref.full_path
 
-            # Older Django versions only work with the annotation select dict
+            # Older Django versions don't work with the annotation select dict
             # when it comes to ordering, so queryable property annotations used
             # for ordering need special treatment.
             order_by_occurrences = []

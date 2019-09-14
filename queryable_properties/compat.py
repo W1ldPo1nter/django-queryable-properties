@@ -6,9 +6,9 @@ try:  # pragma: no cover
 except ImportError:  # pragma: no cover
     from contextlib import nested as dummy_context  # noqa: F401
 
+import six
 from django.db.models.query import QuerySet
 from django.db.models.sql.query import Query
-from django.utils import six
 
 try:  # pragma: no cover
     from django.db.models.constants import LOOKUP_SEP  # noqa: F401

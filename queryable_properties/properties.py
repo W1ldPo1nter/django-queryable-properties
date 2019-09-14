@@ -2,9 +2,8 @@
 
 from __future__ import unicode_literals
 
+import six
 from django.db.models import Q
-from django.utils import six
-from django.utils.encoding import python_2_unicode_compatible
 
 from .compat import LOOKUP_SEP
 from .exceptions import QueryablePropertyError
@@ -67,7 +66,7 @@ def DO_NOTHING(prop, obj, value, return_value):
     pass
 
 
-@python_2_unicode_compatible
+@six.python_2_unicode_compatible
 class QueryableProperty(object):
     """
     Base class for all queryable properties, which are basically simple
