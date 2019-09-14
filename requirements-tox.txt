@@ -9,3 +9,4 @@ pytest==3.6.2
 pytest-cov==2.5.1
 pytest-pep8==1.0.6
 pytest-pythonpath==0.7.2
+six==1.12.0
