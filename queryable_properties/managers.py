@@ -22,7 +22,7 @@ class QueryablePropertiesIterable(InjectableMixin):
     class will be used as a standalone iterable instead.
     """
 
-    def __init__(self, queryset, iterable=None, **kwargs):
+    def __init__(self, queryset, *args, **kwargs):
         """
         Initialize a new iterable for the given queryset. If an iterable is
         given it will be used to retrieve the model instances before applying
@@ -34,14 +34,18 @@ class QueryablePropertiesIterable(InjectableMixin):
                                   for.
         :param collections.Iterable iterable: The optional iterable to use for
                                               standalone usage.
+        :param args: Positional arguments to pass through to the base class
+                     initialization when used as a mixin.
         :param kwargs: Keyword arguments to pass through to the base class
                        initialization when used as a mixin.
+        :keyword collections.Iterable iterable: The optional iterable to use
+                                                for standalone usage.
         """
         self.queryset = queryset
         # Only perform the super call if the class is used as a mixin
         if self.__class__.__bases__ != (InjectableMixin,):
-            super(QueryablePropertiesIterable, self).__init__(queryset, **kwargs)
-        self.iterable = iterable or super(QueryablePropertiesIterable, self).__iter__()
+            super(QueryablePropertiesIterable, self).__init__(queryset, *args, **kwargs)
+        self.iterable = kwargs.get('iterable') or super(QueryablePropertiesIterable, self).__iter__()
         self.yields_model_instances = ((ModelIterable is not None and isinstance(self, ModelIterable)) or
                                        (ValuesQuerySet is not None and not isinstance(self.queryset, ValuesQuerySet)))
 
@@ -178,7 +182,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
             # .values()). Therefore this needs to be re-injected to be on top
             # of the MRO again to enable queryable properties functionality.
             klass = QueryablePropertiesQuerySetMixin.mix_with_class(klass, 'QueryableProperties' + klass.__name__)
-            args = [klass] + list(args)
+            args = (klass,) + args
         clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
         # Since the _iterable_class property may return a dynamically created
         # class, the value of a clone must be reset to the base class.
@@ -254,8 +258,8 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # properties processing (as long as this queryset returns model
         # instances).
         iterable = super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
-        if ValuesQuerySet:  # pragma: no cover
-            return iter(QueryablePropertiesIterable(self, iterable))
+        if '_iterable_class' not in self.__dict__: # pragma: no cover
+            return iter(QueryablePropertiesIterable(self, iterable=iterable))
         return iterable
 
     def order_by(self, *field_names):
