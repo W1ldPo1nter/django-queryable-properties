@@ -4,6 +4,10 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 3.0
+- Added a standalone version of ``six`` to the package requirements as Django will not include it anymore starting with
+  3.0
+
 1.1.0 (2019-06-23)
 ------------------
 
@@ -16,19 +20,19 @@ master (unreleased)
   versions)
 - Fixed unnecessary selections of queryable property annotations in querysets that don't return model instances (i.e.
   queries with ``.values()`` or ``.values_list()``)
-- Fixed unnecessary fields in GROUP BY clauses in querysets that don't return model instances (i.e. queries with
+- Fixed unnecessary fields in ``GROUP BY`` clauses in querysets that don't return model instances (i.e. queries with
   ``.values()`` or ``.values_list()``) in Django versions below 1.8
-- Fixed an infinite recursion when constructing the HAVING clause for annotation-based filters that are not an aggregate
-  in Django 1.8
+- Fixed an infinite recursion when constructing the ``HAVING`` clause for annotation-based filters that are not an
+  aggregate in Django 1.8
 
 1.0.2 (2019-06-02)
 ------------------
 
 - The ``lookup`` parameter of custom filter implementations of queryable properties will now receive the combined
   lookup string if multiple lookups/transforms are used at once instead of just the first lookup/transform
-- Fixed the construction of GROUP BY clauses when annotating queryable properties based on aggregates
-- Fixed the construction of HAVING clauses when annotating queryable properties based on aggregates in Django versions
-  below 1.9
+- Fixed the construction of ``GROUP BY`` clauses when annotating queryable properties based on aggregates
+- Fixed the construction of ``HAVING`` clauses when annotating queryable properties based on aggregates in Django
+  versions below 1.9
 - Fixed the ability to pickle queries and querysets with queryable properties functionality in Django versions below
   1.6
 
