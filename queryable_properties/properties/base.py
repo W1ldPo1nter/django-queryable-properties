@@ -2,69 +2,16 @@
 
 from __future__ import unicode_literals
 
-from django.db.models import Q
 from django.utils import six
 from django.utils.encoding import python_2_unicode_compatible
 
-from .compat import LOOKUP_SEP
-from .exceptions import QueryablePropertyError
-from .utils import get_queryable_property, reset_queryable_property
+from ..compat import LOOKUP_SEP
+from ..exceptions import QueryablePropertyError
+from ..utils import get_queryable_property, reset_queryable_property
+from .cache_behavior import CLEAR_CACHE
+from .mixins import AnnotationMixin
 
 RESET_METHOD_NAME = 'reset_property'
-
-
-def CLEAR_CACHE(prop, obj, value, return_value):
-    """
-    Setter cache behavior function that will clear the cached value for a
-    cached queryable property on objects after the setter was used.
-
-    :param QueryableProperty prop: The property whose setter was used.
-    :param django.db.models.Model obj: The object the setter was used on.
-    :param value: The value that was passed to the setter.
-    :param return_value: The return value of the setter function/method.
-    """
-    prop._clear_cached_value(obj)
-
-
-def CACHE_VALUE(prop, obj, value, return_value):
-    """
-    Setter cache behavior function that will update the cache for the cached
-    queryable property on the object in question with the (raw) value that was
-    passed to the setter.
-
-    :param QueryableProperty prop: The property whose setter was used.
-    :param django.db.models.Model obj: The object the setter was used on.
-    :param value: The value that was passed to the setter.
-    :param return_value: The return value of the setter function/method.
-    """
-    prop._set_cached_value(obj, value)
-
-
-def CACHE_RETURN_VALUE(prop, obj, value, return_value):
-    """
-    Setter cache behavior function that will update the cache for the cached
-    queryable property on the object in question with the return value of the
-    setter function/method.
-
-    :param QueryableProperty prop: The property whose setter was used.
-    :param django.db.models.Model obj: The object the setter was used on.
-    :param value: The value that was passed to the setter.
-    :param return_value: The return value of the setter function/method.
-    """
-    prop._set_cached_value(obj, return_value)
-
-
-def DO_NOTHING(prop, obj, value, return_value):
-    """
-    Setter cache behavior function that will do nothing after the setter of
-    a cached queryable property was used, retaining previously cached values.
-
-    :param QueryableProperty prop: The property whose setter was used.
-    :param django.db.models.Model obj: The object the setter was used on.
-    :param value: The value that was passed to the setter.
-    :param return_value: The return value of the setter function/method.
-    """
-    pass
 
 
 @python_2_unicode_compatible
@@ -204,69 +151,6 @@ class QueryableProperty(object):
                                            on.
         """
         obj.__dict__.pop(self.name, None)
-
-
-class SetterMixin(object):
-    """
-    A mixin for queryable properties that also define a setter.
-    """
-
-    def set_value(self, obj, value):  # pragma: no cover
-        """
-        Setter method for the queryable property, which will be called when the
-        property is write-accessed.
-
-        :param django.db.models.Model obj: The object on which the property was
-                                           accessed.
-        :param value: The value to set.
-        """
-        raise NotImplementedError()
-
-
-class AnnotationMixin(object):
-    """
-    A mixin for queryable properties that allow to add an annotation to
-    represent them to querysets.
-    """
-
-    filter_requires_annotation = True
-
-    def get_annotation(self, cls):  # pragma: no cover
-        """
-        Construct an annotation representing this property that can be added
-        to querysets of the model associated with this property.
-
-        :param type cls: The model class of which a queryset should be
-                         annotated.
-        :return: An annotation object.
-        """
-        raise NotImplementedError()
-
-    def get_filter(self, cls, lookup, value):
-        # Since annotations can be filtered like regular fields, a Q object
-        # that simply passes the filter through can be used.
-        return Q(**{LOOKUP_SEP.join((self.name, lookup)): value})
-
-
-class UpdateMixin(object):
-    """
-    A mixin for queryable properties that allow to use themselves in update
-    queries.
-    """
-
-    def get_update_kwargs(self, cls, value):  # pragma: no cover
-        """
-        Resolve an update keyword argument for this property into the actual
-        keyword arguments to emulate an update using this property.
-
-        :param type cls: The model class of which an update query should be
-                         performed.
-        :param value: The value passed to the update call for this property.
-        :return: The actual keyword arguments to set in the update call instead
-                 of the given one.
-        :rtype: dict
-        """
-        raise NotImplementedError()
 
 
 class queryable_property(QueryableProperty):
