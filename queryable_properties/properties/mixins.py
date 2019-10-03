@@ -1,7 +1,7 @@
 # encoding: utf-8
 
+import six
 from django.db.models import Q
-from django.utils import six
 
 from ..compat import LOOKUP_SEP
 from ..utils import InjectableMixin
