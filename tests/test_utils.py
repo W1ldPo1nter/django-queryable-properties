@@ -98,6 +98,14 @@ class TestInjectableMixin(object):
             assert obj.mixin_attr1 == 1.337
             assert obj.mixin_attr2 == 'test'
 
+    def test_no_reduce_implementation(self, monkeypatch):
+        monkeypatch.setattr(DummyMixin, '_dynamic_pickling', False)
+        monkeypatch.setattr(DummyMixin, '_created_classes', {})
+        base_obj = DummyClass('xyz', 42.42)
+        DummyMixin.inject_into_object(base_obj)
+        with pytest.raises(cPickle.PicklingError):
+            cPickle.dumps(base_obj)
+
 
 class TestTreeNodeProcessor(object):
 
