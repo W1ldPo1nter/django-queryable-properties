@@ -9,8 +9,8 @@ from queryable_properties.properties import (AnnotationMixin, CACHE_RETURN_VALUE
                                              QueryableProperty, queryable_property)
 from queryable_properties.utils import reset_queryable_property
 
-from .models import (ApplicationWithClassBasedProperties, DummyProperty, VersionWithClassBasedProperties,
-                     VersionWithDecoratorBasedProperties)
+from ..models import (ApplicationWithClassBasedProperties, DummyProperty, VersionWithClassBasedProperties,
+                      VersionWithDecoratorBasedProperties)
 
 
 def function_with_docstring():
@@ -120,28 +120,6 @@ class TestBasics(object):
     def test_invalid_property_name(self):
         with pytest.raises(QueryablePropertyError, match='must not contain the lookup separator'):
             type('BrokenModel', (Model,), {'dummy__dummy': DummyProperty(), '__module__': 'tests.models'})
-
-
-class TestAnnotationMixin(object):
-
-    @pytest.fixture
-    def mixin_instance(self):
-        instance = AnnotationMixin()
-        instance.name = 'test'
-        return instance
-
-    @pytest.mark.parametrize('lookup, value', [
-        ('exact', 'abc'),
-        ('isnull', True),
-        ('lte', 5),
-    ])
-    def test_get_filter(self, mixin_instance, lookup, value):
-        q = mixin_instance.get_filter(ApplicationWithClassBasedProperties, lookup, value)
-        assert isinstance(q, Q)
-        assert len(q.children) == 1
-        q_expression, q_value = q.children[0]
-        assert q_expression == 'test__{}'.format(lookup)
-        assert q_value == value
 
 
 class TestDecorators(object):
