@@ -1,5 +1,6 @@
 # Common requirements for envs created by tox
 # Additional, version-dependent requirements can be found in tox.ini
+attrs<19.2  # Higher versions are incompatible with older pytest versions
 coverage==4.5.1
 flake8==3.5.0
 mock==2.0.0
