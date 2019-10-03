@@ -197,11 +197,6 @@ class queryable_property(QueryableProperty):
             self.set_value = setter
         if filter:
             self.get_filter = self._extract_function(filter)
-            # The filter function may be automatically set to the get_filter
-            # method of the AnnotationMixin, in which case the method has to
-            # be bound to the current instance.
-            if self.get_filter is self._extract_function(AnnotationMixin.get_filter):
-                self.get_filter = six.create_bound_method(self.get_filter, self)
         if annotater:
             self.get_annotation = self._extract_function(annotater)
         if updater:
@@ -333,20 +328,20 @@ class queryable_property(QueryableProperty):
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
-        kwargs = {'annotater': method}
-        # If an annotater is defined but a filter isn't, use the default filter
-        # implementation based on an annotation from the AnnotationMixin. This
-        # way, all properties defining an annotater are automatically
-        # filterable while still having the option to register a custom filter
-        # method.
-        if not self.get_filter:
-            kwargs['filter'] = AnnotationMixin.get_filter
-        # If no value was explicitly set for filter_requires_annotation, set it
-        # to True since the default filter implementation of the
-        # AnnotationMixin acts the same way.
-        if self.filter_requires_annotation is None:
-            kwargs['filter_requires_annotation'] = True
-        return self._clone(**kwargs)
+        clone = self._clone(
+            annotater=method,
+            # If no value was explicitly set for filter_requires_annotation,
+            # set it to True since the default filter implementation of the
+            # AnnotationMixin acts the same way.
+            filter_requires_annotation=self.filter_requires_annotation is None or self.filter_requires_annotation
+        )
+        # Dynamically add the AnnotationMixin into the new property to allow
+        # to use the default filter implementation. Since an explicitly set
+        # filter implementation is stored in the instance dict, it will be used
+        # over the default implementation.
+        if not isinstance(clone, AnnotationMixin):
+            AnnotationMixin.inject_into_object(clone)
+        return clone
 
     def updater(self, method):
         """

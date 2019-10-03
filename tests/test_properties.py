@@ -272,33 +272,29 @@ class TestDecorators(object):
         self.assert_cloned_property(original, clone,
                                     {'filter': func, 'filter_requires_annotation': expected_requires_annotation})
 
-    @pytest.mark.parametrize('init_kwargs, should_copy_filter_implementation, expected_requires_annotation', [
-        ({'annotater': lambda: F('dummy')}, True, True),
-        ({}, True, True),
-        ({'filter_requires_annotation': False}, True, False),
-        ({'filter_requires_annotation': True}, True, True),
-        ({'filter': lambda: Q()}, False, True),
-        ({'filter': lambda: Q(), 'filter_requires_annotation': False}, False, False),
-        ({'filter': lambda: Q(), 'filter_requires_annotation': True}, False, True),
+    @pytest.mark.parametrize('init_kwargs, expected_requires_annotation', [
+        ({'annotater': lambda: F('dummy')}, True),
+        ({}, True),
+        ({'filter_requires_annotation': False}, False),
+        ({'filter_requires_annotation': True}, True),
+        ({'filter': lambda: Q()}, True),
+        ({'filter': lambda: Q(), 'filter_requires_annotation': False}, False),
+        ({'filter': lambda: Q(), 'filter_requires_annotation': True}, True),
     ])
-    def test_annotater(self, init_kwargs, should_copy_filter_implementation, expected_requires_annotation):
+    def test_annotater(self, init_kwargs, expected_requires_annotation):
         original = queryable_property(**init_kwargs)
 
         def func():
             pass
 
         prop = self.decorate_function(func, original.annotater)
-        common_attrs = {'annotater': func, 'filter_requires_annotation': expected_requires_annotation}
-
-        # Also test that a copied filter implementation will be correctly re-
-        # copied on subsequent _clone() calls by creating another clone without
-        # changing anything.
-        for clone in (prop, prop._clone()):
-            changed_attrs = dict(common_attrs)
-            if should_copy_filter_implementation:
-                changed_attrs['filter'] = six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter),
-                                                                  clone)
-            self.assert_cloned_property(original, clone, changed_attrs)
+        assert isinstance(prop, AnnotationMixin)
+        self.assert_cloned_property(original, prop, {
+            'annotater': func,
+            'filter_requires_annotation': expected_requires_annotation,
+            'filter': init_kwargs.get(
+                'filter', six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter), prop))
+        })
 
     @pytest.mark.parametrize('old_value', [None, lambda: {}])
     def test_updater(self, old_value):
