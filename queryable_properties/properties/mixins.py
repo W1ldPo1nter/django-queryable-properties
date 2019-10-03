@@ -3,6 +3,7 @@
 from django.db.models import Q
 
 from ..compat import LOOKUP_SEP
+from ..utils import InjectableMixin
 
 
 class SetterMixin(object):
@@ -22,11 +23,14 @@ class SetterMixin(object):
         raise NotImplementedError()
 
 
-class AnnotationMixin(object):
+class AnnotationMixin(InjectableMixin):
     """
     A mixin for queryable properties that allow to add an annotation to
     represent them to querysets.
     """
+
+    # Avoid overriding the __reduce__ implementation of queryable properties.
+    _dynamic_pickling = False
 
     filter_requires_annotation = True
 
