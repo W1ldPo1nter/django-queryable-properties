@@ -4,6 +4,8 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added a standalone version of six to the package requirements
+
 1.1.0 (2019-06-23)
 ------------------
 
