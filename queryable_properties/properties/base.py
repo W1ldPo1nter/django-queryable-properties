@@ -2,13 +2,15 @@
 
 from __future__ import unicode_literals
 
+from functools import wraps
+
 import six
 
 from ..compat import LOOKUP_SEP
 from ..exceptions import QueryablePropertyError
 from ..utils import get_queryable_property, reset_queryable_property
 from .cache_behavior import CLEAR_CACHE
-from .mixins import AnnotationMixin
+from .mixins import AnnotationMixin, LookupFilterMixin
 
 RESET_METHOD_NAME = 'reset_property'
 
@@ -163,8 +165,8 @@ class queryable_property(QueryableProperty):
     get_value = None
     get_filter = None
 
-    def __init__(self, getter=None, setter=None, filter=None, annotater=None, updater=None,
-                 cached=False, setter_cache_behavior=CLEAR_CACHE, filter_requires_annotation=None, doc=None):
+    def __init__(self, getter=None, setter=None, filter=None, annotater=None, updater=None, cached=False,
+                 setter_cache_behavior=CLEAR_CACHE, filter_requires_annotation=None, lookup_mappings=None, doc=None):
         """
         Initialize a new queryable property using the given methods, which may
         be regular functions or classmethods.
@@ -184,6 +186,8 @@ class queryable_property(QueryableProperty):
         :param bool filter_requires_annotation: Determines if using the
                                                 property to filter requires
                                                 annotating first.
+        :param dict lookup_mappings: Mappings of lookups to individual filter
+                                     functions.
         :param doc: The docstring for this property. If set to None (default),
                     the docstring of the getter will be used (if any).
         """
@@ -206,6 +210,7 @@ class queryable_property(QueryableProperty):
         # distinct between a "default False" (None) and an explicit False set
         # by the implementation.
         self.filter_requires_annotation = filter_requires_annotation
+        self.lookup_mappings = lookup_mappings or {}
         self.__doc__ = doc
 
     def __call__(self, getter):
@@ -244,6 +249,7 @@ class queryable_property(QueryableProperty):
             cached=self.cached,
             setter_cache_behavior=self.setter_cache_behavior,
             filter_requires_annotation=self.filter_requires_annotation,
+            lookup_mappings=dict(self.lookup_mappings),
             doc=self.__doc__
         )
         defaults.update(kwargs)
@@ -253,7 +259,7 @@ class queryable_property(QueryableProperty):
         """
         Decorator for a function or method that is used as the getter of this
         queryable property. May be used as a parameter-less decorator
-        (``@getter``) or as a decorator with keyword args
+        (``@getter``) or as a decorator with keyword arguments
         (``@getter(cached=True)``).
 
         :param method: The method to decorate. If it is None, the parameterized
@@ -265,17 +271,18 @@ class queryable_property(QueryableProperty):
         :return: A cloned queryable property or the actual decorator function.
         :rtype: queryable_property | function
         """
-        if not method:
-            def decorator(meth):
-                return self._clone(getter=meth, cached=cached)
-            return decorator
-        return self._clone(getter=method)
+        if method:
+            return self._clone(getter=method)
+
+        def decorator(meth):
+            return self._clone(getter=meth, cached=cached)
+        return decorator
 
     def setter(self, method=None, cache_behavior=CLEAR_CACHE):
         """
         Decorator for a function or method that is used as the setter of this
         queryable property. May be used as a parameter-less decorator
-        (``@setter``) or as a decorator with keyword args
+        (``@setter``) or as a decorator with keyword arguments
         (``@setter(cache_behavior=DO_NOTHING)``).
 
         :param method: The method to decorate.
@@ -285,18 +292,21 @@ class queryable_property(QueryableProperty):
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
-        if not method:
-            def decorator(meth):
-                return self._clone(setter=meth, setter_cache_behavior=cache_behavior)
-            return decorator
-        return self._clone(setter=method)
+        if method:
+            return self._clone(setter=method)
 
-    def filter(self, method=None, requires_annotation=None):
+        def decorator(meth):
+            return self._clone(setter=meth, setter_cache_behavior=cache_behavior)
+        return decorator
+
+    def filter(self, method=None, requires_annotation=None, lookups=None):
         """
         Decorator for a function or method that is used to generate a filter
         for querysets to emulate filtering by this queryable property. May be
         used as a parameter-less decorator (``@filter``) or as a decorator with
-        keyword args (``@filter(requires_annotation=False)``).
+        keyword arguments (``@filter(requires_annotation=False)``). May be used
+        to define a one-for-all filter function or a filter function that will
+        be called for certain lookups only using the `lookups` argument.
 
         :param method: The method to decorate. If it is None, the parameterized
                        usage of this decorator is assumed, so this method
@@ -307,20 +317,45 @@ class queryable_property(QueryableProperty):
                                     applied first; otherwise False. None if
                                     this information should not be changed.
         :type requires_annotation: bool | None
+        :param lookups: If given, the decorated function or method will be used
+                        for the specified lookup(s) only. Automatically adds
+                        the :class:`LookupFilterMixin` to this property if this
+                        is used.
+        :type lookups: collections.Iterable[str] | None
         :return: A cloned queryable property or the actual decorator function.
         :rtype: queryable_property | function
         """
-        if not method:
-            def decorator(meth):
-                annotation_req = self.filter_requires_annotation if requires_annotation is None else requires_annotation
-                return self._clone(filter=meth, filter_requires_annotation=annotation_req)
-            return decorator
-        return self._clone(filter=method)
+        if method:
+            return self._clone(filter=method)
+
+        def decorator(meth):
+            attrs = {}
+            if requires_annotation is not None:
+                attrs['filter_requires_annotation'] = requires_annotation
+            if lookups is not None:  # Register only for the given lookups.
+                # Wrap the given method to comply with the self argument that
+                # the LookupFilterMixin expects.
+                @wraps(meth)
+                def wrapper(self, *args, **kwargs):
+                    return meth(*args, **kwargs)
+                attrs['lookup_mappings'] = dict(self.lookup_mappings, **{lookup: wrapper for lookup in lookups})
+            else:  # Register as a one-for-all filter function.
+                attrs['filter'] = meth
+            clone = self._clone(**attrs)
+            # If the decorated function/method is used for certain lookups
+            # only, add the LookupFilterMixin into the new property to be able
+            # to reuse its filter implementation based on the lookup mappings.
+            if lookups is not None and not isinstance(clone, LookupFilterMixin):
+                LookupFilterMixin.inject_into_object(clone)
+            return clone
+        return decorator
 
     def annotater(self, method):
         """
         Decorator for a function or method that is used to generate an
-        annotation to represent this queryable property in querysets.
+        annotation to represent this queryable property in querysets. The
+        :class:`AnnotationMixin` will automatically applied to this property
+        when this decorator is used.
 
         :param method: The method to decorate.
         :type method: function | classmethod | staticmethod

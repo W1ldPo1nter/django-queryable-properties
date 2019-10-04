@@ -6,7 +6,7 @@ from django.db.models import F, Model, Q
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING,
-                                             QueryableProperty, queryable_property)
+                                             LookupFilterMixin, QueryableProperty, queryable_property)
 from queryable_properties.utils import reset_queryable_property
 
 from ..models import (ApplicationWithClassBasedProperties, DummyProperty, VersionWithClassBasedProperties,
@@ -247,8 +247,54 @@ class TestDecorators(object):
             pass
 
         clone = self.decorate_function(func, original.filter, decorator_kwargs)
+        assert not isinstance(clone, LookupFilterMixin)
         self.assert_cloned_property(original, clone,
                                     {'filter': func, 'filter_requires_annotation': expected_requires_annotation})
+
+    def test_lookup_filters(self):
+        original = queryable_property()
+        get_filter_func = six.get_unbound_function(LookupFilterMixin.get_filter)
+
+        def func1(cls, lookup, value):
+            return 1
+
+        clone1 = self.decorate_function(func1, original.filter, {'lookups': ['lt', 'gt']})
+        assert isinstance(clone1, LookupFilterMixin)
+        self.assert_cloned_property(original, clone1, {
+            'lookup_mappings': {'lt': func1, 'gt': func1},
+            'filter': six.create_bound_method(get_filter_func, clone1),
+        })
+        assert clone1.get_filter(None, 'lt', None) == 1
+        assert clone1.get_filter(None, 'gt', None) == 1
+
+        def func2(cls, lookup, value):
+            return 2
+
+        clone2 = self.decorate_function(func2, clone1.filter, {'lookups': ['lt', 'lte'], 'requires_annotation': True})
+        assert isinstance(clone2, LookupFilterMixin)
+        self.assert_cloned_property(clone1, clone2, {
+            'lookup_mappings': {'lt': func2, 'lte': func2, 'gt': func1},
+            'filter': six.create_bound_method(get_filter_func, clone2),
+            'filter_requires_annotation': True,  # Should be overridable on every call.
+        })
+        assert clone2.get_filter(None, 'lt', None) == 2
+        assert clone2.get_filter(None, 'lte', None) == 2
+        assert clone2.get_filter(None, 'gt', None) == 1
+
+        def func3(cls, lookup, value):
+            return 3
+
+        clone3 = self.decorate_function(func3, clone2.filter, {'lookups': ['exact'], 'requires_annotation': False})
+        assert isinstance(clone3, LookupFilterMixin)
+        self.assert_cloned_property(clone2, clone3, {
+            'lookup_mappings': {'lt': func2, 'lte': func2, 'gt': func1, 'exact': func3},
+            'filter': six.create_bound_method(get_filter_func, clone3),
+            'filter_requires_annotation': False,  # Should be overridable on every call.
+        })
+        assert clone3.get_filter(None, 'lt', None) == 2
+        assert clone3.get_filter(None, 'lte', None) == 2
+        assert clone3.get_filter(None, 'gt', None) == 1
+        assert clone3.get_filter(None, 'exact', None) == 3
 
     @pytest.mark.parametrize('init_kwargs, expected_requires_annotation', [
         ({'annotater': lambda: F('dummy')}, True),
@@ -271,7 +317,7 @@ class TestDecorators(object):
             'annotater': func,
             'filter_requires_annotation': expected_requires_annotation,
             'filter': init_kwargs.get(
-                'filter', six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter), prop))
+                'filter', six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter), prop)),
         })
 
     @pytest.mark.parametrize('old_value', [None, lambda: {}])
