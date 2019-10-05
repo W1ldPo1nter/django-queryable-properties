@@ -2,8 +2,6 @@
 
 from __future__ import unicode_literals
 
-from functools import wraps
-
 import six
 
 from ..compat import LOOKUP_SEP
