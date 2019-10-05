@@ -4,6 +4,8 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added a mixin that allows custom filters for queryable properties (both class- and decorator-based) to be implemented
+  using multiple functions/methods for different lookups
 - Added a standalone version of six to the package requirements
 
 1.1.0 (2019-06-23)
