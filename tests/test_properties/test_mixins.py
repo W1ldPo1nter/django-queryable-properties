@@ -3,6 +3,7 @@ import pytest
 
 from django.db.models import Q
 
+from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import AnnotationMixin, LookupFilterMixin, lookup_filter, QueryableProperty
 
 from ..models import ApplicationWithClassBasedProperties
@@ -74,7 +75,7 @@ class TestLookupFilterMixin(object):
         prop = cls()
         prop.model = ApplicationWithClassBasedProperties
         prop.name = 'dummy'
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(QueryablePropertyError):
             prop.get_filter(None, lookup, value)
 
 

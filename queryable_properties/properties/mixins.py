@@ -4,6 +4,7 @@ import six
 from django.db.models import Q
 
 from ..compat import LOOKUP_SEP
+from ..exceptions import QueryablePropertyError
 from ..utils import InjectableMixin
 
 
@@ -66,8 +67,10 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
     def get_filter(self, cls, lookup, value):
         method = self.lookup_mappings.get(lookup)
         if not method:
-            raise NotImplementedError('Queryable property "{prop}" does not implement filtering with lookup "{lookup}".'
-                                      .format(prop=self, lookup=lookup))
+            raise QueryablePropertyError(
+                'Queryable property "{prop}" does not implement filtering with lookup "{lookup}".'
+                .format(prop=self, lookup=lookup)
+            )
         return method(cls, lookup, value)
 
 
