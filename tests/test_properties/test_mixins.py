@@ -34,14 +34,16 @@ class DerivedLookupFilterProperty(BaseLookupFilterProperty):
 class TestLookupFilterMixin(object):
 
     def test_registration(self):
-        assert set(BaseLookupFilterProperty.lookup_mappings) == {'exact', 'lt', 'lte'}
-        assert BaseLookupFilterProperty.lookup_mappings['exact'] != BaseLookupFilterProperty.lookup_mappings['lt']
-        assert BaseLookupFilterProperty.lookup_mappings['lte'] == BaseLookupFilterProperty.lookup_mappings['lt']
+        base = BaseLookupFilterProperty()
+        assert set(base.lookup_mappings) == {'exact', 'lt', 'lte'}
+        assert base.lookup_mappings['exact'] != base.lookup_mappings['lt']
+        assert base.lookup_mappings['lte'] == base.lookup_mappings['lt']
 
-        assert set(DerivedLookupFilterProperty.lookup_mappings) == {'exact', 'lt', 'lte', 'gt', 'in'}
-        assert DerivedLookupFilterProperty.lookup_mappings['exact'] != DerivedLookupFilterProperty.lookup_mappings['lt']
-        assert DerivedLookupFilterProperty.lookup_mappings['lte'] != DerivedLookupFilterProperty.lookup_mappings['lt']
-        assert DerivedLookupFilterProperty.lookup_mappings['gt'] == DerivedLookupFilterProperty.lookup_mappings['lt']
+        derived = DerivedLookupFilterProperty()
+        assert set(derived.lookup_mappings) == {'exact', 'lt', 'lte', 'gt', 'in'}
+        assert derived.lookup_mappings['exact'] != derived.lookup_mappings['lt']
+        assert derived.lookup_mappings['lte'] != derived.lookup_mappings['lt']
+        assert derived.lookup_mappings['gt'] == derived.lookup_mappings['lt']
 
     @pytest.mark.parametrize('cls, lookup, value, expected_q_value', [
         (BaseLookupFilterProperty, 'exact', 5, ('dummy', 5)),

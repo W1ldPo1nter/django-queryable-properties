@@ -265,7 +265,7 @@ class queryable_property(QueryableProperty):
         :param method: The method to decorate. If it is None, the parameterized
                        usage of this decorator is assumed, so this method
                        returns the actual decorator function.
-        :type method: function | classmethod | staticmethod
+        :type method: function
         :param bool cached: If True, values returned by the decorated getter
                             method will be cached.
         :return: A cloned queryable property or the actual decorator function.
@@ -286,7 +286,7 @@ class queryable_property(QueryableProperty):
         (``@setter(cache_behavior=DO_NOTHING)``).
 
         :param method: The method to decorate.
-        :type method: function | classmethod | staticmethod
+        :type method: function
         :param function cache_behavior: A function that defines how the setter
                                         interacts with cached values.
         :return: A cloned queryable property.
@@ -333,12 +333,7 @@ class queryable_property(QueryableProperty):
             if requires_annotation is not None:
                 attrs['filter_requires_annotation'] = requires_annotation
             if lookups is not None:  # Register only for the given lookups.
-                # Wrap the given method to comply with the self argument that
-                # the LookupFilterMixin expects.
-                @wraps(meth)
-                def wrapper(self, *args, **kwargs):
-                    return meth(*args, **kwargs)
-                attrs['lookup_mappings'] = dict(self.lookup_mappings, **{lookup: wrapper for lookup in lookups})
+                attrs['lookup_mappings'] = dict(self.lookup_mappings, **{lookup: meth for lookup in lookups})
             else:  # Register as a one-for-all filter function.
                 attrs['filter'] = meth
             clone = self._clone(**attrs)

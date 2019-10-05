@@ -17,16 +17,16 @@ class LookupFilterMeta(type):
     def __new__(mcs, name, bases, attrs):
         # Find all methods that have been marked with lookups via the
         # `lookup_filter` decorator.
-        lookup_mappings = {}
-        for attr in six.itervalues(attrs):
+        mappings = {}
+        for attr_name, attr in six.iteritems(attrs):
             if callable(attr) and hasattr(attr, '_lookups'):
                 for lookup in attr._lookups:
-                    lookup_mappings[lookup] = attr
+                    mappings[lookup] = attr_name
 
         # Let the class construction take care of the lookup mappings of the
         # base class(es) and add the ones from the current class to them.
         cls = super(LookupFilterMeta, mcs).__new__(mcs, name, bases, attrs)
-        cls.lookup_mappings = dict(cls.lookup_mappings, **lookup_mappings)
+        cls._lookup_mappings = dict(cls._lookup_mappings, **mappings)
         return cls
 
 
@@ -39,8 +39,13 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
     # Avoid overriding the __reduce__ implementation of queryable properties.
     _dynamic_pickling = False
 
-    # Stores mappings of lookups to their corresponding filter functions.
-    lookup_mappings = {}
+    # Stores mappings of lookups to the names of their corresponding filter
+    # functions.
+    _lookup_mappings = {}
+
+    def __init__(self, *args, **kwargs):
+        self.lookup_mappings = {lookup: getattr(self, name) for lookup, name in six.iteritems(self._lookup_mappings)}
+        super(LookupFilterMixin, self).__init__(*args, **kwargs)
 
     @classmethod
     def lookup_filter(cls, *lookups):
@@ -59,11 +64,11 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
         return decorator
 
     def get_filter(self, cls, lookup, value):
-        func = self.lookup_mappings.get(lookup)
-        if not func:
+        method = self.lookup_mappings.get(lookup)
+        if not method:
             raise NotImplementedError('Queryable property "{prop}" does not implement filtering with lookup "{lookup}".'
                                       .format(prop=self, lookup=lookup))
-        return func(self, cls, lookup, value)
+        return method(cls, lookup, value)
 
 
 # Alias to allow the usage of the decorator without the "LookupFilterMixin."
