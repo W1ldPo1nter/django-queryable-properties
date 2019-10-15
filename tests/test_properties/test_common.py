@@ -4,6 +4,7 @@ from itertools import chain
 
 import pytest
 
+from django import VERSION as DJANGO_VERSION
 from django.db.models import Q
 
 from ..models import VersionWithClassBasedProperties
@@ -40,6 +41,7 @@ class TestValueCheckProperty(object):
         assert len(results) == expected_count
         assert set(result.version for result in results) == expected_versions
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('ordering, expected_version_order', [
         (('-is_stable', '-version'), ['1.3.1', '1.3.0', '2.0.0', '1.2.3']),
         (('-is_unstable', '-is_alpha', 'version'), ['2.0.0', '1.2.3', '1.3.0', '1.3.1']),
