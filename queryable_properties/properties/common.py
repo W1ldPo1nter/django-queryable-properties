@@ -16,7 +16,7 @@ class BooleanProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
 
     filter_requires_annotation = False
 
-    def _get_condition(self):
+    def _get_condition(self):  # pragma: no cover
         """
         Build the query filter condition for this boolean property, which is
         used for both the filter and the annotation implementation.
