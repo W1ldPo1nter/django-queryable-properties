@@ -122,8 +122,8 @@ class RangeCheckProperty(BooleanProperty):
     def _get_condition(self):
         value = self.final_value
         condition = Q(**{
-            LOOKUP_SEP.join((self.min_field_name, 'gte' if self.include_boundaries else 'gt')): value,
-            LOOKUP_SEP.join((self.max_field_name, 'lte' if self.include_boundaries else 'lt')): value,
+            LOOKUP_SEP.join((self.max_field_name, 'gte' if self.include_boundaries else 'gt')): value,
+            LOOKUP_SEP.join((self.min_field_name, 'lte' if self.include_boundaries else 'lt')): value,
         })
         if not self.in_range:
             condition.negate()
