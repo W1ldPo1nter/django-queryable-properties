@@ -86,12 +86,12 @@ class TestFilterWithoutAnnotations(object):
     ])
     def test_filter_in_case_expression(self, model, property_name, condition):
         queryset = model.objects.annotate(is_13=models.Case(
-            models.When(condition, then=True),
-            default=False,
-            output_field=models.BooleanField()
+            models.When(condition, then=1),
+            default=0,
+            output_field=models.IntegerField()
         ))
         assert property_name not in queryset.query.annotations
-        assert all(version.is_13 is (version.major_minor == '1.3') for version in queryset)
+        assert all(bool(version.is_13) is (version.major_minor == '1.3') for version in queryset)
 
     @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Per-aggregate filters didn't exist before Django 2.0")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
