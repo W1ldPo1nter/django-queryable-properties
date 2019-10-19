@@ -258,7 +258,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # properties processing (as long as this queryset returns model
         # instances).
         iterable = super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
-        if '_iterable_class' not in self.__dict__: # pragma: no cover
+        if '_iterable_class' not in self.__dict__:  # pragma: no cover
             return iter(QueryablePropertiesIterable(self, iterable=iterable))
         return iterable
 
