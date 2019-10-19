@@ -54,11 +54,12 @@ class ApplicationVersion(models.Model):
 ```
 
 Instead of defining the properties like this, the property class `ValueCheckProperty` of the
-*django-queryable-properties* could be used:
+*django-queryable-properties* package could be used:
 ```python
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
+from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import ValueCheckProperty
 
 
@@ -74,6 +75,8 @@ class ApplicationVersion(models.Model):
 
     ...  # other fields
     release_type = models.CharField(max_length=1, choices=RELEASE_TYPE_CHOICES)
+    
+    objects = QueryablePropertiesManager()
     
     is_alpha = ValueCheckProperty('release_type', ALPHA)
     is_beta = ValueCheckProperty('release_type', BETA)
@@ -114,4 +117,89 @@ For a quick overview, the `ValueCheckProperty` offers the following queryable pr
 .. note::
    The field name passed to ``ValueCheckProperty`` may also refer to another queryable property as long as that
    property allows filtering with the ``in`` lookup.
+```
+
+## Checking if a value is contained in a range defined by two fields
+
+A common pattern that uses a property is having a model with two fields that define a lower and an upper limit and a
+property that checks if a certain value is contained in that range.
+These fields may be numerical fields (`IntegerField`, `DecimalField`, etc.) or something like date fields (`DateField`,
+`DateTimeField`, etc.) - basically anything that allows "greater than" and "lower than" comparisons.
+
+As an example, the `ApplicationVersion` example model could contain two such date fields to express the period in which
+a certain app version is supported, which could look similar to this:
+```python
+from django.db import models
+from django.utils import timezone
+
+
+class ApplicationVersion(models.Model):
+    ...  # other fields
+    supported_from = models.DateTimeField()
+    supported_until = models.DateTimeField()
+    
+    @property
+    def is_supported(self):
+        return self.supported_from <= timezone.now() <= self.supported_until
+```
+
+Instead of defining the properties like this, the property class `RangeCheckProperty` of the
+*django-queryable-properties* package could be used:
+```python
+from django.db import models
+from django.utils import timezone
+
+from queryable_properties.managers import QueryablePropertiesManager
+from queryable_properties.properties import RangeCheckProperty
+
+
+class ApplicationVersion(models.Model):
+    ...  # other fields
+    supported_from = models.DateTimeField()
+    supported_until = models.DateTimeField()
+    
+    objects = QueryablePropertiesManager()
+    
+    is_supported = RangeCheckProperty('supported_from', 'supported_until', timezone.now)
+```
+
+Instances of this property class take the names of the fields for the lower and upper limits as their first and second
+arguments as well as the value to check as the third argument.
+That value may either be a static value or a callable that can be called without any argument and that returns the
+value to check against (`timezone.now` in the example above), similar to the `default` option of Django's model fields.
+`RangeCheckProperty` objects also take two optional arguments: `include_boundaries` determines if a value exactly equal
+to one of the limits is considered a part of the range (default: `True`), while `in_range` determines if the property
+should return `True` if the value is contained in the configured range (this is the default) or if it should return
+`True` if the value is outside of the range.
+
+Not only does this property class allow to achieve the same functionality with less code, but it offers even more
+functionality due to being a *queryable* property.
+The class implements both queryset filtering as well as annotating (based on Django's `Case`/`When` objects), so the
+properties can be used in querysets as well:
+```python
+currently_supported = ApplicationVersion.objects.filter(is_supported=True)
+not_supported = ApplicationVersion.objects.filter(is_supported=False)
+ApplicationVersion.objects.order_by('is_supported')
+```
+
+For a quick overview, the `RangeCheckProperty` offers the following queryable property features:
+```eval_rst
++----------------+----------------------------+
+| Feature        | Supported                  |
++================+============================+
+| Getter         | Yes                        |
++----------------+----------------------------+
+| Setter         | No                         |
++----------------+----------------------------+
+| Filtering      | Yes                        |
++----------------+----------------------------+
+| Annotation     | Yes (Django 1.8 or higher) |
++----------------+----------------------------+
+| Updating       | No                         |
++----------------+----------------------------+
+
+.. note::
+   The field names passed to ``RangeCheckProperty`` may also refer to other queryable properties as long as these
+   properties allow filtering with the ``lt``/``lte`` and ``gt``/``gte`` lookups (depending on the value of
+   ``include_boundaries``).
 ```
