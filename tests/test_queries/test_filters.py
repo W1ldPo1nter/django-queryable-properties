@@ -77,6 +77,35 @@ class TestFilterWithoutAnnotations(object):
         model.objects.filter(filters).delete()
         assert model.objects.count() == expected_remaining_count
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('model, property_name, condition', [
+        (VersionWithClassBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
+        (VersionWithDecoratorBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
+        (VersionWithClassBasedProperties, 'version', models.Q(version='1.3.0') | models.Q(version='1.3.1')),
+        (VersionWithDecoratorBasedProperties, 'version', models.Q(version='1.3.0') | models.Q(version='1.3.1')),
+    ])
+    def test_filter_in_case_expression(self, model, property_name, condition):
+        queryset = model.objects.annotate(is_13=models.Case(
+            models.When(condition, then=1),
+            default=0,
+            output_field=models.IntegerField()
+        ))
+        assert property_name not in queryset.query.annotations
+        assert all(bool(version.is_13) is (version.major_minor == '1.3') for version in queryset)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Per-aggregate filters didn't exist before Django 2.0")
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_filter_in_aggregate(self, model):
+        queryset = model.objects.annotate(
+            num_13=models.Count('versions', filter=models.Q(versions__major_minor='1.3')),
+            num_200=models.Count('versions', filter=models.Q(versions__version='2.0.0'))
+        )
+        assert 'major_minor' not in queryset.query.annotations
+        assert 'version' not in queryset.query.annotations
+        for app in queryset:
+            assert app.num_13 == 2
+            assert app.num_200 == 1
+
 
 class TestFilterWithAggregateAnnotation(object):
 

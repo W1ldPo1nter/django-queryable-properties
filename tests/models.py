@@ -1,9 +1,12 @@
 # encoding: utf-8
+
+from datetime import date
+
 from django.db import models
 
 from queryable_properties.managers import QueryablePropertiesManager
-from queryable_properties.properties import (AnnotationMixin, QueryableProperty, queryable_property, SetterMixin,
-                                             UpdateMixin)
+from queryable_properties.properties import (AnnotationMixin, QueryableProperty, queryable_property, RangeCheckProperty,
+                                             SetterMixin, UpdateMixin, ValueCheckProperty)
 
 
 class DummyProperty(SetterMixin, QueryableProperty):
@@ -224,10 +227,22 @@ class ApplicationWithDecoratorBasedProperties(Application):
 
 
 class Version(models.Model):
+    ALPHA = 'a'
+    BETA = 'b'
+    STABLE = 's'
+    RELEASE_TYPE_CHOICES = (
+        (ALPHA, 'Alpha'),
+        (BETA, 'Beta'),
+        (STABLE, 'Stable'),
+    )
+
     major = models.IntegerField()
     minor = models.IntegerField()
     patch = models.IntegerField()
     changes = models.TextField(null=True, blank=True)
+    release_type = models.CharField(max_length=1, choices=RELEASE_TYPE_CHOICES, default=STABLE)
+    supported_from = models.DateField()
+    supported_until = models.DateField()
 
     class Meta:
         abstract = True
@@ -242,6 +257,11 @@ class VersionWithClassBasedProperties(Version):
     major_minor = MajorMinorVersionProperty()
     version = FullVersionProperty()
     changes_or_default = DefaultChangesProperty()
+    is_alpha = ValueCheckProperty('release_type', Version.ALPHA)
+    is_beta = ValueCheckProperty('release_type', Version.BETA)
+    is_stable = ValueCheckProperty('release_type', Version.STABLE)
+    is_unstable = ValueCheckProperty('release_type', Version.ALPHA, Version.BETA)
+    is_supported = RangeCheckProperty('supported_from', 'supported_until', date(2019, 1, 1))
 
     class Meta:
         verbose_name = 'Version'

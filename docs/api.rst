@@ -13,7 +13,7 @@ Module ``queryable_properties.managers``
 
 .. automodule:: queryable_properties.managers
    :members:
-   :exclude-members: QueryablePropertiesModelIterable
+   :exclude-members: QueryablePropertiesIterable
 
 .. autoattribute:: queryable_properties.managers.QueryablePropertiesManager
 

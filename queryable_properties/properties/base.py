@@ -3,67 +3,14 @@
 from __future__ import unicode_literals
 
 import six
-from django.db.models import Q
 
-from .compat import LOOKUP_SEP
-from .exceptions import QueryablePropertyError
-from .utils import get_queryable_property, reset_queryable_property
+from ..compat import LOOKUP_SEP
+from ..exceptions import QueryablePropertyError
+from ..utils import get_queryable_property, reset_queryable_property
+from .cache_behavior import CLEAR_CACHE
+from .mixins import AnnotationMixin, LookupFilterMixin
 
 RESET_METHOD_NAME = 'reset_property'
-
-
-def CLEAR_CACHE(prop, obj, value, return_value):
-    """
-    Setter cache behavior function that will clear the cached value for a
-    cached queryable property on objects after the setter was used.
-
-    :param QueryableProperty prop: The property whose setter was used.
-    :param django.db.models.Model obj: The object the setter was used on.
-    :param value: The value that was passed to the setter.
-    :param return_value: The return value of the setter function/method.
-    """
-    prop._clear_cached_value(obj)
-
-
-def CACHE_VALUE(prop, obj, value, return_value):
-    """
-    Setter cache behavior function that will update the cache for the cached
-    queryable property on the object in question with the (raw) value that was
-    passed to the setter.
-
-    :param QueryableProperty prop: The property whose setter was used.
-    :param django.db.models.Model obj: The object the setter was used on.
-    :param value: The value that was passed to the setter.
-    :param return_value: The return value of the setter function/method.
-    """
-    prop._set_cached_value(obj, value)
-
-
-def CACHE_RETURN_VALUE(prop, obj, value, return_value):
-    """
-    Setter cache behavior function that will update the cache for the cached
-    queryable property on the object in question with the return value of the
-    setter function/method.
-
-    :param QueryableProperty prop: The property whose setter was used.
-    :param django.db.models.Model obj: The object the setter was used on.
-    :param value: The value that was passed to the setter.
-    :param return_value: The return value of the setter function/method.
-    """
-    prop._set_cached_value(obj, return_value)
-
-
-def DO_NOTHING(prop, obj, value, return_value):
-    """
-    Setter cache behavior function that will do nothing after the setter of
-    a cached queryable property was used, retaining previously cached values.
-
-    :param QueryableProperty prop: The property whose setter was used.
-    :param django.db.models.Model obj: The object the setter was used on.
-    :param value: The value that was passed to the setter.
-    :param return_value: The return value of the setter function/method.
-    """
-    pass
 
 
 @six.python_2_unicode_compatible
@@ -205,69 +152,6 @@ class QueryableProperty(object):
         obj.__dict__.pop(self.name, None)
 
 
-class SetterMixin(object):
-    """
-    A mixin for queryable properties that also define a setter.
-    """
-
-    def set_value(self, obj, value):  # pragma: no cover
-        """
-        Setter method for the queryable property, which will be called when the
-        property is write-accessed.
-
-        :param django.db.models.Model obj: The object on which the property was
-                                           accessed.
-        :param value: The value to set.
-        """
-        raise NotImplementedError()
-
-
-class AnnotationMixin(object):
-    """
-    A mixin for queryable properties that allow to add an annotation to
-    represent them to querysets.
-    """
-
-    filter_requires_annotation = True
-
-    def get_annotation(self, cls):  # pragma: no cover
-        """
-        Construct an annotation representing this property that can be added
-        to querysets of the model associated with this property.
-
-        :param type cls: The model class of which a queryset should be
-                         annotated.
-        :return: An annotation object.
-        """
-        raise NotImplementedError()
-
-    def get_filter(self, cls, lookup, value):
-        # Since annotations can be filtered like regular fields, a Q object
-        # that simply passes the filter through can be used.
-        return Q(**{LOOKUP_SEP.join((self.name, lookup)): value})
-
-
-class UpdateMixin(object):
-    """
-    A mixin for queryable properties that allow to use themselves in update
-    queries.
-    """
-
-    def get_update_kwargs(self, cls, value):  # pragma: no cover
-        """
-        Resolve an update keyword argument for this property into the actual
-        keyword arguments to emulate an update using this property.
-
-        :param type cls: The model class of which an update query should be
-                         performed.
-        :param value: The value passed to the update call for this property.
-        :return: The actual keyword arguments to set in the update call instead
-                 of the given one.
-        :rtype: dict
-        """
-        raise NotImplementedError()
-
-
 class queryable_property(QueryableProperty):
     """
     A queryable property that is intended to be used like regular properties,
@@ -279,8 +163,8 @@ class queryable_property(QueryableProperty):
     get_value = None
     get_filter = None
 
-    def __init__(self, getter=None, setter=None, filter=None, annotater=None, updater=None,
-                 cached=False, setter_cache_behavior=CLEAR_CACHE, filter_requires_annotation=None, doc=None):
+    def __init__(self, getter=None, setter=None, filter=None, annotater=None, updater=None, cached=False,
+                 setter_cache_behavior=CLEAR_CACHE, filter_requires_annotation=None, lookup_mappings=None, doc=None):
         """
         Initialize a new queryable property using the given methods, which may
         be regular functions or classmethods.
@@ -300,6 +184,8 @@ class queryable_property(QueryableProperty):
         :param bool filter_requires_annotation: Determines if using the
                                                 property to filter requires
                                                 annotating first.
+        :param dict lookup_mappings: Mappings of lookups to individual filter
+                                     functions.
         :param doc: The docstring for this property. If set to None (default),
                     the docstring of the getter will be used (if any).
         """
@@ -312,11 +198,6 @@ class queryable_property(QueryableProperty):
             self.set_value = setter
         if filter:
             self.get_filter = self._extract_function(filter)
-            # The filter function may be automatically set to the get_filter
-            # method of the AnnotationMixin, in which case the method has to
-            # be bound to the current instance.
-            if self.get_filter is self._extract_function(AnnotationMixin.get_filter):
-                self.get_filter = six.create_bound_method(self.get_filter, self)
         if annotater:
             self.get_annotation = self._extract_function(annotater)
         if updater:
@@ -327,6 +208,7 @@ class queryable_property(QueryableProperty):
         # distinct between a "default False" (None) and an explicit False set
         # by the implementation.
         self.filter_requires_annotation = filter_requires_annotation
+        self.lookup_mappings = lookup_mappings or {}
         self.__doc__ = doc
 
     def __call__(self, getter):
@@ -365,6 +247,7 @@ class queryable_property(QueryableProperty):
             cached=self.cached,
             setter_cache_behavior=self.setter_cache_behavior,
             filter_requires_annotation=self.filter_requires_annotation,
+            lookup_mappings=dict(self.lookup_mappings),
             doc=self.__doc__
         )
         defaults.update(kwargs)
@@ -374,50 +257,54 @@ class queryable_property(QueryableProperty):
         """
         Decorator for a function or method that is used as the getter of this
         queryable property. May be used as a parameter-less decorator
-        (``@getter``) or as a decorator with keyword args
+        (``@getter``) or as a decorator with keyword arguments
         (``@getter(cached=True)``).
 
         :param method: The method to decorate. If it is None, the parameterized
                        usage of this decorator is assumed, so this method
                        returns the actual decorator function.
-        :type method: function | classmethod | staticmethod
+        :type method: function
         :param bool cached: If True, values returned by the decorated getter
                             method will be cached.
         :return: A cloned queryable property or the actual decorator function.
         :rtype: queryable_property | function
         """
-        if not method:
-            def decorator(meth):
-                return self._clone(getter=meth, cached=cached)
-            return decorator
-        return self._clone(getter=method)
+        if method:
+            return self._clone(getter=method)
+
+        def decorator(meth):
+            return self._clone(getter=meth, cached=cached)
+        return decorator
 
     def setter(self, method=None, cache_behavior=CLEAR_CACHE):
         """
         Decorator for a function or method that is used as the setter of this
         queryable property. May be used as a parameter-less decorator
-        (``@setter``) or as a decorator with keyword args
+        (``@setter``) or as a decorator with keyword arguments
         (``@setter(cache_behavior=DO_NOTHING)``).
 
         :param method: The method to decorate.
-        :type method: function | classmethod | staticmethod
+        :type method: function
         :param function cache_behavior: A function that defines how the setter
                                         interacts with cached values.
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
-        if not method:
-            def decorator(meth):
-                return self._clone(setter=meth, setter_cache_behavior=cache_behavior)
-            return decorator
-        return self._clone(setter=method)
+        if method:
+            return self._clone(setter=method)
 
-    def filter(self, method=None, requires_annotation=None):
+        def decorator(meth):
+            return self._clone(setter=meth, setter_cache_behavior=cache_behavior)
+        return decorator
+
+    def filter(self, method=None, requires_annotation=None, lookups=None):
         """
         Decorator for a function or method that is used to generate a filter
         for querysets to emulate filtering by this queryable property. May be
         used as a parameter-less decorator (``@filter``) or as a decorator with
-        keyword args (``@filter(requires_annotation=False)``).
+        keyword arguments (``@filter(requires_annotation=False)``). May be used
+        to define a one-for-all filter function or a filter function that will
+        be called for certain lookups only using the `lookups` argument.
 
         :param method: The method to decorate. If it is None, the parameterized
                        usage of this decorator is assumed, so this method
@@ -428,40 +315,60 @@ class queryable_property(QueryableProperty):
                                     applied first; otherwise False. None if
                                     this information should not be changed.
         :type requires_annotation: bool | None
+        :param lookups: If given, the decorated function or method will be used
+                        for the specified lookup(s) only. Automatically adds
+                        the :class:`LookupFilterMixin` to this property if this
+                        is used.
+        :type lookups: collections.Iterable[str] | None
         :return: A cloned queryable property or the actual decorator function.
         :rtype: queryable_property | function
         """
-        if not method:
-            def decorator(meth):
-                annotation_req = self.filter_requires_annotation if requires_annotation is None else requires_annotation
-                return self._clone(filter=meth, filter_requires_annotation=annotation_req)
-            return decorator
-        return self._clone(filter=method)
+        if method:
+            return self._clone(filter=method)
+
+        def decorator(meth):
+            attrs = {}
+            if requires_annotation is not None:
+                attrs['filter_requires_annotation'] = requires_annotation
+            if lookups is not None:  # Register only for the given lookups.
+                attrs['lookup_mappings'] = dict(self.lookup_mappings, **{lookup: meth for lookup in lookups})
+            else:  # Register as a one-for-all filter function.
+                attrs['filter'] = meth
+            clone = self._clone(**attrs)
+            # If the decorated function/method is used for certain lookups
+            # only, add the LookupFilterMixin into the new property to be able
+            # to reuse its filter implementation based on the lookup mappings.
+            if lookups is not None and not isinstance(clone, LookupFilterMixin):
+                LookupFilterMixin.inject_into_object(clone)
+            return clone
+        return decorator
 
     def annotater(self, method):
         """
         Decorator for a function or method that is used to generate an
-        annotation to represent this queryable property in querysets.
+        annotation to represent this queryable property in querysets. The
+        :class:`AnnotationMixin` will automatically applied to this property
+        when this decorator is used.
 
         :param method: The method to decorate.
         :type method: function | classmethod | staticmethod
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
-        kwargs = {'annotater': method}
-        # If an annotater is defined but a filter isn't, use the default filter
-        # implementation based on an annotation from the AnnotationMixin. This
-        # way, all properties defining an annotater are automatically
-        # filterable while still having the option to register a custom filter
-        # method.
-        if not self.get_filter:
-            kwargs['filter'] = AnnotationMixin.get_filter
-        # If no value was explicitly set for filter_requires_annotation, set it
-        # to True since the default filter implementation of the
-        # AnnotationMixin acts the same way.
-        if self.filter_requires_annotation is None:
-            kwargs['filter_requires_annotation'] = True
-        return self._clone(**kwargs)
+        clone = self._clone(
+            annotater=method,
+            # If no value was explicitly set for filter_requires_annotation,
+            # set it to True since the default filter implementation of the
+            # AnnotationMixin acts the same way.
+            filter_requires_annotation=self.filter_requires_annotation is None or self.filter_requires_annotation
+        )
+        # Dynamically add the AnnotationMixin into the new property to allow
+        # to use the default filter implementation. Since an explicitly set
+        # filter implementation is stored in the instance dict, it will be used
+        # over the default implementation.
+        if not isinstance(clone, AnnotationMixin):
+            AnnotationMixin.inject_into_object(clone)
+        return clone
 
     def updater(self, method):
         """

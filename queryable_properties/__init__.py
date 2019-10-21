@@ -3,7 +3,7 @@
 
 from __future__ import unicode_literals
 
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __author__ = 'Marcus Klöpfel'
 __copyright__ = 'Copyright 2019, Marcus Klöpfel'
 __license__ = 'BSD'

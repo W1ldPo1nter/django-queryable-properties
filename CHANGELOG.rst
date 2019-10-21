@@ -5,8 +5,15 @@ master (unreleased)
 -------------------
 
 - Added support for Django 3.0
-- Added a standalone version of ``six`` to the package requirements as Django will not include it anymore starting with
-  3.0
+
+1.2.0 (2019-10-21)
+------------------
+
+- Added a mixin that allows custom filters for queryable properties (both class- and decorator-based) to be implemented
+  using multiple functions/methods for different lookups
+- Added some ready-to-use queryable property implementations (``ValueCheckProperty``, ``RangeCheckProperty``) to
+  simplify common code patterns
+- Added a standalone version of six to the package requirements
 
 1.1.0 (2019-06-23)
 ------------------

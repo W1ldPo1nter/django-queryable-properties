@@ -53,6 +53,9 @@ class InjectableMixin(object):
     # Intentionally use a single cache for all subclasses since it is in no way
     # harmful to use a shared cache.
     _created_classes = {}
+    # Class attribute to determine if dynamically built classes should receive
+    # a custom __reduce__ implementation so their objects can be pickled.
+    _dynamic_pickling = True
 
     def __init__(self, *args, **kwargs):
         super(InjectableMixin, self).__init__(*args, **kwargs)
@@ -85,13 +88,15 @@ class InjectableMixin(object):
         cache_key = (base_class, cls, class_name)
         created_class = cls._created_classes.get(cache_key)
         if created_class is None:
-            # Make sure objects of a dynamically created class can be pickled.
-            def __reduce__(self):
-                get_state = getattr(self, '__getstate__', lambda: self.__dict__)
-                return _unpickle_injected_object, (base_class, cls, class_name), get_state()
+            attrs = {}
+            if cls._dynamic_pickling:
+                # Make sure objects of a dynamically created class can be pickled.
+                def __reduce__(self):
+                    get_state = getattr(self, '__getstate__', lambda: self.__dict__)
+                    return _unpickle_injected_object, (base_class, cls, class_name), get_state()
+                attrs['__reduce__'] = __reduce__
 
-            created_class = cls._created_classes[cache_key] = type(class_name, (cls, base_class),
-                                                                   {'__reduce__': __reduce__})
+            created_class = cls._created_classes[cache_key] = type(class_name, (cls, base_class), attrs)
         return created_class
 
     @classmethod

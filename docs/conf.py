@@ -297,6 +297,16 @@ texinfo_documents = [
 #texinfo_no_detailmenu = False
 
 
+def autodoc_skip_member(app, what, name, obj, skip, options):
+    if getattr(obj, '__module__', None) == 'queryable_properties.properties.common':
+        if name == 'get_value':
+            return True
+        if name == '__init__':
+            return False
+    return None
+
+
 def setup(app):
     app.add_config_value('recommonmark_config', {'enable_eval_rst': True}, True)
     app.add_transform(AutoStructify)
+    app.connect('autodoc-skip-member', autodoc_skip_member)

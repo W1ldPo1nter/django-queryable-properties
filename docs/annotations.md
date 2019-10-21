@@ -82,12 +82,20 @@ Unlike the `SetterMixin` and the `UpdateMixin`, the `AnnotationMixin` does a bit
   As the name suggests, this attribute determines if the annotation must be present in a queryset to be able to use the
   filter and is therefore automatically set to `True` to make the default filter implementation mentioned in the
   previous point work.
+  For decorator-based properties using the `annotater` decorator, it also automatically sets
+  `filter_requires_annotation` to `True` unless another value was already set (see the next example).
 
-Because of this, the functionality of the `AnnotationMixin` is not only relevant for the class-based approach.
-Decorator-based properties that use the `annotater` decorator and don't implement filtering on their own will act in
-the same way (although they don't use the mixin directly).
-For decorator-based properties using the `annotater` decorator, it also automatically sets `filter_requires_annotation`
-to `True` unless another value was specified (see the following example).
+```eval_rst
+.. caution::
+   Since the ``AnnotationMixin`` simply implements the ``get_filter`` method as mentioned above, care must be taken
+   when using other mixins (most notably the ``LookupFilterMixin`` - see :doc:`filters <filters>`) that override this
+   method as well (the implementations override each other).
+   
+   This is also relevant for the decorator-based approach as these mixins are automatically added to such properties
+   when they use annotations or lookup-based filters.
+   The order of the mixins for the class-based approach or the used decorators for the decorator-based approach is
+   therefore important in such cases (the mixin applied last wins).
+```
 
 If the filter implementation shown in the [filtering chapter](filters.md) (which does not require the annotation and
 should therefore be configured accordingly) was to be retained despite annotating being implemented, the implementation
@@ -119,6 +127,14 @@ class ApplicationVersion(Model):
     @classmethod
     def version_str(cls):
         return Concat('major', Value('.'), 'minor')
+```
+
+```eval_rst
+.. note::
+   If lookup-based filters are used with the decorator-based approach, the ``requires_annotation`` value can be set on
+   any method decorated with the ``filter`` decorator.
+   If a value for this parameter is specified in multiple ``filter`` calls, the last one will be the one that will
+   determine the final value since it's still a global flag for the filter behavior (regardless of lookup).
 ```
 
 For the class-based approach, the class (or instance) attribute `filter_requires_annotation` must be changed instead:
@@ -184,8 +200,8 @@ These queryset operations can also be used on related models and include:
    consistent across all supported Django versions.
    
    The selection of the queryable property annotations in these scenarios may also affect queries with ``.distinct()``
-   calls (since the DISTINCT clause also applies to the annotation) or ``.values()``/``.values_list()`` queries, which
-   will return the annotation column in addition to the ones specified in ``.values()``/``.values_list()``.
+   calls (since the ``DISTINCT`` clause also applies to the annotation) or ``.values()``/``.values_list()`` queries,
+   which will return the annotation column in addition to the ones specified in ``.values()``/``.values_list()``.
 ```
 
 ### Caution: the order of queryset operations still matters!
