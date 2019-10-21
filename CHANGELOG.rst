@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.2.0 (2019-10-21)
+------------------
+
 - Added a mixin that allows custom filters for queryable properties (both class- and decorator-based) to be implemented
   using multiple functions/methods for different lookups
 - Added some ready-to-use queryable property implementations (``ValueCheckProperty``, ``RangeCheckProperty``) to
