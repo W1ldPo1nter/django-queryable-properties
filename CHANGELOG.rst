@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.2.1 (2019-12-03)
+------------------
+
 - Added support for Django 3.0
 
 1.2.0 (2019-10-21)
