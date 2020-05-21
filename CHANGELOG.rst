@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+- Fixed the inability to use the ``classmethod`` or ``staticmethod`` decorators with lookup-based filter methods for
+  decorator-based properties
+
 1.2.1 (2019-12-03)
 ------------------
 
