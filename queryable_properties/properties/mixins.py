@@ -102,8 +102,9 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
         return method(cls, lookup, value)
 
 
-# Alias to allow the usage of the decorator without the "LookupFilterMixin."
+# Aliases to allow the usage of the decorators without the "LookupFilterMixin."
 # prefix.
+boolean_filter = LookupFilterMixin.boolean_filter
 lookup_filter = LookupFilterMixin.lookup_filter
 
 
