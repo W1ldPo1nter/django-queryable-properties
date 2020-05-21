@@ -113,9 +113,11 @@ class TestBasics(object):
         deserialized_prop = six.moves.cPickle.loads(serialized_prop)
         assert deserialized_prop is model.version
 
-    def test_string_representation(self):
+    def test_representations(self):
         string_representation = six.text_type(ApplicationWithClassBasedProperties.dummy)
+        object_representation = repr(ApplicationWithClassBasedProperties.dummy)
         assert string_representation == 'tests.ApplicationWithClassBasedProperties.dummy'
+        assert object_representation == '<DummyProperty: {}>'.format(string_representation)
 
     def test_invalid_property_name(self):
         with pytest.raises(QueryablePropertyError, match='must not contain the lookup separator'):
@@ -295,6 +297,15 @@ class TestDecorators(object):
         assert clone3.get_filter(None, 'lte', None) == 2
         assert clone3.get_filter(None, 'gt', None) == 1
         assert clone3.get_filter(None, 'exact', None) == 3
+
+    def test_lookup_boolean_exception(self):
+        prop = queryable_property()
+
+        def func():
+            pass
+
+        with pytest.raises(ValueError):
+            self.decorate_function(func, prop.filter, {'lookups': ['lt', 'lte'], 'boolean': True})
 
     @pytest.mark.parametrize('init_kwargs, expected_requires_annotation', [
         ({'annotater': lambda: F('dummy')}, True),

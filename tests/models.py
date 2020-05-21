@@ -89,7 +89,7 @@ class FullVersionProperty(LookupFilterMixin, UpdateMixin, AnnotationMixin, Sette
         obj.major, obj.minor, obj.patch = value.split('.')
 
     @LookupFilterMixin.lookup_filter('exact')
-    def get_filter(self, cls, lookup, value):
+    def exact_filter(self, cls, lookup, value):
         parts = value.rsplit('.', 1)
         return models.Q(major_minor=parts[0], patch=parts[1])
 
@@ -111,6 +111,16 @@ class DefaultChangesProperty(AnnotationMixin, QueryableProperty):
         from django.db.models import Value
         from django.db.models.functions import Coalesce
         return Coalesce('changes', Value('(No data)'))
+
+
+class Version2Property(LookupFilterMixin, QueryableProperty):
+
+    def get_value(self, obj):
+        return obj.major == 2
+
+    @LookupFilterMixin.boolean_filter
+    def exact_filter(self, cls):
+        return models.Q(major=2)
 
 
 class CircularProperty(AnnotationMixin, QueryableProperty):
@@ -256,6 +266,7 @@ class VersionWithClassBasedProperties(Version):
     major_minor = MajorMinorVersionProperty()
     version = FullVersionProperty()
     changes_or_default = DefaultChangesProperty()
+    is_version_2 = Version2Property()
     is_alpha = ValueCheckProperty('release_type', Version.ALPHA)
     is_beta = ValueCheckProperty('release_type', Version.BETA)
     is_stable = ValueCheckProperty('release_type', Version.STABLE)
@@ -329,3 +340,12 @@ class VersionWithDecoratorBasedProperties(Version):
         from django.db.models import Value
         from django.db.models.functions import Coalesce
         return Coalesce('changes', Value('(No data)'))
+
+    @queryable_property
+    def is_version_2(self):
+        return self.major == 2
+
+    @is_version_2.filter(boolean=True)
+    @classmethod
+    def is_version_2(cls):
+        return models.Q(major=2)

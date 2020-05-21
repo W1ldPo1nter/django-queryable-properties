@@ -77,6 +77,15 @@ class TestFilterWithoutAnnotations(object):
         model.objects.filter(filters).delete()
         assert model.objects.count() == expected_remaining_count
 
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_boolean_filter(self, model):
+        v2_objects = model.objects.filter(is_version_2=True)
+        non_v2_objects = model.objects.filter(is_version_2=False)
+        assert len(v2_objects) == 2
+        assert all(version.is_version_2 for version in v2_objects)
+        assert len(non_v2_objects) == 6
+        assert all(not version.is_version_2 for version in non_v2_objects)
+
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, property_name, condition', [
         (VersionWithClassBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
