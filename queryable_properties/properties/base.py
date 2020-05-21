@@ -197,11 +197,11 @@ class queryable_property(QueryableProperty):
         if setter:
             self.set_value = setter
         if filter:
-            self.get_filter = self._extract_function(filter)
+            self.get_filter = filter
         if annotater:
-            self.get_annotation = self._extract_function(annotater)
+            self.get_annotation = annotater
         if updater:
-            self.get_update_kwargs = self._extract_function(updater)
+            self.get_update_kwargs = updater
         self.cached = cached
         self.setter_cache_behavior = setter_cache_behavior
         # Use None as a default value for filter_requires_annotation to
@@ -324,9 +324,10 @@ class queryable_property(QueryableProperty):
         :rtype: queryable_property | function
         """
         if method:
-            return self._clone(filter=method)
+            return self._clone(filter=self._extract_function(method))
 
         def decorator(meth):
+            meth = self._extract_function(meth)
             attrs = {}
             if requires_annotation is not None:
                 attrs['filter_requires_annotation'] = requires_annotation
@@ -356,7 +357,7 @@ class queryable_property(QueryableProperty):
         :rtype: queryable_property
         """
         clone = self._clone(
-            annotater=method,
+            annotater=self._extract_function(method),
             # If no value was explicitly set for filter_requires_annotation,
             # set it to True since the default filter implementation of the
             # AnnotationMixin acts the same way.
@@ -381,4 +382,4 @@ class queryable_property(QueryableProperty):
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
-        return self._clone(updater=method)
+        return self._clone(updater=self._extract_function(method))
