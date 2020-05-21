@@ -5,8 +5,8 @@ from datetime import date
 from django.db import models
 
 from queryable_properties.managers import QueryablePropertiesManager
-from queryable_properties.properties import (AnnotationMixin, QueryableProperty, queryable_property, RangeCheckProperty,
-                                             SetterMixin, UpdateMixin, ValueCheckProperty)
+from queryable_properties.properties import (AnnotationMixin, LookupFilterMixin, QueryableProperty, queryable_property,
+                                             RangeCheckProperty, SetterMixin, UpdateMixin, ValueCheckProperty)
 
 
 class DummyProperty(SetterMixin, QueryableProperty):
@@ -78,7 +78,7 @@ class MajorMinorVersionProperty(UpdateMixin, QueryableProperty):
         return dict(major=parts[0], minor=parts[1])
 
 
-class FullVersionProperty(UpdateMixin, AnnotationMixin, SetterMixin, QueryableProperty):
+class FullVersionProperty(LookupFilterMixin, UpdateMixin, AnnotationMixin, SetterMixin, QueryableProperty):
 
     filter_requires_annotation = False
 
@@ -88,9 +88,8 @@ class FullVersionProperty(UpdateMixin, AnnotationMixin, SetterMixin, QueryablePr
     def set_value(self, obj, value):
         obj.major, obj.minor, obj.patch = value.split('.')
 
+    @LookupFilterMixin.lookup_filter('exact')
     def get_filter(self, cls, lookup, value):
-        if lookup != 'exact':
-            raise NotImplementedError()
         parts = value.rsplit('.', 1)
         return models.Q(major_minor=parts[0], patch=parts[1])
 
@@ -302,19 +301,17 @@ class VersionWithDecoratorBasedProperties(Version):
     def version(self, value):
         self.major, self.minor, self.patch = value.split('.')
 
-    @version.filter(requires_annotation=False)
-    @classmethod
-    def version(cls, lookup, value):
-        if lookup != 'exact':
-            raise NotImplementedError()
-        parts = value.rsplit('.', 1)
-        return models.Q(major_minor=parts[0], patch=parts[1])
-
     @version.annotater
     @classmethod
     def version(cls):
         from django.db.models.functions import Concat
         return Concat('major', models.Value('.'), 'minor', models.Value('.'), 'patch', output_field=models.CharField())
+
+    @version.filter(requires_annotation=False, lookups=('exact',))
+    @classmethod
+    def version(cls, lookup, value):
+        parts = value.rsplit('.', 1)
+        return models.Q(major_minor=parts[0], patch=parts[1])
 
     @version.updater
     @classmethod
