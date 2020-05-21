@@ -2,6 +2,8 @@
 
 from __future__ import unicode_literals
 
+from functools import partial
+
 import six
 
 from ..compat import LOOKUP_SEP
@@ -69,6 +71,9 @@ class QueryableProperty(object):
 
     def __str__(self):
         return '.'.join((self.model._meta.app_label, self.model._meta.object_name, self.name))
+
+    def __repr__(self):
+        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
 
     def get_value(self, obj):  # pragma: no cover
         """
@@ -297,7 +302,7 @@ class queryable_property(QueryableProperty):
             return self._clone(setter=meth, setter_cache_behavior=cache_behavior)
         return decorator
 
-    def filter(self, method=None, requires_annotation=None, lookups=None):
+    def filter(self, method=None, requires_annotation=None, lookups=None, boolean=False):
         """
         Decorator for a function or method that is used to generate a filter
         for querysets to emulate filtering by this queryable property. May be
@@ -320,26 +325,45 @@ class queryable_property(QueryableProperty):
                         the :class:`LookupFilterMixin` to this property if this
                         is used.
         :type lookups: collections.Iterable[str] | None
+        :param boolean: If True, the decorated function or method is expected
+                        to be a simple boolean filter, which doesn't take the
+                        `lookup` and `value` parameters and should always
+                        return a `Q` object representing positive (i.e. `True`)
+                        filter case. The decorator will automatically negate
+                        the condition if the filter was called with a `False`
+                        value.
+        :type boolean: bool
         :return: A cloned queryable property or the actual decorator function.
         :rtype: queryable_property | function
         """
         if method:
             return self._clone(filter=self._extract_function(method))
+        if boolean and lookups is not None:
+            raise ValueError('A boolean filter cannot specify lookups at the same time.')
 
         def decorator(meth):
             meth = self._extract_function(meth)
+            lookup_mappings = None
+            if boolean:
+                # Re-use the boolean_filter decorator by simulating a method
+                # with a self argument when in reality meth doesn't have one.
+                decorated_method = LookupFilterMixin.boolean_filter(lambda prop, model: meth(model))
+                lookup_mappings = {lookup: partial(decorated_method, None) for lookup in decorated_method._lookups}
+            elif lookups is not None:
+                lookup_mappings = {lookup: meth for lookup in lookups}
+
             attrs = {}
             if requires_annotation is not None:
                 attrs['filter_requires_annotation'] = requires_annotation
-            if lookups is not None:  # Register only for the given lookups.
-                attrs['lookup_mappings'] = dict(self.lookup_mappings, **{lookup: meth for lookup in lookups})
+            if lookup_mappings is not None:  # Register only for the given lookups.
+                attrs['lookup_mappings'] = dict(self.lookup_mappings, **lookup_mappings)
             else:  # Register as a one-for-all filter function.
                 attrs['filter'] = meth
             clone = self._clone(**attrs)
             # If the decorated function/method is used for certain lookups
             # only, add the LookupFilterMixin into the new property to be able
             # to reuse its filter implementation based on the lookup mappings.
-            if lookups is not None and not isinstance(clone, LookupFilterMixin):
+            if lookup_mappings is not None and not isinstance(clone, LookupFilterMixin):
                 LookupFilterMixin.inject_into_object(clone)
             return clone
         return decorator

@@ -1,5 +1,7 @@
 # encoding: utf-8
 
+from functools import wraps
+
 import six
 from django.db.models import Q
 
@@ -63,6 +65,32 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
             func._lookups = lookups  # Store the lookups on the function to be able to read them in the meta class.
             return func
         return decorator
+
+    @classmethod
+    def boolean_filter(cls, method):
+        """
+        Decorator for individual filter methods of classes that use the
+        :class:`LookupFilterMixin` to register the methods that are simple
+        boolean filters (i.e. the filter can only be called with a `True` or
+        `False` value). This automatically restricts the usable lookups to
+        `exact`. Decorated methods should not expect the `lookup` and `value`
+        parameters and should always return a `Q` object representing positive
+        (i.e. `True`) filter case. The decorator will automatically negate the
+        condition if the filter was called with a `False` value.
+
+        :param function method: The method to decorate.
+        :return: The decorated method.
+        :rtype: function
+        """
+        @wraps(method)
+        def filter_wrapper(self, model, lookup, value):
+            """Actual filter method that negates the condition if required."""
+            condition = method(self, model)
+            if not value:
+                condition.negate()
+            return condition
+        lookup_decorator = cls.lookup_filter('exact')
+        return lookup_decorator(filter_wrapper)
 
     def get_filter(self, cls, lookup, value):
         method = self.lookup_mappings.get(lookup)
