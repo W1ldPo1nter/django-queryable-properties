@@ -8,7 +8,8 @@ from django.utils.tree import Node
 
 from .compat import (
     ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, contains_aggregate,
-    convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP, NEED_HAVING_METHOD_NAME
+    convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP, NEED_HAVING_METHOD_NAME,
+    QUERY_CHAIN_METHOD_NAME
 )
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
@@ -220,6 +221,23 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         with self._add_queryable_property_annotation(property_ref, full_group_by) as annotation:
             return annotation
 
+    def _postprocess_clone(self, clone):
+        """
+        Postprocess a query that was the result of cloning this query. This
+        ensures that the cloned query also uses this mixin and that the
+        queryable property attributes are initialized correctly.
+
+        :param django.db.models.sql.Query clone: The cloned query.
+        :return: The postprocessed cloned query.
+        :rtype: django.db.models.sql.Query
+        """
+        if not isinstance(clone, QueryablePropertiesQueryMixin):
+            QueryablePropertiesQueryMixin.inject_into_object(clone)
+        else:
+            clone.init_injected_attrs()
+        clone._queryable_property_annotations.update(self._queryable_property_annotations)
+        return clone
+
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
         # This method is called in older versions to add an aggregate, which
         # may be based on a queryable property annotation, which in turn must
@@ -376,9 +394,12 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
 
     def clone(self, *args, **kwargs):
         obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
-        if not isinstance(obj, QueryablePropertiesQueryMixin):  # pragma: no cover
-            QueryablePropertiesQueryMixin.inject_into_object(obj)
-        else:
-            obj.init_injected_attrs()
-        obj._queryable_property_annotations.update(self._queryable_property_annotations)
+        if QUERY_CHAIN_METHOD_NAME == 'clone':  # pragma: no cover
+            obj = self._postprocess_clone(obj)
+        return obj
+
+    def chain(self, *args, **kwargs):
+        obj = super(QueryablePropertiesQueryMixin, self).chain(*args, **kwargs)
+        if QUERY_CHAIN_METHOD_NAME == 'chain':
+            obj = self._postprocess_clone(obj)
         return obj
