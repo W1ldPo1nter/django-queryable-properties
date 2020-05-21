@@ -280,19 +280,19 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # already, but the check for queryable properties MUST run first).
         try:
             arg, value = filter_expr
-        except ValueError:
-            # Invalid value - just treat it as "no queryable property found",
-            # delegate it to Django and let it generate the exception.
+        except (TypeError, ValueError):
+            # Invalid value - just treat it as "no queryable property found"
+            # and delegate it to Django.
             property_ref = None
         else:
             property_ref, lookups = self._resolve_queryable_property(arg.split(LOOKUP_SEP))
 
         # If no queryable property could be determined for the filter
         # expression (either because a regular/non-existent field is referenced
-        # or because the expression was an invalid value), call Django's
-        # default implementation, which may in turn raise an exception. Act the
-        # same way if the current top of the stack is used to avoid infinite
-        # recursions.
+        # or because the expression was a special or invalid value), call
+        # Django's default implementation, which may in turn raise an
+        # exception. Act the same way if the current top of the stack is used
+        # to avoid infinite recursions.
         if not property_ref or (self._queryable_property_stack and self._queryable_property_stack[-1] == property_ref):
             # The base method has different names in different Django versions
             # (see comment on the constant definition).
