@@ -262,7 +262,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # already, but the check for queryable properties MUST run first).
         try:
             arg, value = filter_expr
-        except ValueError:
+        except (TypeError, ValueError):
             # Invalid value - just treat it as "no queryable property found",
             # delegate it to Django and let it generate the exception.
             property_ref = None
