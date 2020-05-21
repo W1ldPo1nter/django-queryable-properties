@@ -4,6 +4,7 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added an option to implement simplified custom boolean filters utilizing lookup-based filters
 - Fixed the inability to use the ``classmethod`` or ``staticmethod`` decorators with lookup-based filter methods for
   decorator-based properties
 
