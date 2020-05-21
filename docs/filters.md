@@ -184,6 +184,84 @@ supported option must be specified in the decorators (e.g. `'year__gt'`)
    therefore important in such cases (the mixin applied last wins).
 ```
 
+#### Boolean filters
+
+Boolean queryable properties/filters are a somewhat special and very simple case: There are only 2 possible filter
+values (`True` and `False`) and there is only one lookup that really makes sense: `exact`.
+Because boolean filters can be simplified like this, *django-queryable-properties* also has a way to implement them
+as simple as possible based on lookup-based filters.
+
+Let's assume that a simple property that simply returns whether an application version is the first stable version of
+its product is to be implemented (for simplicity's sake, we assume that the first stable version uses the number 1.0).
+
+Using the decorator-based approach, this property could be implemented like this (note the `boolean` argument that
+is used in the `filter` decorator instead of `lookups`):
+
+```python
+from django.db.models import Model, Q
+from queryable_properties.properties import queryable_property
+
+
+class ApplicationVersion(Model):
+    ...
+    
+    @queryable_property
+    def is_first_stable_version(self):
+        """Return True if this application version represents the first stable version."""
+        return self.major == 1 and self.minor == 0
+    
+    @is_first_stable_version.filter(boolean=True)
+    @classmethod
+    def version_str(cls):  # Only ever called with the 'exact' lookup.
+        return Q(major=1, minor=0)
+```
+
+```eval_rst
+.. note::
+   The ``classmethod`` decorator is not required, but makes the functions look more natural since they take the model
+   class as their first argument.
+```
+
+```eval_rst
+.. note::
+   The ``boolean`` and ``lookups`` arguments are mutually exclusive.
+```
+
+To implement a boolean filter using the class-based approach, the `LookupFilterMixin` must still be used, but this time
+in conjunction with the `boolean_filter` decorator for the filter method:
+```python
+from django.db.models import Q
+from queryable_properties.properties import boolean_filter, LookupFilterMixin, QueryableProperty
+
+
+class StableVersionProperty(LookupFilterMixin, QueryableProperty):
+
+    def get_value(self, obj):
+        """Return the combined version info as a string."""
+        return obj.major == 1 and obj.minor == 0
+    
+    @boolean_filter  # Alternatively: @LookupFilterMixin.boolean_filter
+    def filter_equality(self, cls):  # Only ever called with the 'exact' lookup.
+        # Don't implement any validation to keep the example simple.
+        return Q(major=1, minor=0)
+```
+
+Some noteworthy points about the `boolean_filter` decorator and the `boolean` argument:
+* Using either of the two automatically restricts the lookups the filter can be called with to `exact` as other kinds
+  of lookups don't make much sense in conjunction with boolean filters (essentially equivalent to using
+  `@lookup_filter('exact')` or `lookups=('exact',)`, respectively).
+* The decorated methods **do not** take the `lookup` and `value` arguments that any other filter implementation takes.
+  This is part of the simplification for boolean filters, since the lookup will always be `exact` anyway and the value
+  can only ever be `True` or `False`.
+* The filter implementation is expected to always return the condition for the *positive* case, i.e. for the filter
+  value `True`.
+  In the examples above, the filter implementations return the correct filter for a
+  `ApplicationVersion.objects.filter(is_first_stable_version=True)` filter.
+  If the filter is called for the negative case (e.g. in a
+  `ApplicationVersion.objects.filter(is_first_stable_version=False)` query), the boolean filter automatically takes
+  care of negating the condition (essentially transforming it to `~Q(major=1, minor=0)` in the examples above), so
+  that this doesn't have to be implemented manually.
+
 ## Usage
 
 With both implementations shown above, the queryable property can be used to filter querysets like any regular model

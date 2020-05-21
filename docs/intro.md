@@ -32,7 +32,7 @@ just like the `getter` and `setter` of a regular property are implemented togeth
 
 All parts of this documentation contain a few simple examples to show how to take advantage of all the features of 
 queryable properties.
-For consistency, all of those examples are based on two simple Django models, which are shown in the following code
+For consistency, all of those examples are based on a few simple Django models, which are shown in the following code
 block.
 They represent models storing data for a version management system for applications, which in this over-simplified case
 only store which versions of an application exist.
