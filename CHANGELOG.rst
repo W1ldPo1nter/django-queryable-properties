@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.3.0 (2020-05-22)
+------------------
+
 - Added an option to implement simplified custom boolean filters utilizing lookup-based filters
 - Fixed the ability to use the ``classmethod`` or ``staticmethod`` decorators with lookup-based filter methods for
   decorator-based properties
