@@ -262,19 +262,6 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
             return iter(QueryablePropertiesIterable(self, iterable=iterable))
         return iterable
 
-    def order_by(self, *field_names):
-        queryset = chain_queryset(self)
-        for field_name in field_names:
-            # Ordering by a queryable property via simple string values
-            # requires auto-annotating here, while a queryable property used
-            # in a complex ordering expression is resolved through overridden
-            # query methods.
-            if isinstance(field_name, six.string_types) and field_name != '?':
-                if field_name.startswith('-') or field_name.startswith('+'):
-                    field_name = field_name[1:]
-                queryset.query._auto_annotate(field_name.split(LOOKUP_SEP))
-        return super(QueryablePropertiesQuerySetMixin, queryset).order_by(*field_names)
-
     def update(self, **kwargs):
         # Resolve any queryable properties into their actual update kwargs
         # before calling the base update method.

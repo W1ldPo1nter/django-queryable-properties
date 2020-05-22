@@ -4,6 +4,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 from functools import partial
 
+import six
 from django.utils.tree import Node
 
 from .compat import (
@@ -272,6 +273,18 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # necessary.
             return self.build_filter(*args, **kwargs)
         return super(QueryablePropertiesQueryMixin, self).add_filter(*args, **kwargs)
+
+    def add_ordering(self, *ordering, **kwargs):
+        for field_name in ordering:
+            # Ordering by a queryable property via simple string values
+            # requires auto-annotating here, while a queryable property used
+            # in a complex ordering expression is resolved through overridden
+            # query methods.
+            if isinstance(field_name, six.string_types) and field_name != '?':
+                if field_name.startswith('-') or field_name.startswith('+'):
+                    field_name = field_name[1:]
+                self._auto_annotate(field_name.split(LOOKUP_SEP))
+        return super(QueryablePropertiesQueryMixin, self).add_ordering(*ordering, **kwargs)
 
     def build_filter(self, filter_expr, *args, **kwargs):
         # Check if the given filter expression is meant to use a queryable
