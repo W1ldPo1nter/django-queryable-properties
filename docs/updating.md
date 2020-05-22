@@ -82,5 +82,28 @@ ApplicationVersion.objects.update(version_str='1.1')
 The specified value is then translated into actual field values by the implemented function/method and the real,
 underlying `update` call will take place with these values.
 
-Naturally, queryable properties that can be reached via relations can **not** be used as arguments in `update` since
-queries that update records only operate on these records (and not related records).
+## Limitations
+
+### Related models
+
+Unlike filtering and annotation-based operations, updating can not be used for fields on related models.
+This is because updates are generally meant for records of the same type to be able to perform an `UPDATE` query on a
+single table (aside from inheritance scenarios, where Django takes care of updating multiple tables correctly).
+*django-queryable-properties* doesn't add any additional logic here and simply translates the given value according
+to the updater implementation and therefore doesn't allow updating fields on related models, either.
+
+### Expression-based update values
+
+Using expression-based values (like `F` objects or [conditional updates][1]) are generally not supported when updating
+via a queryable property.
+This is because the queryable property updater is simply a preprocessor for the `.update(...)` keyword arguments on the
+python side, while expression-based updates rely on other values in the query, which are only evaluated in SQL when the
+query actually runs.
+
+However, *django-queryable-properties* doesn't technically prevent to use expressions as update values.
+This means that if an expression is used as an update value, it will be passed through to the method decorated with
+`updater` (decorator-based approach) or the `get_update_kwargs` implementation (class-based approach).
+Therefore it would technically be possible to process an expression in the updater's implementation as long the
+expression can be preprocessed in a sensible way before the query runs.
+
+[1]: https://docs.djangoproject.com/en/stable/ref/models/conditional-expressions/#conditional-update

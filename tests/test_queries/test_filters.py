@@ -115,6 +115,18 @@ class TestFilterWithoutAnnotations(object):
             assert app.num_13 == 2
             assert app.num_200 == 1
 
+    @pytest.mark.skipif(DJANGO_VERSION < (3, 0), reason="Conditional filters didn't exist before Django 3.0")
+    @pytest.mark.parametrize('application_model, version_model', [
+        (ApplicationWithClassBasedProperties, VersionWithClassBasedProperties),
+        (ApplicationWithDecoratorBasedProperties, VersionWithDecoratorBasedProperties),
+    ])
+    def test_conditional_filter(self, application_model, version_model):
+        version_model.objects.filter(major=2).first().delete()
+        subquery = version_model.objects.filter(application_id=models.OuterRef('pk'), version='2.0.0')
+        applications = application_model.objects.filter(models.Exists(subquery))
+        assert len(applications) == 1
+        assert applications[0].versions.filter(version='2.0.0').exists()
+
 
 class TestFilterWithAggregateAnnotation(object):
 

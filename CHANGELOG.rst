@@ -4,9 +4,14 @@ Changelog
 master (unreleased)
 -------------------
 
+1.3.0 (2020-05-22)
+------------------
+
 - Added an option to implement simplified custom boolean filters utilizing lookup-based filters
-- Fixed the inability to use the ``classmethod`` or ``staticmethod`` decorators with lookup-based filter methods for
+- Fixed the ability to use the ``classmethod`` or ``staticmethod`` decorators with lookup-based filter methods for
   decorator-based properties
+- Fixed the queryable property resolution in ``When`` parts of conditional updates.
+- Fixed the ability to use conditional expressions directly in ``.filter``/``.exclude`` calls in Django 3.0
 
 1.2.1 (2019-12-03)
 ------------------
