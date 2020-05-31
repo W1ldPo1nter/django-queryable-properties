@@ -328,10 +328,10 @@ class queryable_property(QueryableProperty):
         :param boolean: If True, the decorated function or method is expected
                         to be a simple boolean filter, which doesn't take the
                         `lookup` and `value` parameters and should always
-                        return a `Q` object representing positive (i.e. `True`)
-                        filter case. The decorator will automatically negate
-                        the condition if the filter was called with a `False`
-                        value.
+                        return a `Q` object representing the positive (i.e.
+                        `True`) filter case. The decorator will automatically
+                        negate the condition if the filter was called with a
+                        `False` value.
         :type boolean: bool
         :return: A cloned queryable property or the actual decorator function.
         :rtype: queryable_property | function
