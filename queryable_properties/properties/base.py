@@ -338,32 +338,32 @@ class queryable_property(QueryableProperty):
         """
         if method:
             return self._clone(filter=self._extract_function(method))
-        if boolean and lookups is not None:
-            raise ValueError('A boolean filter cannot specify lookups at the same time.')
+        if boolean:
+            if lookups is not None:
+                raise ValueError('A boolean filter cannot specify lookups at the same time.')
+            lookups = []  # Ensure a mutable object to be able to modify it in the decorator function below.
 
         def decorator(meth):
-            meth = self._extract_function(meth)
-            lookup_mappings = None
+            meth = extracted = self._extract_function(meth)
             if boolean:
                 # Re-use the boolean_filter decorator by simulating a method
                 # with a self argument when in reality meth doesn't have one.
-                decorated_method = LookupFilterMixin.boolean_filter(lambda prop, model: meth(model))
-                lookup_mappings = {lookup: partial(decorated_method, None) for lookup in decorated_method._lookups}
-            elif lookups is not None:
-                lookup_mappings = {lookup: meth for lookup in lookups}
+                meth = LookupFilterMixin.boolean_filter(lambda prop, model: extracted(model))
+                lookups.extend(meth._lookups)
+                meth = partial(meth, None)
 
             attrs = {}
             if requires_annotation is not None:
                 attrs['filter_requires_annotation'] = requires_annotation
-            if lookup_mappings is not None:  # Register only for the given lookups.
-                attrs['lookup_mappings'] = dict(self.lookup_mappings, **lookup_mappings)
+            if lookups is not None:  # Register only for the given lookups.
+                attrs['lookup_mappings'] = dict(self.lookup_mappings, **{lookup: meth for lookup in lookups})
             else:  # Register as a one-for-all filter function.
                 attrs['filter'] = meth
             clone = self._clone(**attrs)
             # If the decorated function/method is used for certain lookups
             # only, add the LookupFilterMixin into the new property to be able
             # to reuse its filter implementation based on the lookup mappings.
-            if lookup_mappings is not None and not isinstance(clone, LookupFilterMixin):
+            if lookups is not None and not isinstance(clone, LookupFilterMixin):
                 LookupFilterMixin.inject_into_object(clone)
             return clone
         return decorator
