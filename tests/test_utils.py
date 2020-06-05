@@ -6,7 +6,8 @@ from six.moves import cPickle
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
-from queryable_properties.utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
+from queryable_properties.utils import (get_queryable_property, InjectableMixin, parametrizable_decorator,
+                                        TreeNodeProcessor)
 
 from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 
@@ -16,6 +17,12 @@ class DummyClass(object):
     def __init__(self, attr1, attr2):
         self.attr1 = attr1
         self.attr2 = attr2
+
+    @parametrizable_decorator
+    def decorator(self, function, *args, **kwargs):
+        function.args = args
+        function.kwargs = kwargs
+        return function
 
 
 class DummyMixin(InjectableMixin):
@@ -130,3 +137,27 @@ class TestTreeNodeProcessor(object):
         children.remove(('prefix_c_suffix', 4))
         assert ('prefix_a_suffix', 2) in children[0].children
         assert ('prefix_b_suffix', 3) in children[0].children
+
+
+def test_parametrizable_decorator():
+    dummy = DummyClass(1, 2)
+
+    @dummy.decorator
+    def func1():
+        pass
+
+    @dummy.decorator(some_kwarg=1, another_kwarg='test')
+    def func2():
+        pass
+
+    def func3():
+        pass
+
+    func3 = dummy.decorator(func3, 1, 2, kwarg='test')
+
+    assert func1.args == ()
+    assert func1.kwargs == {}
+    assert func2.args == ()
+    assert func2.kwargs == dict(some_kwarg=1, another_kwarg='test')
+    assert func3.args == (1, 2)
+    assert func3.kwargs == dict(kwarg='test')

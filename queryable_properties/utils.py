@@ -1,6 +1,7 @@
 # encoding: utf-8
 
 from copy import deepcopy
+from functools import wraps
 
 from django.utils.tree import Node
 
@@ -196,3 +197,26 @@ class TreeNodeProcessor(object):
             else:
                 self.node.children[index] = modifier(child)
         return self.node
+
+
+def parametrizable_decorator(method):
+    """
+    A decorator for methods (not regular functions!) who themselves are to be
+    used as decorators and are to support both a parameter-less decorator usage
+    (``@my_decorator``) as well as parametrized decorator usage
+    (``@my_decorator(some_param=5)``). This decorator takes care of making the
+    distinction between both usages and returning the correct object.
+
+    :param function method: The decorator method to decorate.
+    :return: A wrapper method that will replace the decorated method.
+    :rtype: function
+    """
+    @wraps(method)
+    def wrapper(self, function=None, *args, **kwargs):
+        def decorator(func):
+            return method(self, func, *args, **kwargs)
+
+        if function:  # A function was given directly -> apply the decorator directly (@my_decorator usage).
+            return decorator(function)
+        return decorator  # No function -> return the actual decorator (@my_decorator(some_param=5) usage).
+    return wrapper
