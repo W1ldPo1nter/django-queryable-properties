@@ -2,6 +2,7 @@
 import pytest
 
 import six
+from django import VERSION as DJANGO_VERSION
 from django.db.models import F, Model, Q
 
 from queryable_properties.exceptions import QueryablePropertyError
@@ -305,7 +306,14 @@ class TestDecorators(object):
 
         clone = self.decorate_function(func, original.filter, {'boolean': True})
         assert isinstance(clone, LookupFilterMixin)
-        assert clone.get_filter(None, 'exact', True) == Q(some_field=5)
+        positive_condition = clone.get_filter(None, 'exact', True)
+        negative_condition = clone.get_filter(None, 'exact', False)
+        if DJANGO_VERSION < (1, 6):
+            # In very old Django versions, negating adds another layer.
+            negative_condition = negative_condition.children[0]
+        assert positive_condition.children == negative_condition.children == [('some_field', 5)]
+        assert positive_condition.negated is False
+        assert negative_condition.negated is True
         assert clone.get_filter(None, 'exact', False) == ~Q(some_field=5)
         with pytest.raises(QueryablePropertyError):
             clone.get_filter(None, 'lt', None)
