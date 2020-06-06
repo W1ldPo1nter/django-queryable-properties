@@ -314,7 +314,6 @@ class TestDecorators(object):
         assert positive_condition.children == negative_condition.children == [('some_field', 5)]
         assert positive_condition.negated is False
         assert negative_condition.negated is True
-        assert clone.get_filter(None, 'exact', False) == ~Q(some_field=5)
         with pytest.raises(QueryablePropertyError):
             clone.get_filter(None, 'lt', None)
 
