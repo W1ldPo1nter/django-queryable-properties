@@ -1,6 +1,6 @@
 # Basics
 
-## Ways to define queryable properties
+## Implementing queryable properties
 
 There are two ways to implement a queryable property:
 - Using decorated methods directly on the model class (just like regular properties)
@@ -9,10 +9,14 @@ There are two ways to implement a queryable property:
 
 Say we'd want to implement a queryable property for the `ApplicationVersion` example model that simply returns the
 combined version information as a string.
-To implement only the getter and the setter of such queryable property, the two following code examples achieve the
-same result.
+The two following sections show how to implement such a queryable property - for the sake of simplicity, the examples
+only show how to implement a getter and setter (which could also be implemented using a regular property).
+The following chapters of this documentation will show all available decorators, mixins and implementable methods in
+detail.
 
-Using the decorator-based approach (looks just like a regular property):
+### Decorator-based approach
+
+The decorator-based approach uses the class `queryable_property` and its methods as decorators:
 ```python
 from django.db import models
 from queryable_properties.properties import queryable_property
@@ -31,7 +35,73 @@ class ApplicationVersion(models.Model):
         self.major, self.minor = value.split('.')
 ```
 
-Using the class-based approach:
+#### Using the decorator methods without actually decorating
+
+Python's regular properties also allow to define properties without using `property` as a decorator.
+To do this, the individual methods that should make up the property can be passed to the `property` constructor:
+```python
+class MyClass(object):
+
+    def get_x(self):
+        return self._x
+
+    def set_x(self, value):
+        self._x = value
+
+    x = property(get_x, set_x)
+```
+
+Queryable properties do **not** allow to do this in the same way because of two reasons:
+* To encourage implementing properties using decorators, which is cleaner and makes code more readable.
+* Since queryable properties have a lot more functionality and options than regular properties, they would need to
+  support a huge number of constructor parameters, which would make the constructor too complex and harder to maintain.
+  
+However, there are use-cases where an option similar to the non-decorator usage of regular properties would be nice to
+have, e.g. when implementing a property without a getter or when the individual getter/setter methods are already
+present and cannot be easily deprecated in favor of the property.
+This is why queryable properties do support this form of defining a property - but in a slightly different way: the
+decorator methods can simply be chained together (this also works for all decorators introduced in later chapters).
+```python
+from django.db import models
+from queryable_properties.properties import queryable_property
+
+
+class ApplicationVersion(models.Model):
+    ...
+    
+    def get_version_str(self):
+        return '{major}.{minor}'.format(major=self.major, minor=self.minor)
+        
+    def set_version_str(self, value):
+        # Don't implement any validation to keep the example simple.
+        self.major, self.minor = value.split('.')
+
+    version_str = queryable_property(get_version_str).setter(set_version_str)
+```
+
+By not passing anything to the `queryable_property` constructor, a queryable property without a getter can be defined
+(`queryable_property().setter(set_version_str)` for the example above).
+This can even be used to make a getter-less queryable property while still decorating the setter (or mixing and
+matching chaining and decorating in general):
+```python
+from django.db import models
+from queryable_properties.properties import queryable_property
+
+
+class ApplicationVersion(models.Model):
+    ...
+    
+    version_str = queryable_property()  # Property without a getter
+
+    @version_str.setter
+    def version_str(self, value):
+        # Don't implement any validation to keep the example simple.
+        self.major, self.minor = value.split('.')
+```
+
+### Class-based approach
+
+Using the class-based approach, the queryable property is implemented as a subclass of `QueryableProperty`:
 ```python
 from django.db import models
 from queryable_properties.properties import QueryableProperty, SetterMixin
@@ -52,9 +122,6 @@ class ApplicationVersion(models.Model):
     
     version_str = VersionStringProperty()
 ```
-
-The following chapters of this documentation will show all available decorators, mixins and implementable methods in
-detail.
 
 ### When to use which approach
 
