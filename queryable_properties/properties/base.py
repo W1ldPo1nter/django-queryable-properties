@@ -302,7 +302,7 @@ class queryable_property(QueryableProperty):
                 raise QueryablePropertyError('A boolean filter cannot specify lookups at the same time.')
 
             # Re-use the boolean_filter decorator by simulating a method with
-            # a self argument when in reality meth doesn't have one.
+            # a self argument when in reality `method` doesn't have one.
             method = LookupFilterMixin.boolean_filter(lambda prop, model: extracted(model))
             lookups = method._lookups
             method = partial(method, None)
