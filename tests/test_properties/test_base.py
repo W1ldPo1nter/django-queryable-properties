@@ -2,6 +2,7 @@
 import pytest
 
 import six
+from django import VERSION as DJANGO_VERSION
 from django.db.models import F, Model, Q
 
 from queryable_properties.exceptions import QueryablePropertyError
@@ -9,7 +10,7 @@ from queryable_properties.properties import (AnnotationMixin, CACHE_RETURN_VALUE
                                              LookupFilterMixin, QueryableProperty, queryable_property)
 from queryable_properties.utils import reset_queryable_property
 
-from ..models import (ApplicationWithClassBasedProperties, DummyProperty, VersionWithClassBasedProperties,
+from ..models import (ApplicationWithClassBasedProperties, Category, DummyProperty, VersionWithClassBasedProperties,
                       VersionWithDecoratorBasedProperties)
 
 
@@ -126,27 +127,14 @@ class TestBasics(object):
 
 class TestDecorators(object):
 
-    KWARGS_TO_ATTR_MAP = {  # Maps the queryable_property initializer kwargs to its attributes
-        'getter': 'get_value',
-        'setter': 'set_value',
-        'filter': 'get_filter',
-        'annotater': 'get_annotation',
-        'updater': 'get_update_kwargs',
-        'cached': 'cached',
-        'setter_cache_behavior': 'setter_cache_behavior',
-        'filter_requires_annotation': 'filter_requires_annotation',
-        'doc': '__doc__',
-    }
+    ATTR_NAMES = ('get_value', 'set_value', 'get_filter', 'get_annotation', 'get_update_kwargs', 'cached',
+                  'setter_cache_behavior', 'filter_requires_annotation', 'lookup_mappings', '__doc__')
 
     def assert_cloned_property(self, original, clone, changed_attrs):
         assert original is not clone
-        for kwarg_name, attr_name in self.KWARGS_TO_ATTR_MAP.items():
-            value = getattr(clone, attr_name)
-            # Check for a new docstring that was set via a new getter
-            if kwarg_name == 'doc' and 'doc' not in changed_attrs and original.__doc__ is None and clone.get_value:
-                assert clone.__doc__ == clone.get_value.__doc__
-            else:
-                assert value == changed_attrs.get(kwarg_name, getattr(original, attr_name))
+        for attr_name in self.ATTR_NAMES:
+            value = getattr(clone, attr_name, None)
+            assert value == changed_attrs.get(attr_name, getattr(original, attr_name, None))
 
     def decorate_function(self, func, decorator, decorator_kwargs=None):
         if decorator_kwargs is not None:
@@ -164,10 +152,10 @@ class TestDecorators(object):
         assert prop._extract_function(cls_method) is func
 
     @pytest.mark.parametrize('init_kwargs, clone_kwargs', [
-        ({'getter': lambda: None}, {'setter': lambda: None}),  # Set an additional attribute
-        ({'getter': lambda: None}, {'getter': lambda: 'test'}),  # Override an attribute
-        ({'getter': lambda: None, 'cached': False}, {'setter': lambda: None, 'cached': True, 'doc': 'my docstring'}),
-        ({'getter': lambda: None}, {'getter': function_with_docstring}),  # Set docstring via getter
+        ({'getter': lambda: None}, {'set_value': lambda: None}),  # Set an additional attribute
+        ({'getter': lambda: None}, {'get_value': lambda: 'test'}),  # Override an attribute
+        ({'getter': lambda: None, 'cached': False},
+         {'set_value': lambda: None, 'cached': True, '__doc__': 'my docstring'}),
     ])
     def test_clone(self, init_kwargs, clone_kwargs):
         prop = queryable_property(**init_kwargs)
@@ -178,10 +166,7 @@ class TestDecorators(object):
         (None, None),  # Test @queryable_property
         (None, {}),  # Test @queryable_property() (without any arguments)
         ('my docstring', {}),  # Test if the docstring of the getter is used correctly
-        (None, {'doc': 'nice docstring'}),  # Test explicit docstring
-        ('my docstring', {'doc': 'nice docstring'}),  # Both docstring options: explicit should take precedence
-        (None, {'cached': True, 'filter_requires_annotation': True}),  # Multiple keyword arguments
-        (None, {'filter': lambda: Q()})  # Even set other functions
+        (None, {'cached': True}),  # Keyword arguments
     ])
     def test_initializer(self, docstring, kwargs):
         def func():
@@ -189,35 +174,39 @@ class TestDecorators(object):
         func.__doc__ = docstring
         prop = self.decorate_function(func, queryable_property, kwargs)
         assert prop.get_value is func
-        if kwargs and 'doc' not in kwargs:
-            assert prop.__doc__ == docstring
+        assert prop.__doc__ == (docstring or None)
         if kwargs:
             for name, value in kwargs.items():
-                assert getattr(prop, self.KWARGS_TO_ATTR_MAP[name]) == value
+                assert getattr(prop, name) == value
 
-    @pytest.mark.parametrize('old_value, kwargs', [
-        (None, None),
-        (lambda: 'test', None),  # Test that the decorated function overrides an existing one
-        (None, {'cached': True}),
-        (lambda: 'test', {'cached': True}),
+    @pytest.mark.parametrize('old_getter, old_docstring, new_docstring, kwargs', [
+        (None, None, None, None),
+        (lambda: 'test', 'my old func', None, None),  # Test that the decorated function overrides an existing one
+        (None, None, 'my new func', {'cached': True}),
+        (lambda: 'test', 'my old func', 'my new func', {'cached': True}),
     ])
-    def test_getter(self, old_value, kwargs):
-        original = queryable_property(getter=old_value)
+    def test_getter(self, old_getter, old_docstring, new_docstring, kwargs):
+        original = queryable_property(old_getter)
+        if old_docstring is not None:
+            original.__doc__ = old_docstring
 
         def func():
             pass
+        func.__doc__ = new_docstring
 
         clone = self.decorate_function(func, original.getter, kwargs)
-        self.assert_cloned_property(original, clone, dict(kwargs or {}, getter=func))
+        self.assert_cloned_property(original, clone,
+                                    dict(kwargs or {}, get_value=func, __doc__=new_docstring or old_docstring))
 
-    @pytest.mark.parametrize('old_value, kwargs', [
+    @pytest.mark.parametrize('old_setter, kwargs', [
         (None, None),
         (lambda: None, None),
         (None, {'setter_cache_behavior': DO_NOTHING}),
         (lambda: None, {'setter_cache_behavior': CACHE_VALUE}),
     ])
-    def test_setter(self, old_value, kwargs):
-        original = queryable_property(setter=old_value)
+    def test_setter(self, old_setter, kwargs):
+        original = queryable_property()
+        original.set_value = old_setter
 
         def func():
             pass
@@ -226,13 +215,13 @@ class TestDecorators(object):
         if decorator_kwargs:
             decorator_kwargs['cache_behavior'] = decorator_kwargs.pop('setter_cache_behavior')
         clone = self.decorate_function(func, original.setter, decorator_kwargs)
-        self.assert_cloned_property(original, clone, dict(kwargs or {}, setter=func))
+        self.assert_cloned_property(original, clone, dict(kwargs or {}, set_value=func))
 
-    @pytest.mark.parametrize('init_kwargs, decorator_kwargs, expected_requires_annotation', [
-        ({'filter': lambda: Q()}, {}, None),
-        ({'filter': lambda: Q()}, None, None),
+    @pytest.mark.parametrize('initial_values, decorator_kwargs, expected_requires_annotation', [
+        ({'get_filter': lambda: Q()}, {}, False),
+        ({'get_filter': lambda: Q()}, None, False),
         # The following are the 9 cases for initial fra to decorator fra (each can be None, False or True)
-        ({}, {}, None),
+        ({}, {}, False),
         ({'filter_requires_annotation': False}, {}, False),
         ({'filter_requires_annotation': True}, {}, True),
         ({}, {'requires_annotation': False}, False),
@@ -242,8 +231,9 @@ class TestDecorators(object):
         ({'filter_requires_annotation': False}, {'requires_annotation': True}, True),
         ({'filter_requires_annotation': True}, {'requires_annotation': True}, True),
     ])
-    def test_filter(self, init_kwargs, decorator_kwargs, expected_requires_annotation):
-        original = queryable_property(**init_kwargs)
+    def test_filter(self, initial_values, decorator_kwargs, expected_requires_annotation):
+        original = queryable_property()
+        original.__dict__.update(initial_values)
 
         def func():
             pass
@@ -251,10 +241,12 @@ class TestDecorators(object):
         clone = self.decorate_function(func, original.filter, decorator_kwargs)
         assert not isinstance(clone, LookupFilterMixin)
         self.assert_cloned_property(original, clone,
-                                    {'filter': func, 'filter_requires_annotation': expected_requires_annotation})
+                                    {'get_filter': func, 'filter_requires_annotation': expected_requires_annotation})
 
     def test_lookup_filters(self):
         original = queryable_property()
+        original.model = Category
+        original.name = 'test_property'
         get_filter_func = six.get_unbound_function(LookupFilterMixin.get_filter)
 
         def func1(cls, lookup, value):
@@ -264,10 +256,12 @@ class TestDecorators(object):
         assert isinstance(clone1, LookupFilterMixin)
         self.assert_cloned_property(original, clone1, {
             'lookup_mappings': {'lt': func1, 'gt': func1},
-            'filter': six.create_bound_method(get_filter_func, clone1),
+            'get_filter': six.create_bound_method(get_filter_func, clone1),
         })
         assert clone1.get_filter(None, 'lt', None) == 1
         assert clone1.get_filter(None, 'gt', None) == 1
+        with pytest.raises(QueryablePropertyError):
+            clone1.get_filter(None, 'in', None)
 
         def func2(cls, lookup, value):
             return 2
@@ -276,12 +270,14 @@ class TestDecorators(object):
         assert isinstance(clone2, LookupFilterMixin)
         self.assert_cloned_property(clone1, clone2, {
             'lookup_mappings': {'lt': func2, 'lte': func2, 'gt': func1},
-            'filter': six.create_bound_method(get_filter_func, clone2),
+            'get_filter': six.create_bound_method(get_filter_func, clone2),
             'filter_requires_annotation': True,  # Should be overridable on every call.
         })
         assert clone2.get_filter(None, 'lt', None) == 2
         assert clone2.get_filter(None, 'lte', None) == 2
         assert clone2.get_filter(None, 'gt', None) == 1
+        with pytest.raises(QueryablePropertyError):
+            clone2.get_filter(None, 'in', None)
 
         def func3(cls, lookup, value):
             return 3
@@ -290,13 +286,36 @@ class TestDecorators(object):
         assert isinstance(clone3, LookupFilterMixin)
         self.assert_cloned_property(clone2, clone3, {
             'lookup_mappings': {'lt': func2, 'lte': func2, 'gt': func1, 'exact': func3},
-            'filter': six.create_bound_method(get_filter_func, clone3),
+            'get_filter': six.create_bound_method(get_filter_func, clone3),
             'filter_requires_annotation': False,  # Should be overridable on every call.
         })
         assert clone3.get_filter(None, 'lt', None) == 2
         assert clone3.get_filter(None, 'lte', None) == 2
         assert clone3.get_filter(None, 'gt', None) == 1
         assert clone3.get_filter(None, 'exact', None) == 3
+        with pytest.raises(QueryablePropertyError):
+            clone3.get_filter(None, 'in', None)
+
+    def test_boolean_filter(self):
+        original = queryable_property()
+        original.model = Category
+        original.name = 'test_property'
+
+        def func(cls):
+            return Q(some_field=5)
+
+        clone = self.decorate_function(func, original.filter, {'boolean': True})
+        assert isinstance(clone, LookupFilterMixin)
+        positive_condition = clone.get_filter(None, 'exact', True)
+        negative_condition = clone.get_filter(None, 'exact', False)
+        if DJANGO_VERSION < (1, 6):
+            # In very old Django versions, negating adds another layer.
+            negative_condition = negative_condition.children[0]
+        assert positive_condition.children == negative_condition.children == [('some_field', 5)]
+        assert positive_condition.negated is False
+        assert negative_condition.negated is True
+        with pytest.raises(QueryablePropertyError):
+            clone.get_filter(None, 'lt', None)
 
     def test_lookup_boolean_exception(self):
         prop = queryable_property()
@@ -304,20 +323,21 @@ class TestDecorators(object):
         def func():
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(QueryablePropertyError):
             self.decorate_function(func, prop.filter, {'lookups': ['lt', 'lte'], 'boolean': True})
 
-    @pytest.mark.parametrize('init_kwargs, expected_requires_annotation', [
-        ({'annotater': lambda: F('dummy')}, True),
+    @pytest.mark.parametrize('initial_values, expected_requires_annotation', [
+        ({'get_annotation': lambda: F('dummy')}, True),
         ({}, True),
         ({'filter_requires_annotation': False}, False),
         ({'filter_requires_annotation': True}, True),
-        ({'filter': lambda: Q()}, True),
-        ({'filter': lambda: Q(), 'filter_requires_annotation': False}, False),
-        ({'filter': lambda: Q(), 'filter_requires_annotation': True}, True),
+        ({'get_filter': lambda: Q()}, True),
+        ({'get_filter': lambda: Q(), 'filter_requires_annotation': False}, False),
+        ({'get_filter': lambda: Q(), 'filter_requires_annotation': True}, True),
     ])
-    def test_annotater(self, init_kwargs, expected_requires_annotation):
-        original = queryable_property(**init_kwargs)
+    def test_annotater(self, initial_values, expected_requires_annotation):
+        original = queryable_property()
+        original.__dict__.update(initial_values)
 
         def func():
             pass
@@ -325,18 +345,19 @@ class TestDecorators(object):
         prop = self.decorate_function(func, original.annotater)
         assert isinstance(prop, AnnotationMixin)
         self.assert_cloned_property(original, prop, {
-            'annotater': func,
+            'get_annotation': func,
             'filter_requires_annotation': expected_requires_annotation,
-            'filter': init_kwargs.get(
-                'filter', six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter), prop)),
+            'get_filter': initial_values.get(
+                'get_filter', six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter), prop)),
         })
 
-    @pytest.mark.parametrize('old_value', [None, lambda: {}])
-    def test_updater(self, old_value):
-        original = queryable_property(updater=old_value)
+    @pytest.mark.parametrize('old_updater', [None, lambda: {}])
+    def test_updater(self, old_updater):
+        original = queryable_property()
+        original.get_update_kwargs = old_updater
 
         def func():
             pass
 
         clone = self.decorate_function(classmethod(func), original.updater)
-        self.assert_cloned_property(original, clone, {'updater': func})
+        self.assert_cloned_property(original, clone, {'get_update_kwargs': func})

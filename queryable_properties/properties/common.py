@@ -6,7 +6,7 @@ from django.db.models import BooleanField, Q
 
 from ..compat import LOOKUP_SEP
 from .base import QueryableProperty
-from .mixins import AnnotationMixin, LookupFilterMixin, lookup_filter
+from .mixins import AnnotationMixin, boolean_filter, LookupFilterMixin
 
 
 class BooleanProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
@@ -26,12 +26,9 @@ class BooleanProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
         """
         raise NotImplementedError()
 
-    @lookup_filter('exact')
-    def get_exact_filter(self, cls, lookup, value):
-        condition = self._get_condition()
-        if not value:
-            condition.negate()
-        return condition
+    @boolean_filter
+    def get_exact_filter(self, cls):
+        return self._get_condition()
 
     def get_annotation(self, cls):
         from django.db.models import Case, When
