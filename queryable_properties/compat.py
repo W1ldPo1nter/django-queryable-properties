@@ -2,9 +2,13 @@
 """A stable import interface for Django classes that were moved in between versions and compatibility constants."""
 
 try:  # pragma: no cover
-    from contextlib import ExitStack as dummy_context  # noqa: F401
+    from contextlib import nullcontext  # noqa: F401
 except ImportError:  # pragma: no cover
-    from contextlib import nested as dummy_context  # noqa: F401
+    from contextlib import contextmanager
+
+    @contextmanager
+    def nullcontext(enter_result=None):
+        yield enter_result
 
 import six
 from django.db.models.query import QuerySet

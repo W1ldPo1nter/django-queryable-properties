@@ -9,7 +9,7 @@ from django.utils.tree import Node
 
 from .compat import (
     ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, contains_aggregate,
-    convert_build_filter_to_add_q_kwargs, dummy_context, get_related_model, LOOKUP_SEP, NEED_HAVING_METHOD_NAME,
+    convert_build_filter_to_add_q_kwargs, get_related_model, LOOKUP_SEP, NEED_HAVING_METHOD_NAME, nullcontext,
     QUERY_CHAIN_METHOD_NAME
 )
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
@@ -317,7 +317,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # the property signals the need of its own annotation to function.
         # If so, add the annotation first to avoid endless recursion, since
         # resolved filter will likely contain the same property name again.
-        context = dummy_context()
+        context = nullcontext()
         if property_ref.property.filter_requires_annotation:
             full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
             context = self._add_queryable_property_annotation(property_ref, full_group_by)
