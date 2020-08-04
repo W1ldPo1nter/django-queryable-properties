@@ -4,6 +4,7 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 3.1
 - Refactored decorator-based properties to be more maintainable and memory-efficient and documented a way to use them
   without actually decorating
 
