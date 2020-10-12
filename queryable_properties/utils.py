@@ -3,9 +3,14 @@
 from copy import deepcopy
 from functools import wraps
 
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from django.utils.tree import Node
 
+from .compat import LOOKUP_SEP
 from .exceptions import QueryablePropertyDoesNotExist
+
+MISSING_OBJECT = object()  #: Arbitrary object to represent that an object in an attribute chain is missing.
 
 
 def get_queryable_property(model, name):
@@ -220,3 +225,76 @@ def parametrizable_decorator(method):
             return decorator(function)
         return decorator  # No function -> return the actual decorator (@my_decorator(some_param=5) usage).
     return wrapper
+
+
+class ModelAttributeGetter(object):
+    """
+    An attribute getter akin to :func:`operator.attrgetter` specifically
+    designed for model objects. Like Python's attrgetter, it allows to access
+    attributes on related objects using dot-notation, but it catches some
+    expected exceptions related to models when following attribute chains.
+    It also allows to build filters for querysets based on the configured
+    attribute path.
+    """
+
+    ATTRIBUTE_SEPARATOR = '.'
+
+    def __init__(self, attribute_path):
+        """
+        Initialize a new model attribute getter using the specified attribute
+        path.
+
+        :param str attribute_path: The path to the attribute to retrieve in
+                                   dot-notation (see the docs for
+                                   :func:`operator.attrgetter` for examples).
+                                   For queryset-related operations, all dots
+                                   will simply be replaced with the lookup
+                                   separator (``__``).
+        """
+        self.path_parts = attribute_path.split(self.ATTRIBUTE_SEPARATOR)
+
+    def get_value(self, obj):
+        """
+        Get the value of the attribute configured in this attribute getter from
+        the given model object.
+
+        While resolving the attribute on the model object, a few exceptions are
+        automatically caught (leading to the ``MISSING_OBJECT`` constant being
+        returned):
+         * ``AttributeError``, but only if an object in the attribute chain is
+           None. This allows to use this getter in conjunction with nullable
+           model fields.
+         * ``ObjectDoesNotExist``, which is raised by Django e.g. if an object
+           does not exist for reverse one-to-one relations. This allows to use
+           this getter in conjunction with such relations as well.
+
+        :param django.db.models.Model obj: The model object to retrieve the
+                                           value for.
+        :return: The value retrieved from the model object.
+        """
+        for attribute_name in self.path_parts:
+            try:
+                obj = getattr(obj, attribute_name)
+            except AttributeError:
+                # Allow objects in between to be None without raising an error,
+                # e.g. for nullable fields.
+                if obj is None:
+                    return MISSING_OBJECT
+                raise
+            except ObjectDoesNotExist:
+                # Allow missing DB objects without raising an error, e.g. for
+                # reverse one-to-one relations.
+                return MISSING_OBJECT
+        return obj
+
+    def build_filter(self, lookup, value):
+        """
+        Build a filter condition based on the configured attribute and the
+        given lookup and value.
+
+        :param str lookup: The lookup to use for the filter condition.
+        :param value: The value to filter against.
+        :return: The filter condition as a Q object.
+        :rtype: django.db.models.Q
+        """
+        return Q(**{LOOKUP_SEP.join(self.path_parts + [lookup]): value})
