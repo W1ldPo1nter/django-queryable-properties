@@ -5,6 +5,7 @@ import operator
 from django.db.models import BooleanField, Q
 
 from ..compat import LOOKUP_SEP
+from ..utils import ModelAttributeGetter
 from .base import QueryableProperty
 from .mixins import AnnotationMixin, boolean_filter, LookupFilterMixin
 
@@ -42,29 +43,37 @@ class BooleanProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
 
 class ValueCheckProperty(BooleanProperty):
     """
-    A property that checks if a model field contains a certain value or one of
-    multiple specified values and returns a corresponding boolean value.
+    A property that checks if an attribute of a model instance or a related
+    object contains a certain value or one of multiple specified values and
+    returns a corresponding boolean value.
 
     Supports queryset filtering and CASE/WHEN-based annotating.
     """
 
-    def __init__(self, field_name, *values):
+    def __init__(self, attribute_path, *values):
         """
         Initialize a new property that checks for certain field values.
 
-        :param str field_name: The name of the field whose value is checked by
-                               this property.
+        :param str attribute_path: The name of the attribute to compare
+                                   against. May also be a more complex path to
+                                   a related attribute using dot-notation (like
+                                   with :func:`operator.attrgetter`). If an
+                                   intermediate value on the path is None, it
+                                   will be treated as "no match" instead of
+                                   raising an exception. The behavior is the
+                                   same if an intermediate value raises an
+                                   ObjectDoesNotExist error.
         :param values: The value(s) to check for.
         """
-        self.field_name = field_name
+        self.attribute_getter = ModelAttributeGetter(attribute_path)
         self.values = values
         super(ValueCheckProperty, self).__init__()
 
     def get_value(self, obj):
-        return getattr(obj, self.field_name) in self.values
+        return self.attribute_getter.get_value(obj) in self.values
 
     def _get_condition(self):
-        return Q(**{LOOKUP_SEP.join((self.field_name, 'in')): self.values})
+        return self.attribute_getter.build_filter('in', self.values)
 
 
 class RangeCheckProperty(BooleanProperty):
