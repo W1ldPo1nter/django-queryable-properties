@@ -271,6 +271,8 @@ class VersionWithClassBasedProperties(Version):
     is_beta = ValueCheckProperty('release_type', Version.BETA)
     is_stable = ValueCheckProperty('release_type', Version.STABLE)
     is_unstable = ValueCheckProperty('release_type', Version.ALPHA, Version.BETA)
+    shares_common_data = ValueCheckProperty('application.common_data', 0)
+    released_in_2018 = ValueCheckProperty('supported_from.year', 2018)
     is_supported = RangeCheckProperty('supported_from', 'supported_until', date(2019, 1, 1))
 
     class Meta:
