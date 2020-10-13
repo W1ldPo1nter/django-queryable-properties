@@ -275,16 +275,16 @@ class ModelAttributeGetter(object):
         for attribute_name in self.path_parts:
             try:
                 obj = getattr(obj, attribute_name)
+            except ObjectDoesNotExist:
+                # Allow missing DB objects without raising an error, e.g. for
+                # reverse one-to-one relations.
+                return MISSING_OBJECT
             except AttributeError:
                 # Allow objects in between to be None without raising an error,
                 # e.g. for nullable fields.
                 if obj is None:
                     return MISSING_OBJECT
                 raise
-            except ObjectDoesNotExist:
-                # Allow missing DB objects without raising an error, e.g. for
-                # reverse one-to-one relations.
-                return MISSING_OBJECT
         return obj
 
     def build_filter(self, lookup, value):
