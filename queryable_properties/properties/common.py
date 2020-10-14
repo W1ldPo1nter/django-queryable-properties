@@ -2,10 +2,9 @@
 
 import operator
 
-from django.db.models import BooleanField, Q
+from django.db.models import BooleanField
 
-from ..compat import LOOKUP_SEP
-from ..utils import ModelAttributeGetter
+from ..utils import MISSING_OBJECT, ModelAttributeGetter
 from .base import QueryableProperty
 from .mixins import AnnotationMixin, boolean_filter, LookupFilterMixin
 
@@ -84,15 +83,26 @@ class RangeCheckProperty(BooleanProperty):
     Supports queryset filtering and CASE/WHEN-based annotating.
     """
 
-    def __init__(self, min_field_name, max_field_name, value, include_boundaries=True, in_range=True):
+    def __init__(self, min_attribute_path, max_attribute_path, value, include_boundaries=True, in_range=True,
+                 include_missing=False):
         """
         Initialize a new property that checks if a value is contained in a
         range expressed by two field values.
 
-        :param str min_field_name: The name of the field to get the lower
-                                   boundary from.
-        :param str max_field_name: The name of the field to get the upper
-                                   boundary from.
+        :param str min_attribute_path: The name of the attribute to get the
+                                       lower boundary from. May also be a more
+                                       complex path to a related attribute
+                                       using dot-notation (like with
+                                       :func:`operator.attrgetter`). If an
+                                       intermediate value on the path is None,
+                                       it will be treated as a missing value
+                                       instead of raising an exception. The
+                                       behavior is the same if an intermediate
+                                       value raises an ObjectDoesNotExist
+                                       error.
+        :param str max_attribute_path: The name of the attribute to get the
+                                       upper boundary from. The same behavior
+                                       as for the lower boundary applies.
         :param value: The value which is tested against the boundary. May be a
                       callable which can be called without any arguments, whose
                       return value will then be used as the test value.
@@ -102,12 +112,20 @@ class RangeCheckProperty(BooleanProperty):
         :param bool in_range: Configures whether the property should return
                               `True` if the value is in range (`in_range=True`)
                               or if it is out of the range (`in_range=False`).
+                              This also affects the impact of the
+                              `include_boundaries` and `include_missing`
+                              parameters.
+        :param bool include_missing: Whether or not a missing value is
+                                     considered a part of the range (see the
+                                     description of `min_attribute_path`).
+                                     Useful e.g. for nullable fields.
         """
-        self.min_field_name = min_field_name
-        self.max_field_name = max_field_name
+        self.min_attribute_getter = ModelAttributeGetter(min_attribute_path)
+        self.max_attribute_getter = ModelAttributeGetter(max_attribute_path)
         self.value = value
         self.include_boundaries = include_boundaries
         self.in_range = in_range
+        self.include_missing = include_missing
         super(RangeCheckProperty, self).__init__()
 
     @property
@@ -119,18 +137,21 @@ class RangeCheckProperty(BooleanProperty):
 
     def get_value(self, obj):
         value = self.final_value
+        min_value = self.min_attribute_getter.get_value(obj)
+        max_value = self.max_attribute_getter.get_value(obj)
         lower_operator = operator.le if self.include_boundaries else operator.lt
         greater_operator = operator.ge if self.include_boundaries else operator.gt
-        contained = (greater_operator(value, getattr(obj, self.min_field_name)) and
-                     lower_operator(value, getattr(obj, self.max_field_name)))
+        contained = self.include_missing if min_value in (None, MISSING_OBJECT) else greater_operator(value, min_value)
+        contained &= self.include_missing if max_value in (None, MISSING_OBJECT) else lower_operator(value, max_value)
         return not (contained ^ self.in_range)
 
     def _get_condition(self):
         value = self.final_value
-        condition = Q(**{
-            LOOKUP_SEP.join((self.max_field_name, 'gte' if self.include_boundaries else 'gt')): value,
-            LOOKUP_SEP.join((self.min_field_name, 'lte' if self.include_boundaries else 'lt')): value,
-        })
+        lower_condition = self.min_attribute_getter.build_filter('lte' if self.include_boundaries else 'lt', value)
+        upper_condition = self.max_attribute_getter.build_filter('gte' if self.include_boundaries else 'gt', value)
+        if self.include_missing:
+            lower_condition |= self.min_attribute_getter.build_filter('isnull', True)
+            upper_condition |= self.max_attribute_getter.build_filter('isnull', True)
         if not self.in_range:
-            condition.negate()
-        return condition
+            return ~lower_condition | ~upper_condition
+        return lower_condition & upper_condition
