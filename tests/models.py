@@ -250,8 +250,8 @@ class Version(models.Model):
     patch = models.IntegerField()
     changes = models.TextField(null=True, blank=True)
     release_type = models.CharField(max_length=1, choices=RELEASE_TYPE_CHOICES, default=STABLE)
-    supported_from = models.DateField()
-    supported_until = models.DateField()
+    supported_from = models.DateField(null=True)
+    supported_until = models.DateField(null=True)
 
     class Meta:
         abstract = True
@@ -273,7 +273,8 @@ class VersionWithClassBasedProperties(Version):
     is_unstable = ValueCheckProperty('release_type', Version.ALPHA, Version.BETA)
     shares_common_data = ValueCheckProperty('application.common_data', 0)
     released_in_2018 = ValueCheckProperty('supported_from.year', 2018)
-    is_supported = RangeCheckProperty('supported_from', 'supported_until', date(2019, 1, 1))
+    is_supported = RangeCheckProperty('supported_from', 'supported_until', date(2019, 1, 1), include_missing=True)
+    supported_in_2018 = RangeCheckProperty('supported_from.year', 'supported_until.year', 2018, include_missing=True)
 
     class Meta:
         verbose_name = 'Version'
