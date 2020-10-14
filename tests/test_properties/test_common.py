@@ -126,7 +126,7 @@ class TestRangeCheckProperty(object):
         monkeypatch.setattr(prop, 'include_missing', include_missing)
         monkeypatch.setattr(prop, 'in_range', in_range)
         results = VersionWithClassBasedProperties.objects.filter(condition)
-        assert set(results.select_properties('version').values_list('version', flat=True)) == expected_versions
+        assert set(version.version for version in results) == expected_versions
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('order_by, expected_version_order', [
