@@ -96,32 +96,27 @@ class TestRangeCheckProperty(object):
         monkeypatch.setattr(prop, 'in_range', in_range)
         assert getattr(version, prop_name) is expected_result
 
-    @pytest.mark.parametrize(
-        'prop_name, value, include_boundaries, include_missing, in_range, condition, expected_versions',
-        [
-            ('is_supported', date(2019, 1, 1), True, True, True, Q(is_supported=True), {'2.0.0'}),
-            ('is_supported', date(2019, 1, 1), True, True, True, Q(is_supported=True, major=1), set()),
-            ('is_supported', date(2019, 1, 1), False, True, True, Q(is_supported=True), {'2.0.0'}),
-            ('is_supported', date(2019, 1, 1), True, True, True, Q(is_supported=False), {'1.2.3', '1.3.0', '1.3.1'}),
-            ('is_supported', date(2019, 1, 1), True, True, False, Q(is_supported=True), {'1.2.3', '1.3.0', '1.3.1'}),
-            ('is_supported', date(2019, 1, 1), True, True, False, Q(is_supported=False), {'2.0.0'}),
-            ('is_supported', date(2019, 1, 1), True, False, True, Q(is_supported=True), set()),
-            ('is_supported', date(2019, 1, 1), True, False, False, Q(is_supported=True),
-             {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
-            ('is_supported', date(2016, 12, 31), True, True, True, Q(is_supported=True), {'1.2.3'}),
-            ('is_supported', date(2016, 12, 31), True, True, False, Q(is_supported=True), {'1.3.0', '1.3.1', '2.0.0'}),
-            ('is_supported', date(2016, 12, 31), False, True, True, Q(is_supported=True), set()),
-            ('is_supported', date(2016, 12, 31), False, True, False, Q(is_supported=True),
-             {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
-            ('is_supported', date(2018, 11, 1), True, True, True, Q(is_supported=True), {'1.3.1', '2.0.0'}),
-            ('is_supported', date(2018, 11, 1), True, True, False, Q(is_supported=True), {'1.2.3', '1.3.0'}),
-            ('is_supported', date(2018, 11, 1), False, True, True, Q(is_supported=True), {'1.3.1'}),
-            ('is_supported', date(2018, 11, 1), False, True, False, Q(is_supported=True), {'1.2.3', '1.3.0', '2.0.0'}),
-        ]
-    )
-    def test_filter(self, monkeypatch, prop_name, value, include_boundaries, include_missing, in_range, condition,
+    @pytest.mark.parametrize('value, include_boundaries, include_missing, in_range, condition, expected_versions', [
+        (date(2019, 1, 1), True, True, True, Q(is_supported=True), {'2.0.0'}),
+        (date(2019, 1, 1), True, True, True, Q(is_supported=True, major=1), set()),
+        (date(2019, 1, 1), False, True, True, Q(is_supported=True), {'2.0.0'}),
+        (date(2019, 1, 1), True, True, True, Q(is_supported=False), {'1.2.3', '1.3.0', '1.3.1'}),
+        (date(2019, 1, 1), True, True, False, Q(is_supported=True), {'1.2.3', '1.3.0', '1.3.1'}),
+        (date(2019, 1, 1), True, True, False, Q(is_supported=False), {'2.0.0'}),
+        (date(2019, 1, 1), True, False, True, Q(is_supported=True), set()),
+        (date(2019, 1, 1), True, False, False, Q(is_supported=True), {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
+        (date(2016, 12, 31), True, True, True, Q(is_supported=True), {'1.2.3'}),
+        (date(2016, 12, 31), True, True, False, Q(is_supported=True), {'1.3.0', '1.3.1', '2.0.0'}),
+        (date(2016, 12, 31), False, True, True, Q(is_supported=True), set()),
+        (date(2016, 12, 31), False, True, False, Q(is_supported=True), {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
+        (date(2018, 11, 1), True, True, True, Q(is_supported=True), {'1.3.1', '2.0.0'}),
+        (date(2018, 11, 1), True, True, False, Q(is_supported=True), {'1.2.3', '1.3.0'}),
+        (date(2018, 11, 1), False, True, True, Q(is_supported=True), {'1.3.1'}),
+        (date(2018, 11, 1), False, True, False, Q(is_supported=True), {'1.2.3', '1.3.0', '2.0.0'}),
+    ])
+    def test_filter(self, monkeypatch, value, include_boundaries, include_missing, in_range, condition,
                     expected_versions):
-        prop = getattr(VersionWithClassBasedProperties, prop_name)
+        prop = VersionWithClassBasedProperties.is_supported
         monkeypatch.setattr(prop, 'value', value)
         monkeypatch.setattr(prop, 'include_boundaries', include_boundaries)
         monkeypatch.setattr(prop, 'include_missing', include_missing)
