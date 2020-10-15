@@ -167,6 +167,7 @@ class TestRangeCheckProperty(object):
             '2.0.0', '2.0.0', '1.2.3', '1.2.3', '1.3.0', '1.3.0', '1.3.1', '1.3.1'
         ]
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Transforms and lookup couldn't be combined before Django 1.9")
     def test_annotation_based_on_transform(self):
         results = VersionWithClassBasedProperties.objects.order_by('-supported_in_2018', 'version')
         assert list(results.select_properties('version').values_list('version', flat=True)) == [
