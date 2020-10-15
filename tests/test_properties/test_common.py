@@ -101,12 +101,13 @@ class TestRangeCheckProperty(object):
         [
             ('is_supported', date(2019, 1, 1), True, True, True, Q(is_supported=True), {'2.0.0'}),
             ('is_supported', date(2019, 1, 1), True, True, True, Q(is_supported=True, major=1), set()),
+            ('is_supported', date(2019, 1, 1), False, True, True, Q(is_supported=True), {'2.0.0'}),
             ('is_supported', date(2019, 1, 1), True, True, True, Q(is_supported=False), {'1.2.3', '1.3.0', '1.3.1'}),
+            ('is_supported', date(2019, 1, 1), True, True, False, Q(is_supported=True), {'1.2.3', '1.3.0', '1.3.1'}),
+            ('is_supported', date(2019, 1, 1), True, True, False, Q(is_supported=False), {'2.0.0'}),
             ('is_supported', date(2019, 1, 1), True, False, True, Q(is_supported=True), set()),
-            ('supported_in_2018', 2018, False, True, True, Q(supported_in_2018=True), set()),
-            ('supported_in_2018', 2018, True, True, False, Q(supported_in_2018=True), {'1.2.3', '1.3.0'}),
-            ('supported_in_2018', 2018, True, True, False, Q(supported_in_2018=False), {'1.3.1', '2.0.0'}),
-            ('supported_in_2018', 2018, True, False, False, Q(supported_in_2018=True), {'1.2.3', '1.3.0', '2.0.0'}),
+            ('is_supported', date(2019, 1, 1), True, False, False, Q(is_supported=True),
+             {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
             ('is_supported', date(2016, 12, 31), True, True, True, Q(is_supported=True), {'1.2.3'}),
             ('is_supported', date(2016, 12, 31), True, True, False, Q(is_supported=True), {'1.3.0', '1.3.1', '2.0.0'}),
             ('is_supported', date(2016, 12, 31), False, True, True, Q(is_supported=True), set()),
@@ -122,6 +123,26 @@ class TestRangeCheckProperty(object):
                     expected_versions):
         prop = getattr(VersionWithClassBasedProperties, prop_name)
         monkeypatch.setattr(prop, 'value', value)
+        monkeypatch.setattr(prop, 'include_boundaries', include_boundaries)
+        monkeypatch.setattr(prop, 'include_missing', include_missing)
+        monkeypatch.setattr(prop, 'in_range', in_range)
+        results = VersionWithClassBasedProperties.objects.filter(condition)
+        assert set(version.version for version in results) == expected_versions
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Transforms and lookup couldn't be combined before Django 1.9")
+    @pytest.mark.parametrize('include_boundaries, include_missing, in_range, condition, expected_versions', [
+        (True, True, True, Q(supported_in_2018=True), {'1.3.1', '2.0.0'}),
+        (True, True, True, Q(supported_in_2018=True, major=1), {'1.3.1'}),
+        (True, True, True, Q(supported_in_2018=False), {'1.2.3', '1.3.0'}),
+        (True, False, True, Q(supported_in_2018=True), {'1.3.1'}),
+        (False, True, True, Q(supported_in_2018=True), set()),
+        (True, True, False, Q(supported_in_2018=True), {'1.2.3', '1.3.0'}),
+        (True, True, False, Q(supported_in_2018=False), {'1.3.1', '2.0.0'}),
+        (True, False, False, Q(supported_in_2018=True), {'1.2.3', '1.3.0', '2.0.0'}),
+    ])
+    def test_filter_based_on_transform(self, monkeypatch, include_boundaries, include_missing, in_range, condition,
+                                       expected_versions):
+        prop = VersionWithClassBasedProperties.supported_in_2018
         monkeypatch.setattr(prop, 'include_boundaries', include_boundaries)
         monkeypatch.setattr(prop, 'include_missing', include_missing)
         monkeypatch.setattr(prop, 'in_range', in_range)
