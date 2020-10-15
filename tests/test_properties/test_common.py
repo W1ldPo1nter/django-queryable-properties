@@ -60,13 +60,19 @@ class TestValueCheckProperty(object):
     @pytest.mark.parametrize('ordering, expected_version_order', [
         (('-is_stable', '-version'), ['1.3.1', '1.3.0', '2.0.0', '1.2.3']),
         (('-is_unstable', '-is_alpha', 'version'), ['2.0.0', '1.2.3', '1.3.0', '1.3.1']),
-        (('released_in_2018', '-version'), ['1.3.0', '1.2.3', '2.0.0', '1.3.1']),
     ])
     def test_annotation(self, ordering, expected_version_order):
         results = VersionWithClassBasedProperties.objects.order_by(*ordering)
         # There are 2 objects for each version number.
         expected_version_order = list(chain(*zip(expected_version_order, expected_version_order)))
         assert [result.version for result in results] == expected_version_order
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Transforms and lookup couldn't be combined before Django 1.9")
+    def test_annotation_based_on_transform(self):
+        results = VersionWithClassBasedProperties.objects.order_by('released_in_2018', '-version')
+        assert [result.version for result in results] == [
+            '1.3.0', '1.3.0', '1.2.3', '1.2.3', '2.0.0', '2.0.0', '1.3.1', '1.3.1'
+        ]
 
 
 class TestRangeCheckProperty(object):
@@ -155,10 +161,14 @@ class TestRangeCheckProperty(object):
         assert set(version.version for version in results) == expected_versions
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-    @pytest.mark.parametrize('order_by, expected_version_order', [
-        (('-is_supported', 'version'), ['2.0.0', '2.0.0', '1.2.3', '1.2.3', '1.3.0', '1.3.0', '1.3.1', '1.3.1']),
-        (('-supported_in_2018', 'version'), ['1.3.1', '1.3.1', '2.0.0', '2.0.0', '1.2.3', '1.2.3', '1.3.0', '1.3.0']),
-    ])
-    def test_annotation(self, order_by, expected_version_order):
-        results = VersionWithClassBasedProperties.objects.order_by(*order_by)
-        assert list(results.select_properties('version').values_list('version', flat=True)) == expected_version_order
+    def test_annotation(self):
+        results = VersionWithClassBasedProperties.objects.order_by('-is_supported', 'version')
+        assert list(results.select_properties('version').values_list('version', flat=True)) == [
+            '2.0.0', '2.0.0', '1.2.3', '1.2.3', '1.3.0', '1.3.0', '1.3.1', '1.3.1'
+        ]
+
+    def test_annotation_based_on_transform(self):
+        results = VersionWithClassBasedProperties.objects.order_by('-supported_in_2018', 'version')
+        assert list(results.select_properties('version').values_list('version', flat=True)) == [
+            '1.3.1', '1.3.1', '2.0.0', '2.0.0', '1.2.3', '1.2.3', '1.3.0', '1.3.0'
+        ]
