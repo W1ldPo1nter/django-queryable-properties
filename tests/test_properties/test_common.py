@@ -39,9 +39,19 @@ class TestValueCheckProperty(object):
         (Q(is_stable=False), {'1.2.3', '2.0.0'}),
         (Q(is_alpha=False), {'1.2.3', '1.3.0', '1.3.1'}),
         (Q(shares_common_data=False), set()),
-        (Q(released_in_2018=True, is_alpha=True), {'2.0.0'})
     ])
     def test_filter(self, condition, expected_versions):
+        results = VersionWithClassBasedProperties.objects.filter(condition)
+        assert len(results) == len(expected_versions) * 2
+        assert set(result.version for result in results) == expected_versions
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Transforms and lookup couldn't be combined before Django 1.9")
+    @pytest.mark.parametrize('condition, expected_versions', [
+        (Q(released_in_2018=True), {'1.3.1', '2.0.0'}),
+        (Q(released_in_2018=True, is_alpha=True), {'2.0.0'}),
+        (Q(released_in_2018=False), {'1.2.3', '1.3.0'}),
+    ])
+    def test_filter_based_on_transform(self, condition, expected_versions):
         results = VersionWithClassBasedProperties.objects.filter(condition)
         assert len(results) == len(expected_versions) * 2
         assert set(result.version for result in results) == expected_versions
