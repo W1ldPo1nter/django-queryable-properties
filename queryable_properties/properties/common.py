@@ -155,3 +155,30 @@ class RangeCheckProperty(BooleanProperty):
         if not self.in_range:
             return ~lower_condition | ~upper_condition
         return lower_condition & upper_condition
+
+
+class AggregateProperty(AnnotationMixin, QueryableProperty):
+
+    def __init__(self, aggregate, cached=False):
+        """
+        Initialize a new property that gets its value by retrieving an
+        aggregated value from the database.
+
+        :param django.db.models.Aggregate aggregate: The aggregate to use to
+                                                     determine the value of
+                                                     this property.
+        :param bool cached: Whether or not this property should use a cached
+                            getter. If the property is not cached, the getter
+                            will perform the corresponding aggregate query on
+                            every access.
+        """
+        super(AggregateProperty, self).__init__()
+        self.aggregate = aggregate
+        self.cached = cached
+
+    def get_value(self, obj):
+        manager = obj.__class__._base_manager
+        return manager.filter(pk=obj.pk).aggregate(**{self.name: self.aggregate})[self.name]
+
+    def get_annotation(self, cls):
+        return self.aggregate
