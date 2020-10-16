@@ -261,12 +261,13 @@ class ModelAttributeGetter(object):
         While resolving the attribute on the model object, a few exceptions are
         automatically caught (leading to the ``MISSING_OBJECT`` constant being
         returned):
-         * ``AttributeError``, but only if an object in the attribute chain is
-           None. This allows to use this getter in conjunction with nullable
-           model fields.
-         * ``ObjectDoesNotExist``, which is raised by Django e.g. if an object
-           does not exist for reverse one-to-one relations. This allows to use
-           this getter in conjunction with such relations as well.
+
+        * ``AttributeError``, but only if an object in the attribute chain is
+          None. This allows to use this getter in conjunction with nullable
+          model fields.
+        * ``ObjectDoesNotExist``, which is raised by Django e.g. if an object
+          does not exist for reverse one-to-one relations. This allows to use
+          this getter in conjunction with such relations as well.
 
         :param django.db.models.Model obj: The model object to retrieve the
                                            value for.
