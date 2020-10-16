@@ -8,7 +8,7 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Q
 
-from ..models import VersionWithClassBasedProperties
+from ..models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -172,4 +172,18 @@ class TestRangeCheckProperty(object):
         results = VersionWithClassBasedProperties.objects.order_by('-supported_in_2018', 'version')
         assert list(results.select_properties('version').values_list('version', flat=True)) == [
             '1.3.1', '1.3.1', '2.0.0', '2.0.0', '1.2.3', '1.2.3', '1.3.0', '1.3.0'
+        ]
+
+
+class TestAggregateProperty(object):
+
+    def test_getter(self, applications, versions):
+        assert applications[0].major_sum == 5
+        versions[0].delete()
+        assert applications[0].major_sum == 4
+
+    def test_annotation(self, applications, versions):
+        versions[0].delete()
+        assert list(ApplicationWithClassBasedProperties.objects.order_by('-major_sum')) == [
+            applications[1], applications[0]
         ]

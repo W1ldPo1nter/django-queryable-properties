@@ -5,8 +5,10 @@ from datetime import date
 from django.db import models
 
 from queryable_properties.managers import QueryablePropertiesManager
-from queryable_properties.properties import (AnnotationMixin, LookupFilterMixin, QueryableProperty, queryable_property,
-                                             RangeCheckProperty, SetterMixin, UpdateMixin, ValueCheckProperty)
+from queryable_properties.properties import (
+    AggregateProperty, AnnotationMixin, LookupFilterMixin, QueryableProperty, queryable_property, RangeCheckProperty,
+    SetterMixin, UpdateMixin, ValueCheckProperty
+)
 
 
 class DummyProperty(SetterMixin, QueryableProperty):
@@ -44,15 +46,6 @@ class VersionCountProperty(AnnotationMixin, QueryableProperty):
 
     def get_annotation(self, cls):
         return models.Count('versions')
-
-
-class MajorSumProperty(AnnotationMixin, QueryableProperty):
-
-    def get_value(self, obj):
-        return obj.versions.aggregate(major_sum=models.Sum('major'))['major_sum'] or 0
-
-    def get_annotation(self, cls):
-        return models.Sum('versions__major')
 
 
 class LoweredVersionChangesProperty(AnnotationMixin, QueryableProperty):
@@ -176,7 +169,7 @@ class ApplicationWithClassBasedProperties(Application):
 
     highest_version = HighestVersionProperty()
     version_count = VersionCountProperty()
-    major_sum = MajorSumProperty()
+    major_sum = AggregateProperty(models.Sum('versions__major'))
     lowered_version_changes = LoweredVersionChangesProperty()
     dummy = DummyProperty()
 
@@ -217,7 +210,7 @@ class ApplicationWithDecoratorBasedProperties(Application):
 
     @queryable_property
     def major_sum(self):
-        return self.versions.aggregate(major_sum=models.Sum('major'))['major_sum'] or 0
+        return self.versions.aggregate(major_sum=models.Sum('major'))['major_sum']
 
     @major_sum.annotater
     @classmethod
