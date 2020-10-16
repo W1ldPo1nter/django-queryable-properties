@@ -108,7 +108,7 @@ For a quick overview, the `ValueCheckProperty` offers the following queryable pr
 | Annotation | Yes (Django 1.8 or higher) |
 | Updating   | No                         |
 
-### Attribute Paths
+### Attribute paths
 
 The attribute path specified as the first parameter can not only be a simple field name like in the example above,
 but also a more complex path to an attribute using dot-notation - basically the same way as for Python's
@@ -213,7 +213,7 @@ For a quick overview, the `RangeCheckProperty` offers the following queryable pr
 | Annotation | Yes (Django 1.8 or higher) |
 | Updating   | No                         |
 
-### Range Configuration
+### Range configuration
 
 `RangeCheckProperty` objects also allow further configuration to tweak the configured range via some optional
 parameters:
@@ -234,7 +234,6 @@ range.
 For a quick reference, all possible configuration combinations are listed in the following table:
 
 ```eval_rst
-
 .. list-table::
    :header-rows: 1
 
@@ -287,4 +286,32 @@ For a quick reference, all possible configuration combinations are listed in the
    The attribute paths passed to ``RangeCheckProperty`` may also refer to other queryable properties as long as these
    properties allow filtering with the ``lt``/``lte`` and ``gt``/``gte`` lookups (depending on the value of
    ``include_boundaries``) and potentially the ``isnull`` lookup (depending on the value of ``include_missing``).
+```
+
+## Simple aggregates
+
+*django-queryable-properties* also comes with a property class for simple aggregates that simply takes an aggregate
+object and uses it for both queryset annotations as well as the getter.
+This allows to define such properties in only one line of code.
+For example, the `Application` model could receive a simple property that returns the number of versions like this:
+```python
+from django.db.models import Count, Model
+from queryable_properties.properties import AggregateProperty
+
+
+class Application(Model):
+    ...  # other fields/properties
+
+    version_count = AggregateProperty(Count('versions'))
+```
+
+Since the getter also performs a query to retrieve the aggregated value, the `AggregateProperty` initializer also
+allows to mark the property as cached using an additional `cached` parameter (defaults to `False`).
+This can improve performance since the query will only be executed on the first getter access at the cost of
+potentially not working with an up-to-date value.
+
+```eval_rst
+.. note::
+   Since this property deals with aggregates, the notes :ref:`regarding-aggregate-annotations-across-relations` apply
+   when using such properties across relations in querysets.
 ```

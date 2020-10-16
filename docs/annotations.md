@@ -68,6 +68,8 @@ call, like simple `F` objects, aggregates, `Case` expressions, `Subquery` expres
 .. note::
    The returned annotation object may reference the names of other annotatable queryable properties on the same model,
    which will be resolved accordingly.
+
+.. _the-annotationmixin-and-custom-filter-implementations:
 ```
 
 ### The `AnnotationMixin` and custom filter implementations
@@ -88,8 +90,8 @@ Unlike the `SetterMixin` and the `UpdateMixin`, the `AnnotationMixin` does a bit
 ```eval_rst
 .. caution::
    Since the ``AnnotationMixin`` simply implements the ``get_filter`` method as mentioned above, care must be taken
-   when using other mixins (most notably the ``LookupFilterMixin`` - see :doc:`filters <filters>`) that override this
-   method as well (the implementations override each other).
+   when using other mixins (most notably the ``LookupFilterMixin`` - see :ref:`lookup-based-filter-functions-methods`)
+   that override this method as well (the implementations override each other).
    
    This is also relevant for the decorator-based approach as these mixins are automatically added to such properties
    when they use annotations or lookup-based filters.
@@ -255,6 +257,10 @@ Application.objects.filter(versions__major=2, versions__version_str='2.0')
 
 [1]: https://docs.djangoproject.com/en/stable/topics/db/aggregation/#order-of-annotate-and-filter-clauses
 
+```eval_rst
+.. _selecting-annotations:
+```
+
 ## Selecting annotations
 
 Whenever the actual values for queryable properties are to be retrieved while performing a query, they must be
@@ -321,6 +327,10 @@ This solves the problems mentioned above:
   potential weird and ugly annotation names.
 * You will have to make sure that the related values in conjunction with the relation type make sense and yield the
   results you expect.
+
+```eval_rst
+.. _regarding-aggregate-annotations-across-relations:
+```
 
 ## Regarding aggregate annotations across relations
 
