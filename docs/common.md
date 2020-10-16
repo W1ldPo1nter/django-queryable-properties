@@ -6,8 +6,8 @@ them usable in querysets at the same time.
 
 ## Checking a field for one or multiple specific values
 
-Properties on model objects are often used to check if a field on a model instance contains a specific value (or one 
-of multiple values).
+Properties on model objects are often used to check if an attribute on a model instance contains a specific value (or
+one of multiple values).
 This is often done for fields with choices as it allows to implement the check for a certain choice value in one place
 instead of redefining it whenever the field should be checked for the value.
 However, the pattern is not limited to fields with choices.
@@ -84,7 +84,7 @@ class ApplicationVersion(models.Model):
     is_unstable = ValueCheckProperty('release_type', ALPHA, BETA)
 ```
 
-Instances of this property class take the name of the field to check as their first parameters in addition to any
+Instances of this property class take the path of the attribute to check as their first parameter in addition to any
 number of parameters that represent the values to check for - if one of them matches when the property is accessed on
 a model instance, the property will return `True` (otherwise `False`).
 
@@ -113,11 +113,38 @@ For a quick overview, the `ValueCheckProperty` offers the following queryable pr
 +----------------+----------------------------+
 | Updating       | No                         |
 +----------------+----------------------------+
-
-.. note::
-   The field name passed to ``ValueCheckProperty`` may also refer to another queryable property as long as that
-   property allows filtering with the ``in`` lookup.
 ```
+
+### Attribute Paths
+
+The attribute path specified as the first parameter can not only be a simple field name like in the example above,
+but also a more complex path to an attribute using dot-notation - basically the same way as for Python's
+[`operator.attrgetter`][1].
+For queryset operations, the dots are then simply replaced by the lookup separator (`__`), so an attribute path
+`my.attr` becomes `my__attr` in queries.
+
+This is especially useful to reach fields of related model instances via foreign keys, but it also allows to be more
+creative since the path simply needs to make sense both on the object-level as well as in queries.
+For example, a `DateField` may be defined as `date_field = models.DateField()`, which would allow a
+`ValueCheckProperty` to be set up with the path `date_field.year`.
+This works because the `date` object has an attribute `year` on the object-level and Django offers a `year` transform
+for querysets (so `date_field__year` does in fact work).
+However, this specific example requires at least Django 1.9 as older versions don't allow to combine transforms and
+lookups.
+In general, this means that the attribute path does not have to refer to an actual field, which also means that it may
+refer to another queryable property (which needs to support the `in` lookup to be able to filter correctly).
+
+Unlike Python's `attrgetter`, the property will also automatically catch some exceptions during getter access (if any
+of them occur, the property considers none of the configured values as matching):
+* `AttributeError`s if an intermediate object is `None` (e.g. if a path is `a.b` and the `a` attribute already returns
+  `None`, then the attribute error when accessing `b` will be caught).
+  This is intended to make working with nullable fields easier.
+  Any other kind of `AttributeError` will still be raised.
+* Any `ObjectDoesNotExist` errors raised by Django, which are raised e.g. when accessing a reverse One-To-One relation
+  with a missing value.
+  This is intended to make working with these kinds of relations easier.
+
+[1]: https://docs.python.org/3/library/operator.html#operator.attrgetter
 
 ## Checking if a value is contained in a range defined by two fields
 
