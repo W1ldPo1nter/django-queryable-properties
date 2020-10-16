@@ -99,21 +99,14 @@ ApplicationVersion.objects.order_by('is_unstable')
 ```
 
 For a quick overview, the `ValueCheckProperty` offers the following queryable property features:
-```eval_rst
-+----------------+----------------------------+
-| Feature        | Supported                  |
-+================+============================+
-| Getter         | Yes                        |
-+----------------+----------------------------+
-| Setter         | No                         |
-+----------------+----------------------------+
-| Filtering      | Yes                        |
-+----------------+----------------------------+
-| Annotation     | Yes (Django 1.8 or higher) |
-+----------------+----------------------------+
-| Updating       | No                         |
-+----------------+----------------------------+
-```
+
+| Feature    | Supported                  |
+|------------|----------------------------|
+| Getter     | Yes                        |
+| Setter     | No                         |
+| Filtering  | Yes                        |
+| Annotation | Yes (Django 1.8 or higher) |
+| Updating   | No                         |
 
 ### Attribute Paths
 
@@ -148,8 +141,8 @@ of them occur, the property considers none of the configured values as matching)
 
 ## Checking if a value is contained in a range defined by two fields
 
-A common pattern that uses a property is having a model with two fields that define a lower and an upper limit and a
-property that checks if a certain value is contained in that range.
+A common pattern that uses a property is having a model with two attributes that define a lower and an upper limit and
+a property that checks if a certain value is contained in that range.
 These fields may be numerical fields (`IntegerField`, `DecimalField`, etc.) or something like date fields (`DateField`,
 `DateTimeField`, etc.) - basically anything that allows "greater than" and "lower than" comparisons.
 
@@ -190,14 +183,15 @@ class ApplicationVersion(models.Model):
     is_supported = RangeCheckProperty('supported_from', 'supported_until', timezone.now)
 ```
 
-Instances of this property class take the names of the fields for the lower and upper limits as their first and second
-arguments as well as the value to check as the third argument.
-That value may either be a static value or a callable that can be called without any argument and that returns the
-value to check against (`timezone.now` in the example above), similar to the `default` option of Django's model fields.
-`RangeCheckProperty` objects also take two optional arguments: `include_boundaries` determines if a value exactly equal
-to one of the limits is considered a part of the range (default: `True`), while `in_range` determines if the property
-should return `True` if the value is contained in the configured range (this is the default) or if it should return
-`True` if the value is outside of the range.
+Instances of this property class take the paths of the attributes for the lower and upper limits as their first and
+second arguments.
+Both values may also be more complex attribute paths in dot-notation - the same behavior as for the attribute path of
+`ValueCheckProperty` objects apply (refer to chapter "Attribute Paths" above).
+If one of the limiting values is `None` or an exception is caught, the value is considered missing (see next sub-
+chapter).
+The third mandatory parameter for `RangeCheckProperty` objects is the value to check against, which may either be a
+static value or a callable that can be called without any argument and that returns the actual value (`timezone.now`
+in the example above), similar to the `default` option of Django's model fields.
 
 Not only does this property class allow to achieve the same functionality with less code, but it offers even more
 functionality due to being a *queryable* property.
@@ -210,23 +204,87 @@ ApplicationVersion.objects.order_by('is_supported')
 ```
 
 For a quick overview, the `RangeCheckProperty` offers the following queryable property features:
+
+| Feature    | Supported                  |
+|------------|----------------------------|
+| Getter     | Yes                        |
+| Setter     | No                         |
+| Filtering  | Yes                        |
+| Annotation | Yes (Django 1.8 or higher) |
+| Updating   | No                         |
+
+### Range Configuration
+
+`RangeCheckProperty` objects also allow further configuration to tweak the configured range via some optional
+parameters:
+* `include_boundaries` determines if a value exactly equal to one of the limits is considered a part of the range
+  (default: `True`)
+* `include_missing` determines if a missing value for either boundary is considered part of the range (default:
+  `False`)
+* `in_range` determines if the property should return `True` if the value is contained in the configured range (this is
+  the default) or if it should return `True` if the value is outside of the range
+
+It should be noted that the `include_boundaries` and `include_missing` parameters are applied first to define the range
+(which values are considered inside the range between the two values) and the `in_range` parameter is applied
+*afterwards* to potentially invert the result (in the case of `in_range=False`).
+This means that setting `include_missing=True` defines that missing values are part of the range and a value of
+`in_range=False` would then invert this range, meaning that missing values would **not** lead to a value of `True`
+since they are configured to be in the range while the property is set up to return `True` for values outside of the
+range.
+For a quick reference, all possible configuration combinations are listed in the following table:
+
 ```eval_rst
-+----------------+----------------------------+
-| Feature        | Supported                  |
-+================+============================+
-| Getter         | Yes                        |
-+----------------+----------------------------+
-| Setter         | No                         |
-+----------------+----------------------------+
-| Filtering      | Yes                        |
-+----------------+----------------------------+
-| Annotation     | Yes (Django 1.8 or higher) |
-+----------------+----------------------------+
-| Updating       | No                         |
-+----------------+----------------------------+
+
+.. list-table::
+   :header-rows: 1
+
+   * - ``include_boundaries``
+     - ``include_missing``
+     - ``in_range``
+     - returns ``True`` for
+   * - ``True``
+     - ``False``
+     - ``True``
+     - * Values in between boundaries (excl.)
+       * The exact boundary values
+   * - ``True``
+     - ``True``
+     - ``True``
+     - * Values in between boundaries (excl.)
+       * The exact boundary values
+       * Missing values
+   * - ``False``
+     - ``False``
+     - ``True``
+     - * Values in between boundaries (excl.)
+   * - ``False``
+     - ``True``
+     - ``True``
+     - * Values in between boundaries (excl.)
+       * Missing values
+   * - ``True``
+     - ``False``
+     - ``False``
+     - * Values outside of the boundaries (excl.)
+       * Missing values
+   * - ``True``
+     - ``True``
+     - ``False``
+     - * Values outside of the boundaries (excl.)
+   * - ``False``
+     - ``False``
+     - ``False``
+     - * Values outside of the boundaries (excl.)
+       * The exact boundary values
+       * Missing values
+   * - ``False``
+     - ``True``
+     - ``False``
+     - * Values outside of the boundaries (excl.)
+       * The exact boundary values
 
 .. note::
-   The field names passed to ``RangeCheckProperty`` may also refer to other queryable properties as long as these
+   The attribute paths passed to ``RangeCheckProperty`` may also refer to other queryable properties as long as these
    properties allow filtering with the ``lt``/``lte`` and ``gt``/``gte`` lookups (depending on the value of
-   ``include_boundaries``).
+   ``include_boundaries``) and potentially the ``isnull`` lookup (depending on the value of ``include_missing``).
 ```
