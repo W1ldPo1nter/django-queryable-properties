@@ -100,13 +100,21 @@ ApplicationVersion.objects.order_by('is_unstable')
 
 For a quick overview, the `ValueCheckProperty` offers the following queryable property features:
 
-| Feature    | Supported                  |
-|------------|----------------------------|
-| Getter     | Yes                        |
-| Setter     | No                         |
-| Filtering  | Yes                        |
-| Annotation | Yes (Django 1.8 or higher) |
-| Updating   | No                         |
+```eval_rst
++----------------+----------------------------+
+| Feature        | Supported                  |
++================+============================+
+| Getter         | Yes                        |
++----------------+----------------------------+
+| Setter         | No                         |
++----------------+----------------------------+
+| Filtering      | Yes                        |
++----------------+----------------------------+
+| Annotation     | Yes (Django 1.8 or higher) |
++----------------+----------------------------+
+| Updating       | No                         |
++----------------+----------------------------+
+```
 
 ### Attribute paths
 
@@ -205,13 +213,21 @@ ApplicationVersion.objects.order_by('is_supported')
 
 For a quick overview, the `RangeCheckProperty` offers the following queryable property features:
 
-| Feature    | Supported                  |
-|------------|----------------------------|
-| Getter     | Yes                        |
-| Setter     | No                         |
-| Filtering  | Yes                        |
-| Annotation | Yes (Django 1.8 or higher) |
-| Updating   | No                         |
+```eval_rst
++----------------+----------------------------+
+| Feature        | Supported                  |
++================+============================+
+| Getter         | Yes                        |
++----------------+----------------------------+
+| Setter         | No                         |
++----------------+----------------------------+
+| Filtering      | Yes                        |
++----------------+----------------------------+
+| Annotation     | Yes (Django 1.8 or higher) |
++----------------+----------------------------+
+| Updating       | No                         |
++----------------+----------------------------+
+```
 
 ### Range configuration
 
@@ -314,4 +330,22 @@ potentially not working with an up-to-date value.
 .. note::
    Since this property deals with aggregates, the notes :ref:`regarding-aggregate-annotations-across-relations` apply
    when using such properties across relations in querysets.
+```
+
+For a quick overview, the `AggregateProperty` offers the following queryable property features:
+
+```eval_rst
++----------------+-----------+
+| Feature        | Supported |
++================+===========+
+| Getter         | Yes       |
++----------------+-----------+
+| Setter         | No        |
++----------------+-----------+
+| Filtering      | Yes       |
++----------------+-----------+
+| Annotation     | Yes       |
++----------------+-----------+
+| Updating       | No        |
++----------------+-----------+
 ```
