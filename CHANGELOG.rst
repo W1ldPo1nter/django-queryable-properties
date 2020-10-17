@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.4.0 (2020-10-17)
+------------------
+
 - ``ValueCheckProperty`` and ``RangeCheckProperty`` objects can now take more complex attribute paths instead of simple
   field/attribute names
 - ``RangeCheckProperty`` objects now have an option that determines how to treat missing values to support ranges with
