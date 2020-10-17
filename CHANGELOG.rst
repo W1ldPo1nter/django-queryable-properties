@@ -4,6 +4,13 @@ Changelog
 master (unreleased)
 -------------------
 
+- ``ValueCheckProperty`` and ``RangeCheckProperty`` objects can now take more complex attribute paths instead of simple
+  field/attribute names
+- ``RangeCheckProperty`` objects now have an option that determines how to treat missing values to support ranges with
+  optional boundaries
+- Added a new ready-to-use queryable property implementation for properties based on simple aggregates
+  (``AggregateProperty``)
+
 1.3.1 (2020-08-04)
 ------------------
 
