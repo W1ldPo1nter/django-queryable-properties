@@ -14,8 +14,9 @@ try:
 except ImportError:
     Concat = Mock()
 
+from dummy_lib import ReleaseTypeModel
 from .models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
-                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties, Version)
+                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties)
 
 
 @pytest.fixture
@@ -50,13 +51,13 @@ def versions(applications):
     objs = []
     for application in applications:
         objs.extend([
-            application.versions.create(major=1, minor=2, patch=3, release_type=Version.BETA,
+            application.versions.create(major=1, minor=2, patch=3, release_type=ReleaseTypeModel.BETA,
                                         supported_until=date(2016, 12, 31)),
             application.versions.create(major=1, minor=3, patch=0,
                                         supported_from=date(2017, 1, 1), supported_until=date(2017, 12, 31)),
             application.versions.create(major=1, minor=3, patch=1,
                                         supported_from=date(2018, 1, 1), supported_until=date(2018, 12, 31)),
             application.versions.create(major=2, minor=0, patch=0, changes='Amazing new features',
-                                        release_type=Version.ALPHA, supported_from=date(2018, 11, 1)),
+                                        release_type=ReleaseTypeModel.ALPHA, supported_from=date(2018, 11, 1)),
         ])
     return objs

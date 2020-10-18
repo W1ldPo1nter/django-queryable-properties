@@ -4,6 +4,7 @@ from datetime import date
 
 from django.db import models
 
+from dummy_lib import ReleaseTypeModel
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
     AggregateProperty, AnnotationMixin, LookupFilterMixin, QueryableProperty, queryable_property, RangeCheckProperty,
@@ -228,21 +229,11 @@ class ApplicationWithDecoratorBasedProperties(Application):
         return Lower('versions__changes_or_default')
 
 
-class Version(models.Model):
-    ALPHA = 'a'
-    BETA = 'b'
-    STABLE = 's'
-    RELEASE_TYPE_CHOICES = (
-        (ALPHA, 'Alpha'),
-        (BETA, 'Beta'),
-        (STABLE, 'Stable'),
-    )
-
+class Version(ReleaseTypeModel):
     major = models.IntegerField()
     minor = models.IntegerField()
     patch = models.IntegerField()
     changes = models.TextField(null=True, blank=True)
-    release_type = models.CharField(max_length=1, choices=RELEASE_TYPE_CHOICES, default=STABLE)
     supported_from = models.DateField(null=True)
     supported_until = models.DateField(null=True)
 
@@ -260,10 +251,6 @@ class VersionWithClassBasedProperties(Version):
     version = FullVersionProperty()
     changes_or_default = DefaultChangesProperty()
     is_version_2 = Version2Property()
-    is_alpha = ValueCheckProperty('release_type', Version.ALPHA)
-    is_beta = ValueCheckProperty('release_type', Version.BETA)
-    is_stable = ValueCheckProperty('release_type', Version.STABLE)
-    is_unstable = ValueCheckProperty('release_type', Version.ALPHA, Version.BETA)
     shares_common_data = ValueCheckProperty('application.common_data', 0)
     released_in_2018 = ValueCheckProperty('supported_from.year', 2018)
     is_supported = RangeCheckProperty('supported_from', 'supported_until', date(2019, 1, 1), include_missing=True)
