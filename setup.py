@@ -3,11 +3,12 @@
 
 from __future__ import unicode_literals
 
-from distutils.cmd import Command
 import io
 import os
-from setuptools import find_packages, setup
 import subprocess
+from distutils.cmd import Command
+
+from setuptools import find_packages, setup
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
