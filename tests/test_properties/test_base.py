@@ -114,11 +114,13 @@ class TestBasics(object):
         deserialized_prop = six.moves.cPickle.loads(serialized_prop)
         assert deserialized_prop is model.version
 
-    def test_representations(self):
-        string_representation = six.text_type(ApplicationWithClassBasedProperties.dummy)
-        object_representation = repr(ApplicationWithClassBasedProperties.dummy)
-        assert string_representation == 'tests.ApplicationWithClassBasedProperties.dummy'
-        assert object_representation == '<DummyProperty: {}>'.format(string_representation)
+    @pytest.mark.parametrize('prop, expected_str, expected_class_name', [
+        (ApplicationWithClassBasedProperties.dummy, 'tests.ApplicationWithClassBasedProperties.dummy', 'DummyProperty'),
+        (VersionWithClassBasedProperties.is_beta, 'ReleaseTypeModel.is_beta', 'ValueCheckProperty'),
+    ])
+    def test_representations(self, prop, expected_str, expected_class_name):
+        assert six.text_type(prop) == expected_str
+        assert repr(prop) == '<{}: {}>'.format(expected_class_name, expected_str)
 
     def test_invalid_property_name(self):
         with pytest.raises(QueryablePropertyError, match='must not contain the lookup separator'):
