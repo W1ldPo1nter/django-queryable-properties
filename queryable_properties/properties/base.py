@@ -71,7 +71,7 @@ class QueryableProperty(object):
         return get_queryable_property, (self.model, self.name)
 
     def __str__(self):
-        return '.'.join(filter(None, (self.model._meta.app_label, self.model._meta.object_name, self.name)))
+        return '.'.join((self.model.__module__, self.model.__name__, self.name))
 
     def __repr__(self):
         return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))

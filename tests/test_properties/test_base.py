@@ -115,8 +115,9 @@ class TestBasics(object):
         assert deserialized_prop is model.version
 
     @pytest.mark.parametrize('prop, expected_str, expected_class_name', [
-        (ApplicationWithClassBasedProperties.dummy, 'tests.ApplicationWithClassBasedProperties.dummy', 'DummyProperty'),
-        (VersionWithClassBasedProperties.is_beta, 'ReleaseTypeModel.is_beta', 'ValueCheckProperty'),
+        (ApplicationWithClassBasedProperties.dummy, 'tests.models.ApplicationWithClassBasedProperties.dummy',
+         'DummyProperty'),
+        (VersionWithClassBasedProperties.is_beta, 'dummy_lib.ReleaseTypeModel.is_beta', 'ValueCheckProperty'),
     ])
     def test_representations(self, prop, expected_str, expected_class_name):
         assert six.text_type(prop) == expected_str
