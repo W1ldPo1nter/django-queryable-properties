@@ -117,7 +117,8 @@ class TestBasics(object):
     @pytest.mark.parametrize('prop, expected_str, expected_class_name', [
         (ApplicationWithClassBasedProperties.dummy,
          'tests.app_management.models.ApplicationWithClassBasedProperties.dummy', 'DummyProperty'),
-        (VersionWithClassBasedProperties.is_beta, 'dummy_lib.ReleaseTypeModel.is_beta', 'ValueCheckProperty'),
+        (VersionWithClassBasedProperties.is_beta,
+         'tests.dummy_lib.models.ReleaseTypeModel.is_beta', 'ValueCheckProperty'),
     ])
     def test_representations(self, prop, expected_str, expected_class_name):
         assert six.text_type(prop) == expected_str

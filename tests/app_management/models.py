@@ -4,12 +4,12 @@ from datetime import date
 
 from django.db import models
 
-from dummy_lib import ReleaseTypeModel
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
     AggregateProperty, AnnotationMixin, LookupFilterMixin, QueryableProperty, queryable_property, RangeCheckProperty,
     SetterMixin, UpdateMixin, ValueCheckProperty
 )
+from ..dummy_lib.models import ReleaseTypeModel
 
 
 class DummyProperty(SetterMixin, QueryableProperty):

@@ -14,9 +14,9 @@ try:
 except ImportError:
     Concat = Mock()
 
-from dummy_lib import ReleaseTypeModel
 from .app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties)
+from .dummy_lib.models import ReleaseTypeModel
 
 
 @pytest.fixture
