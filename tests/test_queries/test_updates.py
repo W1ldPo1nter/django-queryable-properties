@@ -5,7 +5,7 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db import models
 
-from ..models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
+from ..app_management.models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 

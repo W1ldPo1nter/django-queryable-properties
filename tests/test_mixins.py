@@ -5,7 +5,7 @@ import pytest
 
 from six.moves import cPickle
 
-from .models import ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties
+from .app_management.models import ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties
 
 
 @pytest.mark.django_db

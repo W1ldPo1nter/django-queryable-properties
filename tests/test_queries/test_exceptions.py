@@ -7,9 +7,9 @@ from django.db import models
 
 from queryable_properties.exceptions import FieldError, QueryablePropertyError
 
-from ..models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
-                      CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
-                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
+                                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
+                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 pytestmark = pytest.mark.django_db
 

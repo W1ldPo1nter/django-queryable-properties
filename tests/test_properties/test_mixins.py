@@ -8,7 +8,7 @@ from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationMixin, boolean_filter, LookupFilterMixin, lookup_filter,
                                              QueryableProperty)
 
-from ..models import ApplicationWithClassBasedProperties
+from ..app_management.models import ApplicationWithClassBasedProperties
 
 
 class BaseLookupFilterProperty(LookupFilterMixin, QueryableProperty):

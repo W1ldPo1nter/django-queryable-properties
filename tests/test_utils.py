@@ -9,7 +9,7 @@ from queryable_properties.properties import QueryableProperty
 from queryable_properties.utils import (get_queryable_property, InjectableMixin, MISSING_OBJECT, ModelAttributeGetter,
                                         parametrizable_decorator, TreeNodeProcessor)
 
-from .models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
+from .app_management.models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 
 
 class DummyClass(object):

@@ -24,7 +24,7 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     'django.contrib.admindocs',
     'queryable_properties',
-    'tests',
+    'tests.app_management',
 )
 
 SITE_ID = 1

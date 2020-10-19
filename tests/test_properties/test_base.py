@@ -10,8 +10,8 @@ from queryable_properties.properties import (AnnotationMixin, CACHE_RETURN_VALUE
                                              LookupFilterMixin, QueryableProperty, queryable_property)
 from queryable_properties.utils import reset_queryable_property
 
-from ..models import (ApplicationWithClassBasedProperties, Category, DummyProperty, VersionWithClassBasedProperties,
-                      VersionWithDecoratorBasedProperties)
+from ..app_management.models import (ApplicationWithClassBasedProperties, Category, DummyProperty,
+                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 
 def function_with_docstring():
@@ -115,8 +115,8 @@ class TestBasics(object):
         assert deserialized_prop is model.version
 
     @pytest.mark.parametrize('prop, expected_str, expected_class_name', [
-        (ApplicationWithClassBasedProperties.dummy, 'tests.models.ApplicationWithClassBasedProperties.dummy',
-         'DummyProperty'),
+        (ApplicationWithClassBasedProperties.dummy,
+         'tests.app_management.models.ApplicationWithClassBasedProperties.dummy', 'DummyProperty'),
         (VersionWithClassBasedProperties.is_beta, 'dummy_lib.ReleaseTypeModel.is_beta', 'ValueCheckProperty'),
     ])
     def test_representations(self, prop, expected_str, expected_class_name):
@@ -125,7 +125,8 @@ class TestBasics(object):
 
     def test_invalid_property_name(self):
         with pytest.raises(QueryablePropertyError, match='must not contain the lookup separator'):
-            type('BrokenModel', (Model,), {'dummy__dummy': DummyProperty(), '__module__': 'tests.models'})
+            type('BrokenModel', (Model,),
+                 {'dummy__dummy': DummyProperty(), '__module__': 'tests.app_management.models'})
 
 
 class TestDecorators(object):
