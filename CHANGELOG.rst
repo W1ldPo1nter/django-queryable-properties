@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.4.1 (2020-10-21)
+------------------
+
 - String representations of queryable properties do now contain the full Python path instead of the Django model path
   (also fixes an error that occurred when building the string representation for a property on an abstract model that
   was defined outside of the installed apps)
