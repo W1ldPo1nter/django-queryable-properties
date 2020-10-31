@@ -14,7 +14,7 @@ matrix:
     - python: 3.8
       env: TOXENV=flake8
 install: pip install tox-travis codecov
-script: tox
+script: tox -- -p no:warnings
 after_success: codecov
 deploy:
   provider: pypi
