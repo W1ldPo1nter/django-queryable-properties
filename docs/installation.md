@@ -18,17 +18,17 @@ supported Python versions:
 +----------------+---------------------------+
 | Django version | Supported Python versions |
 +================+===========================+
-| 3.1            | 3.8, 3.7, 3.6             |
+| 3.1            | 3.9, 3.8, 3.7, 3.6        |
 +----------------+---------------------------+
-| 3.0            | 3.8, 3.7, 3.6             |
+| 3.0            | 3.9, 3.8, 3.7, 3.6        |
 +----------------+---------------------------+
-| 2.2            | 3.7, 3.6, 3.5             |
+| 2.2            | 3.9, 3.8, 3.7, 3.6, 3.5   |
 +----------------+---------------------------+
 | 2.1            | 3.7, 3.6, 3.5             |
 +----------------+---------------------------+
 | 2.0            | 3.7, 3.6, 3.5, 3.4        |
 +----------------+---------------------------+
-| 1.11           | 3.6, 3.5, 3.4, 2.7        |
+| 1.11           | 3.7, 3.6, 3.5, 3.4, 2.7   |
 +----------------+---------------------------+
 | 1.10           | 3.5, 3.4, 2.7             |
 +----------------+---------------------------+
@@ -45,5 +45,8 @@ supported Python versions:
 | 1.4            | 2.7                       |
 +----------------+---------------------------+
 ```
+
+Support for certain Python versions was added to some Django versions retrospecively in a patch version.
+The tests run against the most recent patch version for each Django release. 
 
 Upcoming versions may also work, but are not officially supported as long as they are not added to the test setup.
