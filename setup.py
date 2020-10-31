@@ -113,11 +113,9 @@ setup(
         'coverage',
         'flake8',
         'mock',
-        'pydocstyle',
         'pytest',
         'pytest-cov',
         'pytest-django',
-        'pytest-pep8',
         'pytest-pythonpath',
     ],
     cmdclass={
