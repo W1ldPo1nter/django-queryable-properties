@@ -17,22 +17,6 @@ import sys
 
 import django
 
-from recommonmark.transform import AutoStructify
-from recommonmark.parser import CommonMarkParser
-from recommonmark.states import DummyStateMachine
-
-original_run_role = DummyStateMachine.run_role
-
-
-def run_role(self, name, options=None, content=None):
-    if name == 'doc':
-        name = 'any'
-    return original_run_role(self, name, options, content)
-
-
-# Monkey patch to fix recommonmark 0.4 doc reference issues.
-DummyStateMachine.run_role = run_role
-
 
 # If extensions (or modules to document with autodoc) are in another
 # directory, add these directories to sys.path here. If the directory is
@@ -69,12 +53,10 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx', 'sphinx.ext.viewco
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-source_parsers = {
-    '.md': CommonMarkParser,
-}
+#source_parsers = {}
 
 # The suffix of source filenames.
-source_suffix = ['.rst', '.md']
+source_suffix = ['.rst']
 
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'
@@ -299,7 +281,7 @@ texinfo_documents = [
 
 def autodoc_skip_member(app, what, name, obj, skip, options):
     if getattr(obj, '__module__', None) == 'queryable_properties.properties.common':
-        if name == 'get_value':
+        if name in ('get_value', 'set_value', 'get_filter', 'get_annotation', 'get_update_kwargs'):
             return True
         if name == '__init__':
             return False
@@ -307,6 +289,4 @@ def autodoc_skip_member(app, what, name, obj, skip, options):
 
 
 def setup(app):
-    app.add_config_value('recommonmark_config', {'enable_eval_rst': True}, True)
-    app.add_transform(AutoStructify)
     app.connect('autodoc-skip-member', autodoc_skip_member)
