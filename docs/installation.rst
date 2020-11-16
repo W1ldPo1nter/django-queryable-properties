@@ -1,20 +1,19 @@
-# Installation
+Installation
+============
 
-*django-queryable-properties* is available for installation via `pip` on PyPI:
+*django-queryable-properties* is available for installation via ``pip`` on PyPI::
 
-```
-pip install django-queryable-properties
-```
+    pip install django-queryable-properties
 
 To use the features of this package, simply use the classes and functions as described in this documentation.
-There is no need to add the package to the `INSTALLED_APPS` setting.
+There is no need to add the package to the ``INSTALLED_APPS`` setting.
 
-## Dependencies
+Dependencies
+------------
 
 *django-queryable-properties* supports and is tested against the following Django versions and their corresponding
 supported Python versions:
 
-```eval_rst
 +----------------+---------------------------+
 | Django version | Supported Python versions |
 +================+===========================+
@@ -44,7 +43,6 @@ supported Python versions:
 +----------------+---------------------------+
 | 1.4            | 2.7                       |
 +----------------+---------------------------+
-```
 
 Support for certain Python versions was added to some Django versions retrospecively in a patch version.
 The tests run against the most recent patch version for each Django release. 
