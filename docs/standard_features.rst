@@ -79,7 +79,7 @@ possible to set this attribute on individual instances of the queryable property
 .. note::
    All queryable properties that implement annotation will act like cached properties on the result objects of a
    queryset after they have been explicitly selected.
-   Read more about this in selecting-annotations_.
+   Read more about this in :ref:`annotations:Selecting annotations`.
 
 Resetting a cached property
 """""""""""""""""""""""""""
@@ -165,7 +165,7 @@ cached values and setters.
    The setter cache behavior is not only relevant for queryable properties that have been marked as cached.
    Explicitly selected queryable property annotations also behave like cached properties, which means they also make
    use of this option if their setter is used after they were selected.
-   Read more about this in selecting-annotations_.
+   Read more about this in :ref:`annotations:Selecting annotations`.
 
 There are 4 options that can be used via constants (which in reality are functions, much like Django's built-in values
 for the ``on_delete`` option of ``ForeignKey`` fields), which can be imported from ``queryable_properties.properties``:

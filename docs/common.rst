@@ -203,7 +203,7 @@ Instead of defining the properties like this, the property class ``RangeCheckPro
 Instances of this property class take the paths of the attributes for the lower and upper limits as their first and
 second arguments.
 Both values may also be more complex attribute paths in dot-notation - the same behavior as for the attribute path of
-``ValueCheckProperty`` objects apply (refer to chapter attribute-paths_ above).
+``ValueCheckProperty`` objects apply (refer to chapter :ref:`common:Attribute paths` above).
 If one of the limiting values is ``None`` or an exception is caught, the value is considered missing (see next sub-
 chapter).
 The third mandatory parameter for ``RangeCheckProperty`` objects is the value to check against, which may either be a
@@ -340,8 +340,9 @@ This can improve performance since the query will only be executed on the first 
 potentially not working with an up-to-date value.
 
 .. note::
-   Since this property deals with aggregates, the notes regarding-aggregate-annotations-across-relations_ apply when
-   using such properties across relations in querysets.
+   Since this property deals with aggregates, the notes
+   :ref:`annotations:Regarding aggregate annotations across relations` apply when using such properties across
+   relations in querysets.
 
 For a quick overview, the ``AggregateProperty`` offers the following queryable property features:
 

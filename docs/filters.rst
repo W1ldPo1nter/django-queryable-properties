@@ -12,7 +12,7 @@ implementing it, as long as we don't try to filter a queryset by such a property
 .. note::
    Implementing how to filter by a queryable property is not necessary for properties that also implement annotating,
    because an annotated field in a queryset natively supports filtering.
-   Read more about this in the-annotationmixin-and-custom-filter-implementations_.
+   Read more about this in :ref:`annotations:The \`\`AnnotationMixin\`\` and custom filter implementations`.
 
 Implementation
 --------------
@@ -97,8 +97,6 @@ conditions to represent filtering by the queryable property using the given look
    The returned ``Q`` object may contain filters using other queryable properties on the same model, which will be
    resolved accordingly.
 
-.. _lookup-based-filter-functions-methods:
-
 Lookup-based filter functions/methods
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -180,8 +178,8 @@ supported option must be specified in the decorators (e.g. ``'year__gt'``)
 .. caution::
    Since the ``LookupFilterMixin`` simply implements the ``get_filter`` method to perform the lookup dispatching, care
    must be taken when using other mixins (most notably the ``AnnotationMixin`` - see
-   the-annotationmixin-and-custom-filter-implementations_) that override this method as well (the implementations
-   override each other).
+   :ref:`annotations:The \`\`AnnotationMixin\`\` and custom filter implementations`) that override this method as well
+   (the implementations override each other).
    
    This is also relevant for the decorator-based approach as these mixins are automatically added to such properties
    when they use annotations or lookup-based filters.

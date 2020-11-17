@@ -70,8 +70,6 @@ inheritance scenarios) and must return an annotation - anything that would norma
    The returned annotation object may reference the names of other annotatable queryable properties on the same model,
    which will be resolved accordingly.
 
-.. _the-annotationmixin-and-custom-filter-implementations:
-
 The ``AnnotationMixin`` and custom filter implementations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -91,17 +89,19 @@ for the ``get_annotation`` method:
 
 .. caution::
    Since the ``AnnotationMixin`` simply implements the ``get_filter`` method as mentioned above, care must be taken
-   when using other mixins (most notably the ``LookupFilterMixin`` - see lookup-based-filter-functions-methods_)
-   that override this method as well (the implementations override each other).
+   when using other mixins (most notably the ``LookupFilterMixin`` - see
+   :ref:`filters:Lookup-based filter functions/methods`) that override this method as well (the implementations
+   override each other).
    
    This is also relevant for the decorator-based approach as these mixins are automatically added to such properties
    when they use annotations or lookup-based filters.
    The order of the mixins for the class-based approach or the used decorators for the decorator-based approach is
    therefore important in such cases (the mixin applied last wins).
 
-If the filter implementation shown in the filtering-chapter_ (which does not require the annotation and should
-therefore be configured accordingly) was to be retained despite annotating being implemented, the implementation could
-look like this using the decorator-based approach (note the ``requires_annotation=False``):
+If the filter implementation shown in the :ref:`filters:One-for-all filter function/method` part of the filtering
+chapter (which does not require the annotation and should therefore be configured accordingly) was to be retained
+despite annotating being implemented, the implementation could look like this using the decorator-based approach (note
+the ``requires_annotation=False``):
 
 .. code-block:: python
 
@@ -261,8 +261,6 @@ To make sure that the ``major`` condition will be applied first, multiple option
     # Passing the keyword arguments in the correct order in Python versions that preserve their order (3.6 and above)
     Application.objects.filter(versions__major=2, versions__version_str='2.0')
 
-.. _selecting-annotations:
-
 Selecting annotations
 ---------------------
 
@@ -291,7 +289,7 @@ performance gain could be achieved by the queryset operation.
 By instead behaving like cached queryable properties, one can make use of the queried values, which will be cached for
 any number of consecutive accesses of the property on model objects returned by the queryset.
 If it is desired to not access the cached values anymore, the cached value can always be cleared as described in
-resetting-a-cached-property_.
+:ref:`standard_features:Resetting a cached property`.
 
 Queryable properties on related models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -333,8 +331,6 @@ This solves the problems mentioned above:
   potential weird and ugly annotation names.
 - You will have to make sure that the related values in conjunction with the relation type make sense and yield the
   results you expect.
-
-.. _regarding-aggregate-annotations-across-relations:
 
 Regarding aggregate annotations across relations
 ------------------------------------------------
