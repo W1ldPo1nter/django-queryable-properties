@@ -2,14 +2,14 @@
 
 from .base import QueryableProperty, queryable_property
 from .cache_behavior import CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING
-from .common import AggregateProperty, RangeCheckProperty, ValueCheckProperty
+from .common import AggregateProperty, AnnotationProperty, RangeCheckProperty, ValueCheckProperty
 from .mixins import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin, lookup_filter,
                      SetterMixin, UpdateMixin)
 
 __all__ = (
     'QueryableProperty', 'queryable_property',
     'CACHE_RETURN_VALUE', 'CACHE_VALUE', 'CLEAR_CACHE', 'DO_NOTHING',
-    'AggregateProperty', 'RangeCheckProperty', 'ValueCheckProperty',
+    'AggregateProperty', 'AnnotationProperty', 'RangeCheckProperty', 'ValueCheckProperty',
     'AnnotationGetterMixin', 'AnnotationMixin', 'boolean_filter', 'LookupFilterMixin', 'lookup_filter', 'SetterMixin',
     'UpdateMixin',
 )

@@ -6,7 +6,7 @@ from django.db.models import BooleanField
 
 from ..utils import MISSING_OBJECT, ModelAttributeGetter
 from .base import QueryableProperty
-from .mixins import AnnotationMixin, boolean_filter, LookupFilterMixin
+from .mixins import AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin
 
 
 class BooleanProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
@@ -157,9 +157,38 @@ class RangeCheckProperty(BooleanProperty):
         return lower_condition & upper_condition
 
 
-class AggregateProperty(AnnotationMixin, QueryableProperty):
+class AnnotationProperty(AnnotationGetterMixin, QueryableProperty):
+    """
+    A property that is based on a static annotation that is even used to
+    provide getter values.
+    """
 
-    def __init__(self, aggregate, cached=False):
+    def __init__(self, annotation, cached=None):
+        """
+        Initialize a new property that gets its value by retrieving an
+        annotated value from the database.
+
+        :param annotation: The static annotation to use to determine the value
+                           of this property.
+        :param bool cached: Whether or not this property should use a cached
+                            getter. If the property is not cached, the getter
+                            will perform the corresponding annotated query on
+                            every access.
+        """
+        super(AnnotationProperty, self).__init__(cached)
+        self.annotation = annotation
+
+    def get_annotation(self, cls):
+        return self.annotation
+
+
+class AggregateProperty(AnnotationProperty):
+    """
+    A property that is based on an aggregate that is used to provide both
+    queryset annotations as well as getter values.
+    """
+
+    def __init__(self, aggregate, cached=None):
         """
         Initialize a new property that gets its value by retrieving an
         aggregated value from the database.
@@ -172,13 +201,7 @@ class AggregateProperty(AnnotationMixin, QueryableProperty):
                             will perform the corresponding aggregate query on
                             every access.
         """
-        super(AggregateProperty, self).__init__()
-        self.aggregate = aggregate
-        self.cached = cached
+        super(AggregateProperty, self).__init__(aggregate, cached)
 
     def get_value(self, obj):
-        manager = obj.__class__._base_manager
-        return manager.filter(pk=obj.pk).aggregate(**{self.name: self.aggregate})[self.name]
-
-    def get_annotation(self, cls):
-        return self.aggregate
+        return self.get_queryset(obj).aggregate(**{self.name: self.annotation})[self.name]
