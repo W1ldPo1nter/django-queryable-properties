@@ -6,8 +6,10 @@ from django import VERSION as DJANGO_VERSION
 from django.db.models import F, Model, Q
 
 from queryable_properties.exceptions import QueryablePropertyError
-from queryable_properties.properties import (AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING,
-                                             LookupFilterMixin, QueryableProperty, queryable_property)
+from queryable_properties.properties import (
+    AnnotationGetterMixin, AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING, LookupFilterMixin,
+    QueryableProperty, queryable_property
+)
 from queryable_properties.utils import reset_queryable_property
 
 from ..app_management.models import (ApplicationWithClassBasedProperties, Category, DummyProperty,
@@ -171,27 +173,38 @@ class TestDecorators(object):
         (None, None),  # Test @queryable_property
         (None, {}),  # Test @queryable_property() (without any arguments)
         ('my docstring', {}),  # Test if the docstring of the getter is used correctly
-        (None, {'cached': True}),  # Keyword arguments
+        (None, {'cached': True}),
+        (None, {'annotation_based': True}),
+        ('my docstring', {'annotation_based': True, 'cached': True}),
     ])
     def test_initializer(self, docstring, kwargs):
         def func():
             pass
         func.__doc__ = docstring
         prop = self.decorate_function(func, queryable_property, kwargs)
-        assert prop.get_value is func
         assert prop.__doc__ == (docstring or None)
-        if kwargs:
-            for name, value in kwargs.items():
-                assert getattr(prop, name) == value
+        kwargs = kwargs or {}
+        assert prop.cached is (kwargs.get('cached') or False)
+        annotation_based = kwargs.get('annotation_based', False)
+        assert isinstance(prop, AnnotationGetterMixin) is annotation_based
+        if annotation_based:
+            assert prop.get_value == six.create_bound_method(six.get_unbound_function(AnnotationGetterMixin.get_value),
+                                                             prop)
+            assert prop.get_annotation is func
+        else:
+            assert prop.get_value is func
+            assert prop.get_annotation is None
 
-    @pytest.mark.parametrize('old_getter, old_docstring, new_docstring, kwargs', [
-        (None, None, None, None),
-        (lambda: 'test', 'my old func', None, None),  # Test that the decorated function overrides an existing one
-        (None, None, 'my new func', {'cached': True}),
-        (lambda: 'test', 'my old func', 'my new func', {'cached': True}),
+    @pytest.mark.parametrize('old_getter, init_kwargs, old_docstring, new_docstring, kwargs', [
+        (None, {}, None, None, None),
+        (lambda: 'test', {}, 'my old func', None, None),  # Test that the decorated function overrides an existing one
+        (None, {}, None, 'my new func', {'cached': True}),
+        (lambda: 'test', {}, 'my old func', 'my new func', {'cached': True}),
+        (None, {'annotation_based': True}, None, 'my new func', None),
+        (lambda: 'test', {'annotation_based': True}, 'my old func', 'my new func', {'cached': True}),
     ])
-    def test_getter(self, old_getter, old_docstring, new_docstring, kwargs):
-        original = queryable_property(old_getter)
+    def test_getter(self, old_getter, init_kwargs, old_docstring, new_docstring, kwargs):
+        original = queryable_property(old_getter, **init_kwargs)
         if old_docstring is not None:
             original.__doc__ = old_docstring
 
@@ -200,8 +213,13 @@ class TestDecorators(object):
         func.__doc__ = new_docstring
 
         clone = self.decorate_function(func, original.getter, kwargs)
-        self.assert_cloned_property(original, clone,
-                                    dict(kwargs or {}, get_value=func, __doc__=new_docstring or old_docstring))
+        changed_attrs = dict(kwargs or {}, get_value=func, __doc__=new_docstring or old_docstring)
+        if init_kwargs.get('annotation_based', False):
+            changed_attrs['get_filter'] = six.create_bound_method(
+                six.get_unbound_function(AnnotationMixin.get_filter), clone)
+            changed_attrs['get_annotation'] = six.create_bound_method(
+                six.get_unbound_function(AnnotationMixin.get_annotation), clone)
+        self.assert_cloned_property(original, clone, changed_attrs)
 
     @pytest.mark.parametrize('old_setter, kwargs', [
         (None, None),
