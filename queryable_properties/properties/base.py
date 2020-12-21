@@ -11,7 +11,7 @@ from ..compat import LOOKUP_SEP
 from ..exceptions import QueryablePropertyError
 from ..utils import get_queryable_property, parametrizable_decorator, reset_queryable_property
 from .cache_behavior import CLEAR_CACHE
-from .mixins import AnnotationMixin, LookupFilterMixin
+from .mixins import AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin
 
 RESET_METHOD_NAME = 'reset_property'
 
@@ -168,7 +168,7 @@ class queryable_property(QueryableProperty):
     get_value = None
     get_filter = None
 
-    def __init__(self, getter=None, cached=None):
+    def __init__(self, getter=None, cached=None, annotation_based=False):
         """
         Initialize a new queryable property, optionally using the given getter
         method and getter configuration.
@@ -176,22 +176,33 @@ class queryable_property(QueryableProperty):
         :param function getter: The method to decorate.
         :param cached: Determines if values obtained by the getter should be
                        cached (similar to ``cached_property``). A value of None
-                       means no change.
+                       means using the default value.
         :type cached: bool | None
+        :param annotation_based: If True, the :class:`AnnotationGetterMixin` is
+                                 automatically added to this property to define
+                                 a getter implementation and this property is
+                                 expected to decorate the annotater method
+                                 instead of the getter. If False, property is
+                                 expected to decorate the getter method.
+        :type annotation_based: bool
         """
         super(queryable_property, self).__init__()
         self.__doc__ = None
         if getter:
-            self(getter)
+            self(getter, force_getter=True)
         if cached is not None:
             self.cached = cached
+        if annotation_based:
+            AnnotationGetterMixin.inject_into_object(self)
 
-    def __call__(self, getter):
+    def __call__(self, method, force_getter=False):
         # Since the initializer may be used as a parametrized decorator, the
         # resulting object will be called to apply the decorator.
-        self.get_value = getter
-        if getter.__doc__:
-            self.__doc__ = getter.__doc__
+        if force_getter or not isinstance(self, AnnotationGetterMixin):
+            self.get_value = method
+        else:
+            self.get_annotation = self._extract_function(method)
+        self.__doc__ = method.__doc__ or self.__doc__
         return self
 
     def _extract_function(self, method_or_function):
@@ -240,7 +251,7 @@ class queryable_property(QueryableProperty):
         clone = self._clone()
         if cached is not None:
             clone.cached = cached
-        return clone(method)
+        return clone(method, force_getter=True)
 
     @parametrizable_decorator
     def setter(self, method, cache_behavior=None):
