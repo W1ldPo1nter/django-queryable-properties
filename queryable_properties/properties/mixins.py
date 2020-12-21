@@ -153,6 +153,45 @@ class AnnotationMixin(InjectableMixin):
         return Q(**{LOOKUP_SEP.join((self.name, lookup)): value})
 
 
+class AnnotationGetterMixin(AnnotationMixin):
+    """
+    A mixin for queryable properties that support annotation and use their
+    annotation even to provide the value for their getter (i.e. perform a query
+    to retrieve the getter value).
+    """
+
+    def __init__(self, cached=None):
+        """
+        Initialize a new queryable property based that uses the
+        :class:`AnnotationGetterMixin`.
+
+        :param cached: Determines if values obtained by the getter should be
+                       cached (similar to ``cached_property``). A value of None
+                       means using the default value.
+        """
+        super(AnnotationGetterMixin, self).__init__()
+        if cached is not None:
+            self.cached = cached
+
+    def get_value(self, obj):
+        queryset = self.get_queryset(obj).distinct().annotate(**{self.name: self.get_annotation(obj.__class__)})
+        return queryset.values_list(self.name, flat=True).get()
+
+    def get_queryset(self, obj):
+        """
+        Construct a base queryset that can be used to retrieve the getter value
+        for the given object.
+
+        :param django.db.models.Model obj: The object to build the queryset
+                                           for.
+        :return: A base queryset for the correct model that is already filtered
+                 for the given object.
+        :rtype: django.db.models.QuerySet
+        """
+        manager = obj.__class__._base_manager
+        return manager.filter(pk=obj.pk)
+
+
 class UpdateMixin(object):
     """
     A mixin for queryable properties that allows to use themselves in update
