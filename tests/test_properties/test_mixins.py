@@ -2,11 +2,11 @@
 import pytest
 
 from django import VERSION as DJANGO_VERSION
-from django.db.models import Q
+from django.db.models import Count, Q
 
 from queryable_properties.exceptions import QueryablePropertyError
-from queryable_properties.properties import (AnnotationMixin, boolean_filter, LookupFilterMixin, lookup_filter,
-                                             QueryableProperty)
+from queryable_properties.properties import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin,
+                                             lookup_filter, QueryableProperty)
 
 from ..app_management.models import ApplicationWithClassBasedProperties
 
@@ -36,6 +36,12 @@ class DerivedLookupFilterProperty(BaseLookupFilterProperty):
     def filter_in(self, cls, lookup, value):
         value = list(value) + ['test']
         return Q(dummy__in=value)
+
+
+class AnnotationGetterProperty(AnnotationGetterMixin, QueryableProperty):
+
+    def get_annotation(self, cls):
+        return Count('versions')
 
 
 class TestLookupFilterMixin(object):
@@ -116,3 +122,41 @@ class TestAnnotationMixin(object):
         assert isinstance(q, Q)
         assert len(q.children) == 1
         assert q.children[0] == ('test__{}'.format(lookup), value)
+
+
+class TestAnnotationGetterMixin(object):
+
+    @pytest.fixture
+    def prop(self):
+        prop = AnnotationGetterProperty()
+        prop.name = 'test'
+        prop.model = ApplicationWithClassBasedProperties
+        return prop
+
+    @pytest.mark.parametrize('kwargs, expected_cached', [
+        ({}, QueryableProperty.cached),
+        ({'cached': None}, QueryableProperty.cached),
+        ({'cached': False}, False),
+        ({'cached': True}, True),
+    ])
+    def test_initializer(self, kwargs, expected_cached):
+        cls = AnnotationGetterMixin.mix_with_class(QueryableProperty)
+        prop = cls(**kwargs)
+        assert prop.cached is expected_cached
+
+    @pytest.mark.django_db
+    def test_get_queryset(self, prop, applications):
+        for application in applications[:2]:
+            assert prop.get_queryset(application).get() == application
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    def test_get_value(self, prop, applications):
+        for application in applications[:2]:
+            assert prop.get_value(application) == 4
+
+    @pytest.mark.django_db
+    def test_get_value_unsaved_object(self, prop):
+        application = ApplicationWithClassBasedProperties()
+        with pytest.raises(ApplicationWithClassBasedProperties.DoesNotExist):
+            prop.get_value(application)
