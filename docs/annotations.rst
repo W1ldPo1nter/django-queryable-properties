@@ -281,7 +281,7 @@ The following example shows how to select the ``version_str`` property from the 
         print(version.version_str)  # Uses the value directly from the query and does not call the getter
 
 To be able to make use of this performance-oriented feature, **all explicitly selected queryable properties will always
-behave like cached-queryable-properties_** on the model instances returned by the queryset.
+behave like properties with a** :ref:`standard_features:Cached getter` on the model instances returned by the queryset.
 If this wasn't the case, accessing uncached queryable properties on model instances would always execute their default
 behavior: calling the getter.
 This would make the selection of the annotations useless to begin with, as the getter would called regardless and no
