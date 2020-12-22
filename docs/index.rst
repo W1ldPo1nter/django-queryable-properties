@@ -12,6 +12,7 @@ Write Django model properties that can be used in database queries.
    standard_features
    filters
    annotations
+   annotation_based
    updating
    common
    api
