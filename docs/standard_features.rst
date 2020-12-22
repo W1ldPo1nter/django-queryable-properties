@@ -91,8 +91,8 @@ cached value (since it's still a queryable property marked as cached).
 To make this as simple as possible, a method ``reset_property``, which takes the name of a defined queryable property
 as parameter, is automatically added to each model class that defines at least one queryable property.
 If a model class already defines a method with this name, it will *not* be overridden.
-Queryable properties on objects of such model classes may instead be cleared using a utility function
-``reset_queryable_property`` that comes with the ``queryable_properties.utils`` module.
+Queryable properties on objects of such model classes may instead be cleared using the utility function
+:func:`queryable_properties.utils.reset_queryable_property`.
 
 To reset the ``version_str`` property from the example above on an ``ApplicationVersion`` instance, both of the
 variants in the following code block can be used (``obj`` is an ``ApplicationVersion`` instance):
@@ -134,8 +134,8 @@ decorator-based approach:
 
 Using the class-based approach, the queryable property's method ``set_value`` must be implemented instead, taking the
 model object to set the fields on as well as the actual value for the property as parameters.
-It is recommended to use the ``SetterMixin`` for class-based queryable properties that define a setter because it
-defines the actual stub for the ``set_value`` method.
+It is recommended to use the :class:`queryable_properties.properties.SetterMixin` for class-based queryable properties
+that define a setter because it defines the actual stub for the ``set_value`` method.
 However, using this mixin is not required - a queryable property can be set as long as the ``set_value`` method is
 implemented correctly.
 

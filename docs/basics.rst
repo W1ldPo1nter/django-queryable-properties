@@ -20,7 +20,8 @@ detail.
 Decorator-based approach
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The decorator-based approach uses the class ``queryable_property`` and its methods as decorators:
+The decorator-based approach uses the class :class:`queryable_properties.properties.queryable_property` and its methods
+as decorators:
 
 .. code-block:: python
 
@@ -112,7 +113,8 @@ matching chaining and decorating in general):
 Class-based approach
 ^^^^^^^^^^^^^^^^^^^^
 
-Using the class-based approach, the queryable property is implemented as a subclass of ``QueryableProperty``:
+Using the class-based approach, the queryable property is implemented as a subclass of
+:class:`queryable_properties.properties.QueryableProperty`:
 
 .. code-block:: python
 

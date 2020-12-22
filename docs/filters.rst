@@ -105,7 +105,8 @@ become unwieldy as it will most likely require a big ``if``/``elif``/``else`` di
 To avoid this, *django-queryable-properties* also offers a built-in way to spread the filter implementation across
 multiple functions or methods while assigning one or more lookups to each of them.
 This can also be useful for implementations that only support a single lookup as it will guarantee that the filter can
-only be called with this lookup, while a ``QueryablePropertyError`` will be raised for any other lookup.
+only be called with this lookup, while a :class:`queryable_properties.exceptions.QueryablePropertyError` will be raised
+for any other lookup.
 
 Let's assume that the implementation above should also support the ``lt`` and ``lte`` lookups.
 To achieve this with lookup-based filter functions using the decorator-based approach, the ``lookups`` argument of the
@@ -143,8 +144,9 @@ To achieve this with lookup-based filter functions using the decorator-based app
    The ``classmethod`` decorator is not required, but makes the functions look more natural since they take the model
    class as their first argument.
 
-To make use of the lookup-based filters using the class-based approach, the ``LookupFilterMixin`` (which implements
-``get_filter``) must be used in conjunction with the ``lookup_filter`` decorator for the individual filter methods:
+To make use of the lookup-based filters using the class-based approach, the
+:class:`queryable_properties.properties.LookupFilterMixin` (which implements ``get_filter``) must be used in
+conjunction with the :func:`queryable_properties.properties.lookup_filter` decorator for the individual filter methods:
 
 .. code-block:: python
 
@@ -227,7 +229,7 @@ is used in the ``filter`` decorator instead of ``lookups``):
    The ``boolean`` and ``lookups`` arguments are mutually exclusive.
 
 To implement a boolean filter using the class-based approach, the ``LookupFilterMixin`` must still be used, but this
-time in conjunction with the ``boolean_filter`` decorator for the filter method:
+time in conjunction with the :func:`queryable_properties.properties.boolean_filter` decorator for the filter method:
 
 .. code-block:: python
 

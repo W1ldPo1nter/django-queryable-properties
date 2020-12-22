@@ -73,8 +73,8 @@ inheritance scenarios) and must return an annotation - anything that would norma
 The ``AnnotationMixin`` and custom filter implementations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Unlike the ``SetterMixin`` and the ``UpdateMixin``, the ``AnnotationMixin`` does a bit more than just define the stub
-for the ``get_annotation`` method:
+Unlike the ``SetterMixin`` and the ``UpdateMixin``, the :class:`queryable_properties.properties.AnnotationMixin` does a
+bit more than just define the stub for the ``get_annotation`` method:
 
 - It automatically implements filtering via the ``get_filter`` method by simply creating ``Q`` objects that reference
   the annotation.
