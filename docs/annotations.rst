@@ -258,7 +258,7 @@ To make sure that the ``major`` condition will be applied first, multiple option
     Application.objects.filter(versions__major=2).filter(versions__version_str='2.0')
     # Combining Q objects to represent the AND conjunction
     Application.objects.filter(Q(versions__major=2) & Q(versions__version_str='2.0'))
-    # Passing the keyword arguments in the correct order in Python versions that preserve their order (3.6 and above)
+    # Passing the keyword arguments in the correct order in Python versions that preserve their order (3.7 and above)
     Application.objects.filter(versions__major=2, versions__version_str='2.0')
 
 Selecting annotations
