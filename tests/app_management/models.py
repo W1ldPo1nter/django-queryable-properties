@@ -6,8 +6,8 @@ from django.db import models
 
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
-    AggregateProperty, AnnotationMixin, LookupFilterMixin, QueryableProperty, queryable_property, RangeCheckProperty,
-    SetterMixin, UpdateMixin, ValueCheckProperty
+    AggregateProperty, AnnotationGetterMixin, AnnotationMixin, AnnotationProperty, LookupFilterMixin, QueryableProperty,
+    queryable_property, RangeCheckProperty, SetterMixin, UpdateMixin, ValueCheckProperty
 )
 from ..dummy_lib.models import ReleaseTypeModel
 
@@ -40,10 +40,7 @@ class HighestVersionProperty(AnnotationMixin, QueryableProperty):
         return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
 
 
-class VersionCountProperty(AnnotationMixin, QueryableProperty):
-
-    def get_value(self, obj):
-        return obj.versions.count()
+class VersionCountProperty(AnnotationGetterMixin, QueryableProperty):
 
     def get_annotation(self, cls):
         return models.Count('versions')
@@ -133,6 +130,7 @@ class Category(models.Model):
 class CategoryWithClassBasedProperties(Category):
     objects = QueryablePropertiesManager()
 
+    version_count = AnnotationProperty(models.Count('applications__versions'))
     circular = CircularProperty()
 
     class Meta:
@@ -200,11 +198,7 @@ class ApplicationWithDecoratorBasedProperties(Application):
         queryset = queryset.filter(application=models.OuterRef('pk')).order_by('-major', '-minor', '-patch')
         return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
 
-    @queryable_property
-    def version_count(self):
-        return self.versions.count()
-
-    @version_count.annotater
+    @queryable_property(annotation_based=True)
     @classmethod
     def version_count(cls):
         return models.Count('versions')
@@ -218,9 +212,7 @@ class ApplicationWithDecoratorBasedProperties(Application):
     def major_sum(cls):
         return models.Sum('versions__major')
 
-    @queryable_property
-    def lowered_version_changes(self):
-        raise NotImplementedError()
+    lowered_version_changes = queryable_property()
 
     @lowered_version_changes.annotater
     @classmethod

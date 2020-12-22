@@ -6,9 +6,10 @@ from itertools import chain
 import pytest
 
 from django import VERSION as DJANGO_VERSION
-from django.db.models import Q
+from django.db.models import Avg, Q
 
-from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
+from queryable_properties.properties import AggregateProperty, AnnotationProperty
+from ..app_management.models import CategoryWithClassBasedProperties, VersionWithClassBasedProperties
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -175,15 +176,43 @@ class TestRangeCheckProperty(object):
         ]
 
 
+class TestAnnotationProperty(object):
+
+    @pytest.mark.parametrize('cached, expected_cached', [
+        (None, False),
+        (False, False),
+        (True, True),
+    ])
+    def test_initializer(self, cached, expected_cached):
+        annotation = Avg('test')
+        prop = AnnotationProperty(annotation, cached)
+        assert prop.annotation is annotation
+        assert prop.cached is expected_cached
+
+    def test_getter(self, categories):
+        assert categories[0].version_count == 8
+        assert categories[1].version_count == 4
+
+    def test_annotation(self, categories):
+        assert list(CategoryWithClassBasedProperties.objects.order_by('-version_count')) == [
+            categories[0], categories[1]
+        ]
+
+
 class TestAggregateProperty(object):
+
+    @pytest.mark.parametrize('cached, expected_cached', [
+        (None, False),
+        (False, False),
+        (True, True),
+    ])
+    def test_initializer(self, cached, expected_cached):
+        annotation = Avg('test')
+        prop = AggregateProperty(annotation, cached)
+        assert prop.annotation is annotation
+        assert prop.cached is expected_cached
 
     def test_getter(self, applications, versions):
         assert applications[0].major_sum == 5
         versions[0].delete()
         assert applications[0].major_sum == 4
-
-    def test_annotation(self, applications, versions):
-        versions[0].delete()
-        assert list(ApplicationWithClassBasedProperties.objects.order_by('-major_sum')) == [
-            applications[1], applications[0]
-        ]
