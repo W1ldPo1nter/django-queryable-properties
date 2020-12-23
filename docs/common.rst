@@ -5,8 +5,13 @@ Common Patterns
 They are parameterizable and are supposed to help remove boilerplate for recurring types of properties while making
 them usable in querysets at the same time.
 
-Checking a field for one or multiple specific values
-----------------------------------------------------
+Specialized properties
+----------------------
+
+The properties in this category are designed for very specific use cases and are not based on annotations.
+
+``ValueCheckProperty``: Checking a field for one or multiple specific values
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Properties on model objects are often used to check if an attribute on a model instance contains a specific value (or
 one of multiple values).
@@ -56,8 +61,8 @@ Without *django-queryable-properties*, the implementation could look similar to 
         def is_unstable(self):
             return self.release_type in (self.ALPHA, self.BETA)
 
-Instead of defining the properties like this, the property class ``ValueCheckProperty`` of the
-*django-queryable-properties* package could be used:
+Instead of defining the properties like this, the property class
+:class:`queryable_properties.properties.ValueCheckProperty` could be used:
 
 .. code-block:: python
 
@@ -105,22 +110,22 @@ the properties can be used in querysets as well:
 
 For a quick overview, the ``ValueCheckProperty`` offers the following queryable property features:
 
-+----------------+----------------------------+
-| Feature        | Supported                  |
-+================+============================+
-| Getter         | Yes                        |
-+----------------+----------------------------+
-| Setter         | No                         |
-+----------------+----------------------------+
-| Filtering      | Yes                        |
-+----------------+----------------------------+
-| Annotation     | Yes (Django 1.8 or higher) |
-+----------------+----------------------------+
-| Updating       | No                         |
-+----------------+----------------------------+
++------------+----------------------------+
+| Feature    | Supported                  |
++============+============================+
+| Getter     | Yes                        |
++------------+----------------------------+
+| Setter     | No                         |
++------------+----------------------------+
+| Filtering  | Yes                        |
++------------+----------------------------+
+| Annotation | Yes (Django 1.8 or higher) |
++------------+----------------------------+
+| Updating   | No                         |
++------------+----------------------------+
 
 Attribute paths
-^^^^^^^^^^^^^^^
+"""""""""""""""
 
 The attribute path specified as the first parameter can not only be a simple field name like in the example above,
 but also a more complex path to an attribute using dot-notation - basically the same way as for Python's
@@ -153,8 +158,8 @@ Unlike Python's |operator.attrgetter|_, the property will also automatically cat
 .. |operator.attrgetter| replace:: ``operator.attrgetter``
 .. _operator.attrgetter: https://docs.python.org/3/library/operator.html#operator.attrgetter
 
-Checking if a value is contained in a range defined by two fields
------------------------------------------------------------------
+``RangeCheckProperty``: Checking if a value is contained in a range defined by two fields
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A common pattern that uses a property is having a model with two attributes that define a lower and an upper limit and
 a property that checks if a certain value is contained in that range.
@@ -179,8 +184,8 @@ a certain app version is supported, which could look similar to this:
         def is_supported(self):
             return self.supported_from <= timezone.now() <= self.supported_until
 
-Instead of defining the properties like this, the property class ``RangeCheckProperty`` of the
-*django-queryable-properties* package could be used:
+Instead of defining the properties like this, the property class
+:class:`queryable_properties.properties.RangeCheckProperty` could be used:
 
 .. code-block:: python
 
@@ -223,22 +228,22 @@ properties can be used in querysets as well:
 
 For a quick overview, the ``RangeCheckProperty`` offers the following queryable property features:
 
-+----------------+----------------------------+
-| Feature        | Supported                  |
-+================+============================+
-| Getter         | Yes                        |
-+----------------+----------------------------+
-| Setter         | No                         |
-+----------------+----------------------------+
-| Filtering      | Yes                        |
-+----------------+----------------------------+
-| Annotation     | Yes (Django 1.8 or higher) |
-+----------------+----------------------------+
-| Updating       | No                         |
-+----------------+----------------------------+
++------------+----------------------------+
+| Feature    | Supported                  |
++============+============================+
+| Getter     | Yes                        |
++------------+----------------------------+
+| Setter     | No                         |
++------------+----------------------------+
+| Filtering  | Yes                        |
++------------+----------------------------+
+| Annotation | Yes (Django 1.8 or higher) |
++------------+----------------------------+
+| Updating   | No                         |
++------------+----------------------------+
 
 Range configuration
-^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""
 
 ``RangeCheckProperty`` objects also allow further configuration to tweak the configured range via some optional
 parameters:
@@ -315,13 +320,75 @@ For a quick reference, all possible configuration combinations are listed in the
    properties allow filtering with the ``lt``/``lte`` and ``gt``/``gte`` lookups (depending on the value of
    ``include_boundaries``) and potentially the ``isnull`` lookup (depending on the value of ``include_missing``).
 
-Simple aggregates
------------------
+Annotation-based properties
+---------------------------
+
+The properties in this category are all :ref:`annotation_based:Annotation-based properties`, which means their getter
+implementation will also perform a databse query.
+All of the listed properties therefore also take an additional ``cached`` argument in their initializer that allows
+to mark individual properties as having a :ref:`standard_features:Cached getter`.
+This can improve performance since the query will only be executed on the first getter access at the cost of
+potentially not working with an up-to-date value.
+
+``AnnotationProperty``: Static annotations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The property class :class:`queryable_properties.properties.AnnotationProperty` represents the most simple common
+annotation-based property.
+It can be instanciated using any annotation and will use that annotation both in queries as well as to provide its
+getter value.
+This, however, means that the ``AnnotationProperty`` is only intended to be used with static/fixed annotations without
+any dynamic components as its objects are set up by passing the annotation to the initializer.
+
+As an example, the ``version_str`` property from the annotation :ref:`annotations:Implementation` section could be
+reduced to (**not recommended**):
+
+.. code-block:: python
+
+    from django.db.models import Model, Value
+    from django.db.models.functions import Concat
+    from queryable_properties.properties import AnnotationProperty
+
+
+    class ApplicationVersion(Model):
+        ...  # other fields/properties
+
+        version_str = AnnotationProperty(Concat('major', Value('.'), 'minor'))
+
+.. note::
+   This example is only supposed to demonstrate how to set up an ``AnnotationProperty``.
+   Implementing a ``Concat`` annotation like this is not recommended as even the getter will perform a query, even
+   though concatenating field values on the object level could simply be done without involving the database.
+
+For a quick overview, the ``AnnotationProperty`` offers the following queryable property features:
+
++------------+-----------+
+| Feature    | Supported |
++============+===========+
+| Getter     | Yes       |
++------------+-----------+
+| Setter     | No        |
++------------+-----------+
+| Filtering  | Yes       |
++------------+-----------+
+| Annotation | Yes       |
++------------+-----------+
+| Updating   | No        |
++------------+-----------+
+
+``AggregateProperty``: Simple aggregates
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 *django-queryable-properties* also comes with a property class for simple aggregates that simply takes an aggregate
 object and uses it for both queryset annotations as well as the getter.
-This allows to define such properties in only one line of code.
-For example, the ``Application`` model could receive a simple property that returns the number of versions like this:
+This is therefore not entirely different from the ``AnnotationProperty`` class shown above.
+The main difference between the two is that while ``AnnotationProperty`` uses ``QuerySet.annotate`` to query the getter
+value, ``AggregateProperty`` uses ``QuerySet.aggregate``, which is slightly more efficient.
+Using ``AggregateProperty`` for aggregate annotations might also make code more clear/readable.
+
+As an example, the ``Application`` model could receive a simple property that returns the number of versions like the
+one in the :ref:`annotation_based:Implementation` section of annotation-based properties.
+:class:`queryable_properties.properties.AggregateProperty` allows to implement this in an even more condensed form:
 
 .. code-block:: python
 
@@ -334,11 +401,6 @@ For example, the ``Application`` model could receive a simple property that retu
 
         version_count = AggregateProperty(Count('versions'))
 
-Since the getter also performs a query to retrieve the aggregated value, the ``AggregateProperty`` initializer also
-allows to mark the property as cached using an additional ``cached`` parameter (defaults to ``False``).
-This can improve performance since the query will only be executed on the first getter access at the cost of
-potentially not working with an up-to-date value.
-
 .. note::
    Since this property deals with aggregates, the notes
    :ref:`annotations:Regarding aggregate annotations across relations` apply when using such properties across
@@ -346,16 +408,16 @@ potentially not working with an up-to-date value.
 
 For a quick overview, the ``AggregateProperty`` offers the following queryable property features:
 
-+----------------+-----------+
-| Feature        | Supported |
-+================+===========+
-| Getter         | Yes       |
-+----------------+-----------+
-| Setter         | No        |
-+----------------+-----------+
-| Filtering      | Yes       |
-+----------------+-----------+
-| Annotation     | Yes       |
-+----------------+-----------+
-| Updating       | No        |
-+----------------+-----------+
++------------+-----------+
+| Feature    | Supported |
++============+===========+
+| Getter     | Yes       |
++------------+-----------+
+| Setter     | No        |
++------------+-----------+
+| Filtering  | Yes       |
++------------+-----------+
+| Annotation | Yes       |
++------------+-----------+
+| Updating   | No        |
++------------+-----------+
