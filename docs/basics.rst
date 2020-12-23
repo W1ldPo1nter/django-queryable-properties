@@ -65,7 +65,7 @@ Queryable properties do **not** allow to do this in the same way because of two 
 - Since queryable properties have a lot more functionality and options than regular properties, they would need to
   support a huge number of constructor parameters, which would make the constructor too complex and harder to maintain.
   
-However, there are use-cases where an option similar to the non-decorator usage of regular properties would be nice to
+However, there are use cases where an option similar to the non-decorator usage of regular properties would be nice to
 have, e.g. when implementing a property without a getter or when the individual getter/setter methods are already
 present and cannot be easily deprecated in favor of the property.
 This is why queryable properties do support this form of defining a property - but in a slightly different way: the

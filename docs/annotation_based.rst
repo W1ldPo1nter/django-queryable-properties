@@ -32,7 +32,7 @@ an application, similar to the example in :ref:`annotations:Regarding aggregate 
 The decorator-based approach for an annotation-based property looks slightly different since the `queryable_property`
 decorator is normally used for the getter, but the goal of annotation-based properties is to avoid having to manually
 implement a getter.
-The ``queryable_property`` decorator therefore accepts an ``annotation_based`` argument for this use-case - if it is
+The ``queryable_property`` decorator therefore accepts an ``annotation_based`` argument for this use case - if it is
 set to ``True``, the decorator expects the annotation function (that is usually decorated with
 ``@<property_name>.annotater`` - see :ref:`annotations:Implementation`) as the decorated function instead of the getter
 function.
@@ -89,7 +89,7 @@ The getter may therefore raise ``MultipleObjectsReturned`` exceptions if somehow
 ``DoesNotExist`` exceptions if no row can be found (e.g. when accessing the property on an object that is not yet saved
 to the database).
 
-Due to the performed queries, the getters of annotation-based properties can be a prime use-case for a
+Due to the performed queries, the getters of annotation-based properties can be a prime use case for a
 :ref:`standard_features:Cached getter`.
 Because of this, the ``AnnotationGetterMixin`` also adds the ``cached`` argument to the initializer (``__init__``) of
 the classes that use it (which is only relevant for the class-based approach).
