@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added an option to implement annotation-based properties that use their annotation to query their getter from the
+  database
+
 1.4.1 (2020-10-21)
 ------------------
 
