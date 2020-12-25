@@ -195,7 +195,7 @@ class TestRelatedExistenceCheckProperty(object):
         applications[1].versions.all().delete()
         assert categories[0].has_versions is True
         assert categories[1].has_versions is False
-    
+
     def test_getter_based_on_non_relation_field(self, applications):
         assert applications[0].has_version_with_changelog is True
         assert applications[1].has_version_with_changelog is True
