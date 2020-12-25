@@ -7,7 +7,7 @@ from django.db import models
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
     AggregateProperty, AnnotationGetterMixin, AnnotationMixin, AnnotationProperty, LookupFilterMixin, QueryableProperty,
-    queryable_property, RangeCheckProperty, SetterMixin, UpdateMixin, ValueCheckProperty
+    queryable_property, RangeCheckProperty, RelatedExistenceCheckProperty, SetterMixin, UpdateMixin, ValueCheckProperty
 )
 from ..dummy_lib.models import ReleaseTypeModel
 
@@ -130,6 +130,7 @@ class Category(models.Model):
 class CategoryWithClassBasedProperties(Category):
     objects = QueryablePropertiesManager()
 
+    has_versions = RelatedExistenceCheckProperty('applications__versions')
     version_count = AnnotationProperty(models.Count('applications__versions'))
     circular = CircularProperty()
 
@@ -170,6 +171,7 @@ class ApplicationWithClassBasedProperties(Application):
     version_count = VersionCountProperty()
     major_sum = AggregateProperty(models.Sum('versions__major'))
     lowered_version_changes = LoweredVersionChangesProperty()
+    has_version_with_changelog = RelatedExistenceCheckProperty('versions__changes')
     dummy = DummyProperty()
 
     class Meta:

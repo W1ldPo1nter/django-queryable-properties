@@ -8,8 +8,9 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Avg, Q
 
-from queryable_properties.properties import AggregateProperty, AnnotationProperty
-from ..app_management.models import CategoryWithClassBasedProperties, VersionWithClassBasedProperties
+from queryable_properties.properties import AggregateProperty, AnnotationProperty, RelatedExistenceCheckProperty
+from ..app_management.models import (ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties,
+                                     VersionWithClassBasedProperties)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -174,6 +175,63 @@ class TestRangeCheckProperty(object):
         assert list(results.select_properties('version').values_list('version', flat=True)) == [
             '1.3.1', '1.3.1', '2.0.0', '2.0.0', '1.2.3', '1.2.3', '1.3.0', '1.3.0'
         ]
+
+
+class TestRelatedExistenceCheckProperty(object):
+
+    @pytest.mark.parametrize('path, cached, expected_filter, expected_cached', [
+        ('my_field', False, 'my_field__isnull', False),
+        ('my_relation__my_field', None, 'my_relation__my_field__isnull', False),
+        ('my_field', True, 'my_field__isnull', True),
+    ])
+    def test_initializer(self, path, cached, expected_filter, expected_cached):
+        prop = RelatedExistenceCheckProperty(path, cached)
+        assert prop.filters == {expected_filter: False}
+        assert prop.cached is expected_cached
+
+    def test_getter(self, categories, applications):
+        assert categories[0].has_versions is True
+        assert categories[1].has_versions is True
+        applications[1].versions.all().delete()
+        assert categories[0].has_versions is True
+        assert categories[1].has_versions is False
+    
+    def test_getter_based_on_non_relation_field(self, applications):
+        assert applications[0].has_version_with_changelog is True
+        assert applications[1].has_version_with_changelog is True
+        applications[0].versions.filter(major=2).delete()
+        assert applications[0].has_version_with_changelog is False
+        assert applications[1].has_version_with_changelog is True
+
+    def test_filter(self, categories, applications):
+        queryset = CategoryWithClassBasedProperties.objects.all()
+        assert set(queryset.filter(has_versions=True)) == set(categories[:2])
+        assert not queryset.filter(has_versions=False).exists()
+        applications[1].versions.all().delete()
+        assert queryset.get(has_versions=True) == categories[0]
+        assert queryset.get(has_versions=False) == categories[1]
+
+    def test_filter_based_on_non_relation_field(self, applications):
+        queryset = ApplicationWithClassBasedProperties.objects.all()
+        assert set(queryset.filter(has_version_with_changelog=True)) == set(applications[:2])
+        assert not queryset.filter(has_version_with_changelog=False).exists()
+        applications[0].versions.filter(major=2).delete()
+        assert queryset.get(has_version_with_changelog=True) == applications[1]
+        assert queryset.get(has_version_with_changelog=False) == applications[0]
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    def test_annotation(self, categories, applications):
+        queryset = CategoryWithClassBasedProperties.objects.all()
+        assert list(queryset.order_by('has_versions', 'pk')) == categories[:2]
+        applications[1].versions.all().delete()
+        assert list(queryset.order_by('has_versions', 'pk')) == [categories[1], categories[0]]
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    def test_annotation_based_on_non_relation_field(self, applications):
+        queryset = ApplicationWithClassBasedProperties.objects.all()
+        assert list(queryset.order_by('-has_version_with_changelog', 'pk')) == applications[:2]
+        applications[0].versions.filter(major=2).delete()
+        assert list(queryset.order_by('-has_version_with_changelog', 'pk')) == [applications[1], applications[0]]
 
 
 class TestAnnotationProperty(object):
