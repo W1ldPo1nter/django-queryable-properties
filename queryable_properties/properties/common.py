@@ -9,9 +9,11 @@ from .base import QueryableProperty
 from .mixins import AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin
 
 
-class BooleanProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
+class BooleanMixin(LookupFilterMixin):
     """
-    Internal base class for common properties that return boolean values.
+    Internal mixin class for common properties that return boolean values,
+    which is intended to be used in conjunction with one of the annotation
+    mixins.
     """
 
     filter_requires_annotation = False
@@ -40,7 +42,7 @@ class BooleanProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
         )
 
 
-class ValueCheckProperty(BooleanProperty):
+class ValueCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
     """
     A property that checks if an attribute of a model instance or a related
     object contains a certain value or one of multiple specified values and
@@ -75,7 +77,7 @@ class ValueCheckProperty(BooleanProperty):
         return self.attribute_getter.build_filter('in', self.values)
 
 
-class RangeCheckProperty(BooleanProperty):
+class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
     """
     A property that checks if a static or dynamic value is contained in a range
     expressed by two field values and returns a corresponding boolean value.
