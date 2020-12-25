@@ -2,8 +2,9 @@
 
 import operator
 
-from django.db.models import BooleanField
+from django.db.models import BooleanField, Q
 
+from ..compat import LOOKUP_SEP
 from ..utils import MISSING_OBJECT, ModelAttributeGetter
 from .base import QueryableProperty
 from .mixins import AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin
@@ -159,6 +160,40 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
         return lower_condition & upper_condition
 
 
+class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, QueryableProperty):
+    """
+    A property that checks whether related objects to the one that uses the
+    property exist in the database and returns a corresponding boolean value.
+
+    Supports queryset filtering and CASE/WHEN-based annotating.
+    """
+
+    def __init__(self, relation_path, cached=None):
+        """
+        Initialize a new property that checks for the existence of related
+        objects.
+
+        :param str relation_path: The path to the object/field whose existence
+                                  is to be checked. May contain the lookup
+                                  separator (``__``) to check for more remote
+                                  relations.
+        :param bool cached: Whether or not this property should use a cached
+                            getter. If the property is not cached, the getter
+                            will perform the corresponding query on every
+                            access.
+        """
+        super(RelatedExistenceCheckProperty, self).__init__(cached)
+        self.filters = {LOOKUP_SEP.join((relation_path, 'isnull')): False}
+
+    def get_value(self, obj):
+        return self.get_filtered_queryset(obj).filter(**self.filters).exists()
+
+    def _get_condition(self):
+        # Perform the filtering via a subquery to avoid any side-effects that may be introduced by JOINs.
+        subquery = self.get_queryset(self.model).filter(**self.filters)
+        return Q(pk__in=subquery)
+
+
 class AnnotationProperty(AnnotationGetterMixin, QueryableProperty):
     """
     A property that is based on a static annotation that is even used to
@@ -206,4 +241,4 @@ class AggregateProperty(AnnotationProperty):
         super(AggregateProperty, self).__init__(aggregate, cached)
 
     def get_value(self, obj):
-        return self.get_queryset(obj).aggregate(**{self.name: self.annotation})[self.name]
+        return self.get_filtered_queryset(obj).aggregate(**{self.name: self.annotation})[self.name]
