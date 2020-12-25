@@ -174,10 +174,20 @@ class AnnotationGetterMixin(AnnotationMixin):
             self.cached = cached
 
     def get_value(self, obj):
-        queryset = self.get_queryset(obj).distinct().annotate(**{self.name: self.get_annotation(obj.__class__)})
+        queryset = self.get_filtered_queryset(obj).distinct()
+        queryset = queryset.annotate(**{self.name: self.get_annotation(obj.__class__)})
         return queryset.values_list(self.name, flat=True).get()
 
-    def get_queryset(self, obj):
+    def get_queryset(self, model):
+        """
+        Construct a base queryset for the given model class that can be used
+        to build queries in property code.
+
+        :param model: The model class to build the queryset for.
+        """
+        return model._base_manager.all()
+
+    def get_filtered_queryset(self, obj):
         """
         Construct a base queryset that can be used to retrieve the getter value
         for the given object.
@@ -188,8 +198,7 @@ class AnnotationGetterMixin(AnnotationMixin):
                  for the given object.
         :rtype: django.db.models.QuerySet
         """
-        manager = obj.__class__._base_manager
-        return manager.filter(pk=obj.pk)
+        return self.get_queryset(obj.__class__).filter(pk=obj.pk)
 
 
 class UpdateMixin(object):
