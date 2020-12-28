@@ -6,6 +6,8 @@ master (unreleased)
 
 - Added an option to implement annotation-based properties that use their annotation to query their getter from the
   database
+- Added a new ready-to-use queryable property implementation for properties that check whether or not certain related
+  objects exist (``RelatedExistenceCheckProperty``)
 
 1.4.1 (2020-10-21)
 ------------------
