@@ -421,3 +421,107 @@ For a quick overview, the ``AggregateProperty`` offers the following queryable p
 +------------+-----------+
 | Updating   | No        |
 +------------+-----------+
+
+``RelatedExistenceCheckProperty``: Checking whether or not certain related objects exist
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A common use case for properties is checking whether or not at least one related object exists.
+For example, both the ``Application`` as well the ``Category`` models could define a property that checks whether or
+not any corresponding applications versions exist in the database.
+
+Without *django-queryable-properties*, the implementation could look similar to this:
+
+.. code-block:: python
+
+    from django.db import models
+
+
+    class Category(models.Model):
+        ...  # other fields/properties
+
+        @property
+        def has_versions(self):
+            return self.applications.filter(versions__isnull=False).exists()
+
+
+    class Application(models.Model):
+        ...  # other fields/properties
+
+        @property
+        def has_versions(self):
+            return self.versions.exists()
+
+Instead of defining the properties like this, the property class
+:class:`queryable_properties.properties.RelatedExistenceCheckProperty` could be used:
+
+.. code-block:: python
+
+    from django.db import models
+    from queryable_properties.properties import RelatedExistenceCheckProperty
+
+
+    class Category(models.Model):
+        ...  # other fields/properties
+
+        has_versions = RelatedExistenceCheckProperty('applications__versions')
+
+
+    class Application(models.Model):
+        ...  # other fields/properties
+
+        has_versions = RelatedExistenceCheckProperty('versions')
+
+Instances of this property class take the query path to the related objects, which may also span multiple relations
+using the ``__`` separator, as their first parameter.
+In queries, this query path is extended with the ``__isnull`` lookup, which is tested against the value ``False``, to
+determine whether or not related objects exist.
+The path may also lead to a nullable field, which would allow to check for the existence of related objects that
+have a value for a certain field.
+
+Not only does this property class allow to achieve the same functionality with less code, but it offers even more
+functionality due to being a *queryable* property.
+The class implements both queryset filtering as well as annotating (based on Django's ``Case``/``When`` objects), so
+the properties can be used in querysets as well:
+
+.. code-block:: python
+
+    apps_with_versions = Application.objects.filter(has_versions=True)
+    apps_without_versions = Application.objects.filter(has_versions=False)
+    Category.objects.order_by('has_versions')
+
+When being used in querysets like this, the filter condition is tested in a |in-subquery|_ (supported in all Django
+versions supported by *django-queryable-properties*), which is built using the base manager (``_base_manager``) of the
+property's associated model class.
+This avoids ``JOIN`` ing the related models in the main queryset and therefore avoids duplicate objects in the results
+whenever ...-to-many relations are involved.
+
+.. |in-subquery| replace:: ``__in`` subquery
+.. _in-subquery: https://docs.djangoproject.com/en/stable/ref/models/querysets/#in
+
+.. note::
+   The query paths passed to ``RelatedExistenceCheckProperty`` may also refer to another queryable propertie as long as
+   this property allows filtering with the ``isnull`` lookup.
+
+.. note::
+   Since the property's getter also performs a query for the existence check, the use of the
+   ``RelatedExistenceCheckProperty`` is only recommended whenever a query would have to be performed anyway.
+   It is therefore not recommended to be used to check if local non-relation fields are filled or even if a simple
+   forward ``ForeignKey`` or ``OneToOneField`` has a value (which could be tested by checking the ``<fk_name>_id``
+   attribute without performing a query).
+   A ``ValueCheckProperty`` may be better suited to check the value of local fields instead.
+
+For a quick overview, the ``RelatedExistenceCheckProperty`` offers the following queryable property features:
+
++------------+----------------------------+
+| Feature    | Supported                  |
++============+============================+
+| Getter     | Yes                        |
++------------+----------------------------+
+| Setter     | No                         |
++------------+----------------------------+
+| Filtering  | Yes                        |
++------------+----------------------------+
+| Annotation | Yes (Django 1.8 or higher) |
++------------+----------------------------+
+| Updating   | No                         |
++------------+----------------------------+
