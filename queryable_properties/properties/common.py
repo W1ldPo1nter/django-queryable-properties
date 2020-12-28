@@ -19,11 +19,13 @@ class BooleanMixin(LookupFilterMixin):
 
     filter_requires_annotation = False
 
-    def _get_condition(self):  # pragma: no cover
+    def _get_condition(self, cls):  # pragma: no cover
         """
         Build the query filter condition for this boolean property, which is
         used for both the filter and the annotation implementation.
 
+        :param type cls: The model class of which a queryset should be filtered
+                         or annotated.
         :return: The filter condition for this property.
         :rtype: django.db.models.Q
         """
@@ -31,13 +33,13 @@ class BooleanMixin(LookupFilterMixin):
 
     @boolean_filter
     def get_exact_filter(self, cls):
-        return self._get_condition()
+        return self._get_condition(cls)
 
     def get_annotation(self, cls):
         from django.db.models import Case, When
 
         return Case(
-            When(self._get_condition(), then=True),
+            When(self._get_condition(cls), then=True),
             default=False,
             output_field=BooleanField()
         )
@@ -74,7 +76,7 @@ class ValueCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
     def get_value(self, obj):
         return self.attribute_getter.get_value(obj) in self.values
 
-    def _get_condition(self):
+    def _get_condition(self, cls):
         return self.attribute_getter.build_filter('in', self.values)
 
 
@@ -148,7 +150,7 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
         contained &= self.include_missing if max_value in (None, MISSING_OBJECT) else lower_operator(value, max_value)
         return not (contained ^ self.in_range)
 
-    def _get_condition(self):
+    def _get_condition(self, cls):
         value = self.final_value
         lower_condition = self.min_attribute_getter.build_filter('lte' if self.include_boundaries else 'lt', value)
         upper_condition = self.max_attribute_getter.build_filter('gte' if self.include_boundaries else 'gt', value)
@@ -188,9 +190,9 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
     def get_value(self, obj):
         return self.get_queryset_for_object(obj).filter(**self.filters).exists()
 
-    def _get_condition(self):
+    def _get_condition(self, cls):
         # Perform the filtering via a subquery to avoid any side-effects that may be introduced by JOINs.
-        subquery = self.get_queryset(self.model).filter(**self.filters)
+        subquery = self.get_queryset(cls).filter(**self.filters)
         return Q(pk__in=subquery)
 
 
