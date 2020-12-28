@@ -149,9 +149,9 @@ class TestAnnotationGetterMixin(object):
         assert set(prop.get_queryset(ApplicationWithClassBasedProperties)) == set(applications[:2])
 
     @pytest.mark.django_db
-    def test_get_filtered_queryset(self, prop, applications):
+    def test_get_queryset_for_object(self, prop, applications):
         for application in applications[:2]:
-            assert prop.get_filtered_queryset(application).get() == application
+            assert prop.get_queryset_for_object(application).get() == application
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')

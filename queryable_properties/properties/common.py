@@ -186,7 +186,7 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
         self.filters = {LOOKUP_SEP.join((relation_path, 'isnull')): False}
 
     def get_value(self, obj):
-        return self.get_filtered_queryset(obj).filter(**self.filters).exists()
+        return self.get_queryset_for_object(obj).filter(**self.filters).exists()
 
     def _get_condition(self):
         # Perform the filtering via a subquery to avoid any side-effects that may be introduced by JOINs.
@@ -241,4 +241,4 @@ class AggregateProperty(AnnotationProperty):
         super(AggregateProperty, self).__init__(aggregate, cached)
 
     def get_value(self, obj):
-        return self.get_filtered_queryset(obj).aggregate(**{self.name: self.annotation})[self.name]
+        return self.get_queryset_for_object(obj).aggregate(**{self.name: self.annotation})[self.name]

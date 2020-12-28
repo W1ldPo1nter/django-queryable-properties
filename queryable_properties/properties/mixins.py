@@ -174,7 +174,7 @@ class AnnotationGetterMixin(AnnotationMixin):
             self.cached = cached
 
     def get_value(self, obj):
-        queryset = self.get_filtered_queryset(obj).distinct()
+        queryset = self.get_queryset_for_object(obj).distinct()
         queryset = queryset.annotate(**{self.name: self.get_annotation(obj.__class__)})
         return queryset.values_list(self.name, flat=True).get()
 
@@ -187,7 +187,7 @@ class AnnotationGetterMixin(AnnotationMixin):
         """
         return model._base_manager.all()
 
-    def get_filtered_queryset(self, obj):
+    def get_queryset_for_object(self, obj):
         """
         Construct a base queryset that can be used to retrieve the getter value
         for the given object.
