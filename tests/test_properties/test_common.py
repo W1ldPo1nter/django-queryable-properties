@@ -252,7 +252,7 @@ class TestMappingProperty(object):
 
     @contextmanager
     def apply_dummy_translations(self):
-        original_catalog = deepcopy(trans_real._default._catalog)
+        original_catalog = deepcopy(trans_real.catalog()._catalog)
         for term in ('Alpha', 'Beta', 'Stable'):
             trans_real._default._catalog[term] = term[1:]
         yield
