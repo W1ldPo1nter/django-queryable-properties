@@ -1,5 +1,7 @@
 # encoding: utf-8
 
+from contextlib import contextmanager
+from copy import deepcopy
 from datetime import date
 from itertools import chain
 
@@ -7,7 +9,9 @@ import pytest
 
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Avg, Q
+from django.utils.translation import trans_real
 
+from queryable_properties.compat import nullcontext
 from queryable_properties.properties import AggregateProperty, AnnotationProperty, RelatedExistenceCheckProperty
 from ..app_management.models import (ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties,
                                      VersionWithClassBasedProperties)
@@ -242,6 +246,72 @@ class TestRelatedExistenceCheckProperty(object):
         assert list(app_queryset.order_by('-has_version_with_changelog', '-pk')) == applications[:2]
         assert list(category_queryset.order_by('-applications__has_version_with_changelog', '-pk')) == [
             categories[0], categories[1], categories[0]]
+
+
+class TestMappingProperty(object):
+
+    @contextmanager
+    def apply_dummy_translations(self):
+        original_catalog = deepcopy(trans_real._default._catalog)
+        for term in ('Alpha', 'Beta', 'Stable'):
+            trans_real._default._catalog[term] = term[1:]
+        yield
+        trans_real._default._catalog = original_catalog
+
+    @pytest.mark.parametrize('apply_dummy_translations, expected_verbose_names', [
+        (False, ['Beta', 'Stable', 'Stable', 'Alpha']),
+        (True, ['eta', 'table', 'table', 'lpha']),
+    ])
+    def test_getter(self, versions, apply_dummy_translations, expected_verbose_names):
+        with self.apply_dummy_translations() if apply_dummy_translations else nullcontext():
+            for i, expected_verbose_name in enumerate(expected_verbose_names):
+                assert str(versions[i].release_type_verbose_name) == expected_verbose_name
+
+    @pytest.mark.parametrize('apply_dummy_translations', [False, True])
+    def test_getter_default(self, versions, apply_dummy_translations):
+        versions[0].release_type = 'x'
+        with self.apply_dummy_translations() if apply_dummy_translations else nullcontext():
+            assert versions[0].release_type_verbose_name is None
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('apply_dummy_translations, filter_value, expected_count', [
+        (False, 'Alpha', 2),
+        (False, 'Stable', 4),
+        (True, 'eta', 2),
+        (True, 'table', 4),
+    ])
+    def test_filter(self, apply_dummy_translations, filter_value, expected_count):
+        with self.apply_dummy_translations() if apply_dummy_translations else nullcontext():
+            queryset = VersionWithClassBasedProperties.objects.filter(release_type_verbose_name=filter_value)
+            assert queryset.count() == expected_count
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('apply_dummy_translations', [False, True])
+    def test_filter_default(self, versions, apply_dummy_translations):
+        versions[0].release_type = 'x'
+        versions[0].save()
+        with self.apply_dummy_translations() if apply_dummy_translations else nullcontext():
+            assert VersionWithClassBasedProperties.objects.get(release_type_verbose_name=None) == versions[0]
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('apply_dummy_translations, expected_verbose_names', [
+        (False, ['Beta', 'Stable', 'Stable', 'Alpha']),
+        (True, ['eta', 'table', 'table', 'lpha']),
+    ])
+    def test_annotation(self, applications, apply_dummy_translations, expected_verbose_names):
+        with self.apply_dummy_translations() if apply_dummy_translations else nullcontext():
+            queryset = VersionWithClassBasedProperties.objects.order_by('major', 'minor', 'patch')
+            queryset = queryset.filter(application=applications[0]).select_properties('release_type_verbose_name')
+            assert list(queryset.values_list('release_type_verbose_name', flat=True)) == expected_verbose_names
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('apply_dummy_translations', [False, True])
+    def test_annotation_default(self, versions, apply_dummy_translations):
+        versions[0].release_type = 'x'
+        versions[0].save()
+        with self.apply_dummy_translations() if apply_dummy_translations else nullcontext():
+            queryset = VersionWithClassBasedProperties.objects.select_properties('release_type_verbose_name')
+            assert queryset.values_list('release_type_verbose_name', flat=True).get(pk=versions[0].pk) is None
 
 
 class TestAnnotationProperty(object):
