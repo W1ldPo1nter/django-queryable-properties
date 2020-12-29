@@ -25,11 +25,16 @@ While especially the latter options are not *wrong*, they do require some boiler
 business logic into multiple parts (e.g. the property for single objects is implemented on the model class while
 the corresponding annotation for batch operations is part of a queryset class), making it harder to apply changes to
 the business logic to all required parts.
+Solutions like these are genereally also not really reusable unless a lot of effort is put into them.
+For example, even manager/queryset extensions will likely only work on the exact model they were designed for and will
+therefore not be usable from other models via relations.
 
 *django-queryable-properties* does, in fact, not remove the general necessity of implementing the business logic in
 (at least) 2 parts - one for individual objects and one for batch/queryset operations.
 Instead, it aims to remove as much boilerplate as possible and offers an option to implement said parts in one place -
 just like the ``getter`` and ``setter`` of a regular property are implemented together.
+On top of that, queryable properties cannot only be used in querysets for the model they were defined on, but can also
+be accessed through relations when querying via other models.
 
 Examples in this documentation
 ------------------------------
