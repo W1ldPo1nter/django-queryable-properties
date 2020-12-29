@@ -2,7 +2,8 @@
 
 import operator
 
-from django.db.models import BooleanField, Q
+import six
+from django.db.models import BooleanField, Field, Q
 
 from ..compat import LOOKUP_SEP
 from ..utils import MISSING_OBJECT, ModelAttributeGetter
@@ -194,6 +195,60 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
         # Perform the filtering via a subquery to avoid any side-effects that may be introduced by JOINs.
         subquery = self.get_queryset(cls).filter(**self.filters)
         return Q(pk__in=subquery)
+
+
+class MappingProperty(AnnotationMixin, QueryableProperty):
+    """
+    A property that translates values of an attribute into other values using
+    defined mappings.
+    """
+
+    # Copy over Django's implementation to forcibly evaluate a lazy value.
+    _force_value = six.get_unbound_function(Field.get_prep_value)
+
+    def __init__(self, attribute_path, output_field, mappings, default=None):
+        """
+        Initialize a property that maps values from an attribute to other
+        values.
+
+        :param str attribute_path: The name of the attribute to compare
+                                   against. May also be a more complex path to
+                                   a related attribute using dot-notation (like
+                                   with :func:`operator.attrgetter`). If an
+                                   intermediate value on the path is None, it
+                                   will be treated as "no match" instead of
+                                   raising an exception. The behavior is the
+                                   same if an intermediate value raises an
+                                   ObjectDoesNotExist error.
+        :param django.db.models.Field output_field: The field to represent the
+                                                    mapped values in querysets.
+        :param mappings: An iterable containing 2-tuples that represent the
+                         mappings to use (the first value of each tuple is
+                         mapped to the second value).
+        :type mappings: collections.Iterable[(object, object)]
+        :param default: A default value to return/use in querysets when in case
+                        none of the mappings match an encountered value.
+                        Defaults to None.
+        """
+        super(MappingProperty, self).__init__()
+        self.attribute_getter = ModelAttributeGetter(attribute_path)
+        self.output_field = output_field
+        self.mappings = mappings
+        self.default = default
+
+    def get_value(self, obj):
+        attibute_value = self.attribute_getter.get_value(obj)
+        for from_value, to_value in self.mappings:
+            if attibute_value == from_value:
+                return self._force_value(to_value)
+        return self._force_value(self.default)
+
+    def get_annotation(self, cls):
+        from django.db.models import Case, Value, When
+
+        cases = (When(self.attribute_getter.build_filter('exact', from_value), then=Value(self._force_value(to_value)))
+                 for from_value, to_value in self.mappings)
+        return Case(*cases, default=Value(self._force_value(self.default)), output_field=self.output_field)
 
 
 class AnnotationProperty(AnnotationGetterMixin, QueryableProperty):
