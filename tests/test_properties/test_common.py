@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 from contextlib import contextmanager
-from copy import deepcopy
 from datetime import date
 from itertools import chain
 
@@ -250,13 +249,18 @@ class TestRelatedExistenceCheckProperty(object):
 
 class TestMappingProperty(object):
 
+    TRANSLATION_TERMS = ('Alpha', 'Beta', 'Stable')
+
     @contextmanager
     def apply_dummy_translations(self):
-        original_catalog = deepcopy(trans_real.catalog()._catalog)
-        for term in ('Alpha', 'Beta', 'Stable'):
-            trans_real._default._catalog[term] = term[1:]
+        catalog_dict = trans_real.catalog()._catalog
+        if hasattr(catalog_dict, '_catalogs'):
+            catalog_dict = catalog_dict._catalogs[0]
+        for term in self.TRANSLATION_TERMS:
+            catalog_dict[term] = term[1:]
         yield
-        trans_real._default._catalog = original_catalog
+        for term in self.TRANSLATION_TERMS:
+            del catalog_dict[term]
 
     @pytest.mark.parametrize('apply_dummy_translations, expected_verbose_names', [
         (False, ['Beta', 'Stable', 'Stable', 'Alpha']),
