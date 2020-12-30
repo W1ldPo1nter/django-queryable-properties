@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.5.0 (2020-12-30)
+------------------
+
 - Added an option to implement annotation-based properties that use their annotation to query their getter value from
   the database
 - Added a new ready-to-use queryable property implementation for properties that check whether or not certain related
