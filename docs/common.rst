@@ -320,6 +320,109 @@ For a quick reference, all possible configuration combinations are listed in the
    properties allow filtering with the ``lt``/``lte`` and ``gt``/``gte`` lookups (depending on the value of
    ``include_boundaries``) and potentially the ``isnull`` lookup (depending on the value of ``include_missing``).
 
+``MappingProperty``: Mapping field values to other values
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The property class :class:`queryable_properties.properties.MappingProperty` streamlines a very simple pattern: mapping
+the values of an attribute (most likely a field) to different values.
+While there is nothing special about this on an object basis, it allows to introduce values into querysets that
+otherwise are not database values.
+The value mapping inside querysets is achieved using ``CASE``/``WHEN`` expressions based on Django's ``Case``/``When``
+objects, which means that this property class can only be properly used in Django versions that provide these features
+(1.8+).
+
+A common use case for this might be to set up a ``MappingProperty`` that simply works with a choice field and uses the
+choice definitions themselves as its mappings.
+This allows to introduce the (most likely translatable) choice verbose names into the query, which in turn allows to
+order the queryset by the *translated* verbose names, providing sensible ordering no matter what language an
+application is used in.
+
+For the release type values in an example above, this could look like this:
+
+.. code-block:: python
+
+    from django.db import models
+    from django.utils.translation import ugettext_lazy as _
+
+    from queryable_properties.managers import QueryablePropertiesManager
+    from queryable_properties.properties import MappingProperty
+
+
+    class ApplicationVersion(models.Model):
+        ALPHA = 'a'
+        BETA = 'b'
+        STABLE = 's'
+        RELEASE_TYPE_CHOICES = (
+            (ALPHA, _('Alpha')),
+            (BETA, _('Beta')),
+            (STABLE, _('Stable')),
+        )
+
+        ...  # other fields
+        release_type = models.CharField(max_length=1, choices=RELEASE_TYPE_CHOICES)
+
+        objects = QueryablePropertiesManager()
+
+        release_type_verbose_name = MappingProperty('release_type', models.CharField(), RELEASE_TYPE_CHOICES)
+
+In a view, one could then perform a query similar to the following to order the ``ApplicationVersion`` objects by
+their translated verbose name, which may lead to a different ordering depending on the user's language:
+
+.. code-block:: python
+
+    ApplicationVersion.objects.order_by('release_type_verbose_name')
+
+This is, however, not the only way ``MappingProperty`` objects can be used - any attribute values may be translated
+into any other values that can be represented in database queries and then used in querysets.
+
+``MappingProperty`` objects may be initialized with up to four parameters:
+
+``attribute_path`` (required)
+  An attribute path to the attribute whose values are to be mapped to other values - the same behavior as for the
+  attribute path of ``ValueCheckProperty`` objects apply (refer to chapter :ref:`common:Attribute paths` above).
+
+``output_field`` (required)
+  A field instance that is used to represent the translated values in queries.
+
+``mappings`` (required)
+  Defines the actual mappings as an iterable of 2-tuples, where the first value is the expected attribute value and the
+  second value is the translated value.
+  This can be almost any type of iterable - it just needs to be able to be iterated multiple times as the whole
+  iterable is evaluated any time the property is accessed on an object or in queries (generators are therefore not
+  usable).
+``default`` (optional)
+  Defines a default value, which defaults to ``None``.
+  Whenever an attribute value is encountered that has no mapping via the third parameter, this default value is
+  returned instead.
+
+.. note::
+   Whenever the mapping output values are actually accessed (by accessing the property on an object or by referencing
+   it in a queryset), lazy values (like the translations in the example above) are evaluated.
+   Property access or queryset references should therefore be performed as late as possible when dealing with lazy
+   mapping values.
+   For queryset operations, the translated values are also automatically wrapped in
+   `Value <https://docs.djangoproject.com/en/stable/ref/models/expressions/#value-expressions>`_ objects.
+
+.. note::
+   The attribute path passed to ``MappingProperty`` may also refer to another queryable property as long as this
+   property allows filtering with the ``exact`` lookup.
+
+For a quick overview, the ``MappingProperty`` offers the following queryable property features:
+
++------------+----------------------------+
+| Feature    | Supported                  |
++============+============================+
+| Getter     | Yes                        |
++------------+----------------------------+
+| Setter     | No                         |
++------------+----------------------------+
+| Filtering  | Yes (Django 1.8 or higher) |
++------------+----------------------------+
+| Annotation | Yes (Django 1.8 or higher) |
++------------+----------------------------+
+| Updating   | No                         |
++------------+----------------------------+
+
 Annotation-based properties
 ---------------------------
 

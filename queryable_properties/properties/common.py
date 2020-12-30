@@ -225,7 +225,7 @@ class MappingProperty(AnnotationMixin, QueryableProperty):
         :param mappings: An iterable containing 2-tuples that represent the
                          mappings to use (the first value of each tuple is
                          mapped to the second value).
-        :type mappings: collections.Collection[(object, object)]
+        :type mappings: collections.Iterable[(object, object)]
         :param default: A default value to return/use in querysets when in case
                         none of the mappings match an encountered value.
                         Defaults to None.
