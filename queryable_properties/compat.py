@@ -26,6 +26,11 @@ except ImportError:  # pragma: no cover
     from django.db.models.query import ValuesQuerySet  # noqa: F401
     ModelIterable = None
 
+try:  # pragma: no cover
+    from django.forms.utils import pretty_name  # noqa: F401
+except ImportError:  # pragma: no cover
+    from django.forms.forms import pretty_name  # noqa: F401
+
 # A dictionary mapping names of build_filter/add_filter keyword arguments to
 # keyword arguments for an _add_q/add_q call. It contains kwargs names for
 # all Django versions (some do not use all of these). If a keyword argument
