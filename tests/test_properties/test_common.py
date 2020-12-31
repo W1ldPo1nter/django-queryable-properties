@@ -188,7 +188,7 @@ class TestRelatedExistenceCheckProperty(object):
         ('my_field', True, 'my_field__isnull', True),
     ])
     def test_initializer(self, path, cached, expected_filter, expected_cached):
-        prop = RelatedExistenceCheckProperty(path, cached)
+        prop = RelatedExistenceCheckProperty(path, cached=cached)
         assert prop.filters == {expected_filter: False}
         assert prop.cached is expected_cached
 
@@ -327,7 +327,7 @@ class TestAnnotationProperty(object):
     ])
     def test_initializer(self, cached, expected_cached):
         annotation = Avg('test')
-        prop = AnnotationProperty(annotation, cached)
+        prop = AnnotationProperty(annotation, cached=cached)
         assert prop.annotation is annotation
         assert prop.cached is expected_cached
 
@@ -350,7 +350,7 @@ class TestAggregateProperty(object):
     ])
     def test_initializer(self, cached, expected_cached):
         annotation = Avg('test')
-        prop = AggregateProperty(annotation, cached)
+        prop = AggregateProperty(annotation, cached=cached)
         assert prop.annotation is annotation
         assert prop.cached is expected_cached
 
