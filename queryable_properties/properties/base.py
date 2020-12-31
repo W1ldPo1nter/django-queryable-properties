@@ -7,7 +7,7 @@ from functools import partial
 
 import six
 
-from ..compat import LOOKUP_SEP
+from ..compat import LOOKUP_SEP, pretty_name
 from ..exceptions import QueryablePropertyError
 from ..utils import get_queryable_property, parametrizable_decorator, reset_queryable_property
 from .cache_behavior import CLEAR_CACHE
@@ -33,10 +33,18 @@ class QueryableProperty(object):
     get_annotation = None
     get_update_kwargs = None
 
-    def __init__(self):
+    def __init__(self, verbose_name=None):
+        """
+        Initialize a new queryable property.
+
+        :param str verbose_name: An optional verbose name of the property. If
+                                 not provided it defaults to a prettified
+                                 version of the property's name.
+        """
         self.model = None
         self.name = None
         self.setter_cache_behavior = six.get_method_function(self.setter_cache_behavior)
+        self.verbose_name = verbose_name
 
     def __get__(self, obj, objtype=None):
         if obj is None:
@@ -76,6 +84,17 @@ class QueryableProperty(object):
     def __repr__(self):
         return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
 
+    @property
+    def short_description(self):
+        """
+        Return the verbose name of this property as its short description,
+        which is required for the admin integration.
+
+        :return: The verbose name of this property.
+        :rtype: str
+        """
+        return self.verbose_name
+
     def get_value(self, obj):  # pragma: no cover
         """
         Getter method for the queryable property, which will be called when
@@ -108,6 +127,8 @@ class QueryableProperty(object):
         # Store some useful values on model class initialization.
         self.model = self.model or cls
         self.name = self.name or name
+        if self.verbose_name is None:
+            self.verbose_name = pretty_name(self.name)
         setattr(cls, name, self)  # Re-append the property to the model class
         # If not already set, also add a method to the model class that allows
         # to reset the cached values of queryable properties.
@@ -168,7 +189,7 @@ class queryable_property(QueryableProperty):
     get_value = None
     get_filter = None
 
-    def __init__(self, getter=None, cached=None, annotation_based=False):
+    def __init__(self, getter=None, cached=None, annotation_based=False, **kwargs):
         """
         Initialize a new queryable property, optionally using the given getter
         method and getter configuration.
@@ -186,7 +207,7 @@ class queryable_property(QueryableProperty):
                                  expected to decorate the getter method.
         :type annotation_based: bool
         """
-        super(queryable_property, self).__init__()
+        super(queryable_property, self).__init__(**kwargs)
         self.__doc__ = None
         if getter:
             self(getter, force_getter=True)

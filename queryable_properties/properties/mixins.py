@@ -136,6 +136,17 @@ class AnnotationMixin(InjectableMixin):
 
     filter_requires_annotation = True
 
+    @property
+    def admin_order_field(self):
+        """
+        Return the field name for the ordering in the admin, which is simply
+        the property's name since it's annotatable.
+
+        :return: The field name for ordering in the admin.
+        :rtype: str
+        """
+        return self.name
+
     def get_annotation(self, cls):  # pragma: no cover
         """
         Construct an annotation representing this property that can be added
@@ -160,7 +171,7 @@ class AnnotationGetterMixin(AnnotationMixin):
     to retrieve the getter value).
     """
 
-    def __init__(self, cached=None):
+    def __init__(self, cached=None, *args, **kwargs):
         """
         Initialize a new queryable property based that uses the
         :class:`AnnotationGetterMixin`.
@@ -169,7 +180,7 @@ class AnnotationGetterMixin(AnnotationMixin):
                        cached (similar to ``cached_property``). A value of None
                        means using the default value.
         """
-        super(AnnotationGetterMixin, self).__init__()
+        super(AnnotationGetterMixin, self).__init__(*args, **kwargs)
         if cached is not None:
             self.cached = cached
 

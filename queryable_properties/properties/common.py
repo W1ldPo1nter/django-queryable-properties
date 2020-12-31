@@ -55,7 +55,7 @@ class ValueCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
     Supports queryset filtering and CASE/WHEN-based annotating.
     """
 
-    def __init__(self, attribute_path, *values):
+    def __init__(self, attribute_path, *values, **kwargs):
         """
         Initialize a new property that checks for certain field values.
 
@@ -72,7 +72,7 @@ class ValueCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
         """
         self.attribute_getter = ModelAttributeGetter(attribute_path)
         self.values = values
-        super(ValueCheckProperty, self).__init__()
+        super(ValueCheckProperty, self).__init__(**kwargs)
 
     def get_value(self, obj):
         return self.attribute_getter.get_value(obj) in self.values
@@ -90,7 +90,7 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
     """
 
     def __init__(self, min_attribute_path, max_attribute_path, value, include_boundaries=True, in_range=True,
-                 include_missing=False):
+                 include_missing=False, **kwargs):
         """
         Initialize a new property that checks if a value is contained in a
         range expressed by two field values.
@@ -132,7 +132,7 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
         self.include_boundaries = include_boundaries
         self.in_range = in_range
         self.include_missing = include_missing
-        super(RangeCheckProperty, self).__init__()
+        super(RangeCheckProperty, self).__init__(**kwargs)
 
     @property
     def final_value(self):
@@ -171,7 +171,7 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
     Supports queryset filtering and CASE/WHEN-based annotating.
     """
 
-    def __init__(self, relation_path, cached=None):
+    def __init__(self, relation_path, **kwargs):
         """
         Initialize a new property that checks for the existence of related
         objects.
@@ -180,12 +180,8 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
                                   is to be checked. May contain the lookup
                                   separator (``__``) to check for more remote
                                   relations.
-        :param bool cached: Whether or not this property should use a cached
-                            getter. If the property is not cached, the getter
-                            will perform the corresponding query on every
-                            access.
         """
-        super(RelatedExistenceCheckProperty, self).__init__(cached)
+        super(RelatedExistenceCheckProperty, self).__init__(**kwargs)
         self.filters = {LOOKUP_SEP.join((relation_path, 'isnull')): False}
 
     def get_value(self, obj):
@@ -206,7 +202,7 @@ class MappingProperty(AnnotationMixin, QueryableProperty):
     # Copy over Django's implementation to forcibly evaluate a lazy value.
     _force_value = six.get_unbound_function(Field.get_prep_value)
 
-    def __init__(self, attribute_path, output_field, mappings, default=None):
+    def __init__(self, attribute_path, output_field, mappings, default=None, **kwargs):
         """
         Initialize a property that maps values from an attribute to other
         values.
@@ -230,7 +226,7 @@ class MappingProperty(AnnotationMixin, QueryableProperty):
                         none of the mappings match an encountered value.
                         Defaults to None.
         """
-        super(MappingProperty, self).__init__()
+        super(MappingProperty, self).__init__(**kwargs)
         self.attribute_getter = ModelAttributeGetter(attribute_path)
         self.output_field = output_field
         self.mappings = mappings
@@ -257,19 +253,15 @@ class AnnotationProperty(AnnotationGetterMixin, QueryableProperty):
     provide getter values.
     """
 
-    def __init__(self, annotation, cached=None):
+    def __init__(self, annotation, **kwargs):
         """
         Initialize a new property that gets its value by retrieving an
         annotated value from the database.
 
         :param annotation: The static annotation to use to determine the value
                            of this property.
-        :param bool cached: Whether or not this property should use a cached
-                            getter. If the property is not cached, the getter
-                            will perform the corresponding annotated query on
-                            every access.
         """
-        super(AnnotationProperty, self).__init__(cached)
+        super(AnnotationProperty, self).__init__(**kwargs)
         self.annotation = annotation
 
     def get_annotation(self, cls):
@@ -282,7 +274,7 @@ class AggregateProperty(AnnotationProperty):
     queryset annotations as well as getter values.
     """
 
-    def __init__(self, aggregate, cached=None):
+    def __init__(self, aggregate, **kwargs):
         """
         Initialize a new property that gets its value by retrieving an
         aggregated value from the database.
@@ -290,12 +282,8 @@ class AggregateProperty(AnnotationProperty):
         :param django.db.models.Aggregate aggregate: The aggregate to use to
                                                      determine the value of
                                                      this property.
-        :param bool cached: Whether or not this property should use a cached
-                            getter. If the property is not cached, the getter
-                            will perform the corresponding aggregate query on
-                            every access.
         """
-        super(AggregateProperty, self).__init__(aggregate, cached)
+        super(AggregateProperty, self).__init__(aggregate, **kwargs)
 
     def get_value(self, obj):
         return self.get_queryset_for_object(obj).aggregate(**{self.name: self.annotation})[self.name]
