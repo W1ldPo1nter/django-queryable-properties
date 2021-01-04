@@ -4,8 +4,14 @@ import pytest
 from django.db.models import Q
 from six.moves import cPickle
 
-from queryable_properties.utils.internal import (InjectableMixin, MISSING_OBJECT, ModelAttributeGetter,
-                                                 parametrizable_decorator, TreeNodeProcessor)
+from queryable_properties.utils.internal import (
+    InjectableMixin, MISSING_OBJECT, ModelAttributeGetter, parametrizable_decorator, QueryablePropertyReference,
+    resolve_queryable_property, TreeNodeProcessor
+)
+
+from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
+                                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
+                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 
 class DummyClass(object):
@@ -112,30 +118,6 @@ class TestTreeNodeProcessor(object):
         assert ('prefix_b_suffix', 3) in children[0].children
 
 
-def test_parametrizable_decorator():
-    dummy = DummyClass(1, 2)
-
-    @dummy.decorator
-    def func1():
-        pass
-
-    @dummy.decorator(some_kwarg=1, another_kwarg='test')
-    def func2():
-        pass
-
-    def func3():
-        pass
-
-    func3 = dummy.decorator(func3, 1, 2, kwarg='test')
-
-    assert func1.args == ()
-    assert func1.kwargs == {}
-    assert func2.args == ()
-    assert func2.kwargs == dict(some_kwarg=1, another_kwarg='test')
-    assert func3.args == (1, 2)
-    assert func3.kwargs == dict(kwarg='test')
-
-
 class TestModelAttributeGetter(object):
 
     @pytest.mark.parametrize('path, expected_parts', [
@@ -189,3 +171,122 @@ class TestModelAttributeGetter(object):
         condition = getter.build_filter(lookup, value)
         assert isinstance(condition, Q)
         assert condition.children[0] == (expected_query_name, value)
+
+
+def test_parametrizable_decorator():
+    dummy = DummyClass(1, 2)
+
+    @dummy.decorator
+    def func1():
+        pass
+
+    @dummy.decorator(some_kwarg=1, another_kwarg='test')
+    def func2():
+        pass
+
+    def func3():
+        pass
+
+    func3 = dummy.decorator(func3, 1, 2, kwarg='test')
+
+    assert func1.args == ()
+    assert func1.kwargs == {}
+    assert func2.args == ()
+    assert func2.kwargs == dict(some_kwarg=1, another_kwarg='test')
+    assert func3.args == (1, 2)
+    assert func3.kwargs == dict(kwarg='test')
+
+
+class TestResolveQueryableProperty(object):
+
+    @pytest.mark.parametrize('model, path, expected_property, expected_lookups', [
+        # No relation involved
+        (VersionWithClassBasedProperties, ['version'], VersionWithClassBasedProperties.version, []),
+        (VersionWithDecoratorBasedProperties, ['version'], VersionWithDecoratorBasedProperties.version, []),
+        (VersionWithClassBasedProperties, ['version', 'lower', 'exact'],
+         VersionWithClassBasedProperties.version, ['lower', 'exact']),
+        (VersionWithDecoratorBasedProperties, ['version', 'lower', 'exact'],
+         VersionWithDecoratorBasedProperties.version, ['lower', 'exact']),
+        # FK forward relation
+        (VersionWithClassBasedProperties, ['application', 'version_count'],
+         ApplicationWithClassBasedProperties.version_count, []),
+        (VersionWithDecoratorBasedProperties, ['application', 'version_count'],
+         ApplicationWithDecoratorBasedProperties.version_count, []),
+        (VersionWithClassBasedProperties, ['application', 'major_sum', 'gt'],
+         ApplicationWithClassBasedProperties.major_sum, ['gt']),
+        (VersionWithDecoratorBasedProperties, ['application', 'major_sum', 'gt'],
+         ApplicationWithDecoratorBasedProperties.major_sum, ['gt']),
+        # FK reverse relation
+        (ApplicationWithClassBasedProperties, ['versions', 'major_minor'],
+         VersionWithClassBasedProperties.major_minor, []),
+        (ApplicationWithDecoratorBasedProperties, ['versions', 'major_minor'],
+         VersionWithDecoratorBasedProperties.major_minor, []),
+        (ApplicationWithClassBasedProperties, ['versions', 'version', 'lower', 'contains'],
+         VersionWithClassBasedProperties.version, ['lower', 'contains']),
+        (ApplicationWithDecoratorBasedProperties, ['versions', 'version', 'lower', 'contains'],
+         VersionWithDecoratorBasedProperties.version, ['lower', 'contains']),
+        # M2M forward relation
+        (ApplicationWithClassBasedProperties, ['categories', 'circular'],
+         CategoryWithClassBasedProperties.circular, []),
+        (ApplicationWithDecoratorBasedProperties, ['categories', 'circular'],
+         CategoryWithDecoratorBasedProperties.circular, []),
+        (ApplicationWithClassBasedProperties, ['categories', 'circular', 'exact'],
+         CategoryWithClassBasedProperties.circular, ['exact']),
+        (ApplicationWithDecoratorBasedProperties, ['categories', 'circular', 'exact'],
+         CategoryWithDecoratorBasedProperties.circular, ['exact']),
+        # M2M reverse relation
+        (CategoryWithClassBasedProperties, ['applications', 'major_sum'],
+         ApplicationWithClassBasedProperties.major_sum, []),
+        (CategoryWithDecoratorBasedProperties, ['applications', 'major_sum'],
+         ApplicationWithDecoratorBasedProperties.major_sum, []),
+        (CategoryWithClassBasedProperties, ['applications', 'version_count', 'lt'],
+         ApplicationWithClassBasedProperties.version_count, ['lt']),
+        (CategoryWithDecoratorBasedProperties, ['applications', 'version_count', 'lt'],
+         ApplicationWithDecoratorBasedProperties.version_count, ['lt']),
+        # Multiple relations
+        (CategoryWithClassBasedProperties, ['applications', 'versions', 'application', 'categories', 'circular'],
+         CategoryWithClassBasedProperties.circular, []),
+        (CategoryWithDecoratorBasedProperties, ['applications', 'versions', 'application', 'categories', 'circular'],
+         CategoryWithDecoratorBasedProperties.circular, []),
+        (VersionWithClassBasedProperties, ['application', 'categories', 'circular', 'in'],
+         CategoryWithClassBasedProperties.circular, ['in']),
+        (VersionWithDecoratorBasedProperties, ['application', 'categories', 'circular', 'in'],
+         CategoryWithDecoratorBasedProperties.circular, ['in']),
+    ])
+    def test_successful(self, model, path, expected_property, expected_lookups):
+        expected_ref = QueryablePropertyReference(expected_property, expected_property.model,
+                                                  tuple(path[:-len(expected_lookups) - 1]))
+        assert resolve_queryable_property(model, path) == (expected_ref, expected_lookups)
+
+    @pytest.mark.parametrize('model, path', [
+        # No relation involved
+        (VersionWithClassBasedProperties, ['non_existent']),
+        (VersionWithDecoratorBasedProperties, ['non_existent']),
+        (VersionWithClassBasedProperties, ['major']),
+        (VersionWithDecoratorBasedProperties, ['major']),
+        # FK forward relation
+        (VersionWithClassBasedProperties, ['application', 'non_existent', 'exact']),
+        (VersionWithDecoratorBasedProperties, ['application', 'non_existent', 'exact']),
+        (VersionWithClassBasedProperties, ['application', 'name']),
+        (VersionWithDecoratorBasedProperties, ['application', 'name']),
+        # FK reverse relation
+        (ApplicationWithClassBasedProperties, ['versions', 'non_existent']),
+        (ApplicationWithDecoratorBasedProperties, ['versions', 'non_existent']),
+        (ApplicationWithClassBasedProperties, ['versions', 'minor', 'gt']),
+        (ApplicationWithDecoratorBasedProperties, ['versions', 'minor', 'gt']),
+        # M2M forward relation
+        (ApplicationWithClassBasedProperties, ['categories', 'non_existent']),
+        (ApplicationWithDecoratorBasedProperties, ['categories', 'non_existent']),
+        (ApplicationWithClassBasedProperties, ['categories', 'name']),
+        (ApplicationWithDecoratorBasedProperties, ['categories', 'name']),
+        # M2M reverse relation
+        (CategoryWithClassBasedProperties, ['applications', 'non_existent']),
+        (CategoryWithDecoratorBasedProperties, ['applications', 'non_existent']),
+        (CategoryWithClassBasedProperties, ['applications', 'name']),
+        (CategoryWithDecoratorBasedProperties, ['applications', 'name']),
+        # Non existent relation
+        (VersionWithClassBasedProperties, ['non_existent_relation', 'non_existent', 'in']),
+        (VersionWithDecoratorBasedProperties, ['non_existent_relation', 'non_existent', 'in']),
+    ])
+    def test_unsuccessful(self, model, path):
+        assert resolve_queryable_property(model, path) == (None, [])

@@ -9,9 +9,9 @@ from django.db.models.query import QuerySet
 from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, chain_query, chain_queryset,
                      LOOKUP_SEP, ModelIterable, ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from .query import QueryablePropertiesQueryMixin, QueryablePropertyReference
+from .query import QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
-from .utils.internal import InjectableMixin
+from .utils.internal import InjectableMixin, QueryablePropertyReference
 
 
 class QueryablePropertiesIterable(InjectableMixin):
