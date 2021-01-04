@@ -148,8 +148,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
     to use queryable properties in filters, annotations and update queries.
     """
 
-    def __init__(self, *args, **kwargs):
-        super(QueryablePropertiesQuerySetMixin, self).__init__(*args, **kwargs)
+    def init_injected_attrs(self):
         # To work correctly, a query using the QueryablePropertiesQueryMixin is
         # required. If the current query is not using the mixin already, it
         # will be dynamically injected into the query. That way, other Django
