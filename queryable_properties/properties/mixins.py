@@ -7,7 +7,7 @@ from django.db.models import Q
 
 from ..compat import LOOKUP_SEP
 from ..exceptions import QueryablePropertyError
-from ..utils import InjectableMixin
+from ..utils.internal import InjectableMixin
 
 
 class LookupFilterMeta(type):

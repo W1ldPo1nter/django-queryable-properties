@@ -9,7 +9,8 @@ import six
 
 from ..compat import LOOKUP_SEP, pretty_name
 from ..exceptions import QueryablePropertyError
-from ..utils import get_queryable_property, parametrizable_decorator, reset_queryable_property
+from ..utils import get_queryable_property, reset_queryable_property
+from ..utils.internal import parametrizable_decorator
 from .cache_behavior import CLEAR_CACHE
 from .mixins import AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin
 

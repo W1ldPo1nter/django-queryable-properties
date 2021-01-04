@@ -6,7 +6,7 @@ import six
 from django.db.models import BooleanField, Field, Q
 
 from ..compat import LOOKUP_SEP
-from ..utils import MISSING_OBJECT, ModelAttributeGetter
+from ..utils.internal import MISSING_OBJECT, ModelAttributeGetter
 from .base import QueryableProperty
 from .mixins import AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin
 

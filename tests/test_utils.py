@@ -6,8 +6,9 @@ from six.moves import cPickle
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
-from queryable_properties.utils import (get_queryable_property, InjectableMixin, MISSING_OBJECT, ModelAttributeGetter,
-                                        parametrizable_decorator, TreeNodeProcessor)
+from queryable_properties.utils import get_queryable_property, MISSING_OBJECT
+from queryable_properties.utils.internal import (InjectableMixin, ModelAttributeGetter, parametrizable_decorator,
+                                                 TreeNodeProcessor)
 
 from .app_management.models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
 

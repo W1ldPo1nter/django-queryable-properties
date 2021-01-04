@@ -13,7 +13,8 @@ from .compat import (
     QUERY_CHAIN_METHOD_NAME
 )
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
-from .utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
+from .utils import get_queryable_property
+from .utils.internal import InjectableMixin, TreeNodeProcessor
 
 
 class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):

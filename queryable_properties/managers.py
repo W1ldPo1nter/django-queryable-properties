@@ -10,7 +10,8 @@ from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRI
                      LOOKUP_SEP, ModelIterable, ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QueryablePropertiesQueryMixin, QueryablePropertyReference
-from .utils import get_queryable_property, InjectableMixin
+from .utils import get_queryable_property
+from .utils.internal import InjectableMixin
 
 
 class QueryablePropertiesIterable(InjectableMixin):
