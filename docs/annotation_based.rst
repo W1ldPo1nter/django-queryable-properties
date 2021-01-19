@@ -98,7 +98,7 @@ The ``VersionCountProperty`` example above could therefore be used in the follow
 
 .. code-block:: python
 
-    class ApplicationVersion(Model):
+    class Application(Model):
         ...
 
         version_count = VersionCountProperty()
