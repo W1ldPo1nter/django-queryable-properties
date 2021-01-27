@@ -10,7 +10,7 @@ from django.utils.tree import Node
 from .compat import (
     ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, contains_aggregate,
     convert_build_filter_to_add_q_kwargs, get_related_model, LOOKUP_SEP, NEED_HAVING_METHOD_NAME, nullcontext,
-    QUERY_CHAIN_METHOD_NAME
+    QUERY_CHAIN_METHOD_NAME, ValuesQuerySet
 )
 from .exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 from .utils import get_queryable_property, InjectableMixin, TreeNodeProcessor
@@ -202,7 +202,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                     self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
                 self.set_group_by()
 
-    def _auto_annotate(self, path):
+    def _auto_annotate(self, path, full_group_by=None):
         """
         Try to resolve the given path into a queryable property and annotate
         the property as a non-selected property (if the property wasn't added
@@ -212,13 +212,20 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         :param collections.Sequence path: The path to resolve (a string of
                                           Django's query expression split up
                                           by the lookup separator).
+        :param bool | None full_group_by: Optional override to indicate whether
+                                          or not all fields must be contained
+                                          in a GROUP BY clause for aggregate
+                                          annotations. If not set, it will be
+                                          determined from the state of this
+                                          query.
         :return: The resolved annotation or None if the path couldn't be
                  resolved.
         """
         property_ref = self._resolve_queryable_property(path)[0]
         if not property_ref:
             return None
-        full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
+        if full_group_by is None:
+            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
         with self._add_queryable_property_annotation(property_ref, full_group_by) as annotation:
             return annotation
 
@@ -384,7 +391,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         path = tuple(name.split(LOOKUP_SEP))
         if self._queryable_property_stack:
             path = self._queryable_property_stack[-1].relation_path + path
-        property_annotation = self._auto_annotate(path)
+        property_annotation = self._auto_annotate(path, full_group_by=ValuesQuerySet is not None)
         if property_annotation:
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
