@@ -281,7 +281,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         path = tuple(name.split(LOOKUP_SEP))
         if self._queryable_property_stack:
             path = self._queryable_property_stack[-1].relation_path + path
-        property_annotation = self._auto_annotate(path, full_group_by=bool(ValuesQuerySet))
+        property_annotation = self._auto_annotate(path, full_group_by=ValuesQuerySet is not None)
         if property_annotation:
             if summarize:
                 # Outer queries for aggregations need refs to annotations of

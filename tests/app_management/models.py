@@ -171,7 +171,7 @@ class ApplicationWithClassBasedProperties(Application):
     version_count = VersionCountProperty()
     major_sum = AggregateProperty(models.Sum('versions__major'))
     support_start_date = AggregateProperty(models.Min('versions__supported_from'))
-    lowered_version_changes = LoweredVersionChangesProperty('versions__supported_from')
+    lowered_version_changes = LoweredVersionChangesProperty()
     has_version_with_changelog = RelatedExistenceCheckProperty('versions__changes')
     dummy = DummyProperty()
 
@@ -206,14 +206,14 @@ class ApplicationWithDecoratorBasedProperties(Application):
     def version_count(cls):
         return models.Count('versions')
 
-    @queryable_property
-    def major_sum(self):
-        return self.versions.aggregate(major_sum=models.Sum('major'))['major_sum']
-
     @queryable_property(annotation_based=True)
     @classmethod
     def support_start_date(cls):
         return models.Min('versions__supported_from')
+
+    @queryable_property
+    def major_sum(self):
+        return self.versions.aggregate(major_sum=models.Sum('major'))['major_sum']
 
     @major_sum.annotater
     @classmethod
