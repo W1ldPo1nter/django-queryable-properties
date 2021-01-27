@@ -170,6 +170,7 @@ class ApplicationWithClassBasedProperties(Application):
     highest_version = HighestVersionProperty()
     version_count = VersionCountProperty()
     major_sum = AggregateProperty(models.Sum('versions__major'))
+    support_start_date = AggregateProperty(models.Min('versions__supported_from'))
     lowered_version_changes = LoweredVersionChangesProperty()
     has_version_with_changelog = RelatedExistenceCheckProperty('versions__changes')
     dummy = DummyProperty()
@@ -204,6 +205,11 @@ class ApplicationWithDecoratorBasedProperties(Application):
     @classmethod
     def version_count(cls):
         return models.Count('versions')
+
+    @queryable_property(annotation_based=True)
+    @classmethod
+    def support_start_date(cls):
+        return models.Min('versions__supported_from')
 
     @queryable_property
     def major_sum(self):

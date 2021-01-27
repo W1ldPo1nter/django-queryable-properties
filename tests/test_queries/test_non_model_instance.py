@@ -1,7 +1,8 @@
 # encoding: utf-8
 
-import pytest
+from datetime import date
 
+import pytest
 from django import VERSION as DJANGO_VERSION
 
 from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
@@ -90,6 +91,13 @@ class TestAggregateAnnotations(object):
         queryset = model.objects.filter(**filters).select_properties('version_count').values_list('version_count',
                                                                                                   flat=True)
         assert set(queryset) == expected_version_counts
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="dates() couldn't be used with annotations before Django 1.8")
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_dates(self, model):
+        model.objects.all()[0].versions.filter(version='1.3.0').delete()
+        queryset = model.objects.dates('support_start_date', 'day')
+        assert list(queryset) == [date(2017, 1, 1), date(2018, 1, 1)]
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
