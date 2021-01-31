@@ -36,19 +36,22 @@ class Error(BaseError):
 # TODO: alternative for Django < 1.9 validators
 class QueryablePropertiesChecksMixin(InjectableMixin):
 
-    def _check_queryable_property(self, obj, query_path, attribute_name, allow_relation=True):
+    def _check_queryable_property(self, obj, query_path, attribute_name, allow_lookups=True):
         errors = []
-        path = query_path.split(LOOKUP_SEP) if allow_relation else [query_path]
-        property_ref = resolve_queryable_property(obj.model, path)[0]
+        property_ref, lookups = resolve_queryable_property(obj.model, query_path.split(LOOKUP_SEP))
         if not property_ref.property.get_annotation:
             message = '"{}" refers to queryable property "{}", which does not implement annotation creation.'.format(
                 attribute_name, query_path)
             errors.append(Error(message, obj, error_id=1))
+        if lookups and not allow_lookups:
+            message = 'Queryable properties in "{}" must not contain lookups/transforms (invalid item: "{}").'.format(
+                attribute_name, query_path)
+            errors.append(Error(message, obj, error_id=2))
         return property_ref and property_ref.property, errors
 
     def _check_date_hierarchy(self, obj):
         errors = super(QueryablePropertiesChecksMixin, self)._check_date_hierarchy(obj)
-        if not errors:
+        if not errors or errors[0].id != 'admin.E127':
             return errors
 
         prop, property_errors = self._check_queryable_property(obj, obj.date_hierarchy, 'date_hierarchy')
@@ -57,12 +60,24 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
             if output_field and not isinstance(output_field, DateField):
                 message = ('"date_hierarchy" refers to queryable property "{}", which does not annotate date values.'
                            .format(obj.date_hierarchy))
-                property_errors.append(Error(message, obj, error_id=2))
+                property_errors.append(Error(message, obj, error_id=3))
+        return property_errors if prop else errors
+
+    def _check_list_filter_item(self, obj, *args):
+        errors = super(QueryablePropertiesChecksMixin, self)._check_list_filter_item(obj, *args)
+        if not errors or errors[0].id != 'admin.E116':
+            return errors
+
+        # The number of arguments differs between old and recent Django
+        # versions.
+        item = args[-2]
+        field_name = item[0] if isinstance(item, (tuple, list)) else item
+        prop, property_errors = self._check_queryable_property(obj, field_name, 'list_filter', allow_lookups=False)
         return property_errors if prop else errors
 
     def _check_ordering_item(self, obj, *args):
         errors = super(QueryablePropertiesChecksMixin, self)._check_ordering_item(obj, *args)
-        if not errors:
+        if not errors or errors[0].id != 'admin.E033':
             return errors
 
         # The number of arguments differs between old and recent Django
