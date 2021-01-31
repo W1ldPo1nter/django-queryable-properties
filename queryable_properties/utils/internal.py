@@ -375,3 +375,15 @@ def resolve_queryable_property(model, path):
                 break
             model = related_model
     return property_ref, lookups
+
+
+def get_output_field(annotation):
+    """
+    Return the output field of an annotation if it can be determined.
+
+    :param annotation: The annotation to get the output field from.
+    :return: The output field of the annotation or None if it can't be
+             determined.
+    :rtype: django.db.models.Field | None
+    """
+    return getattr(annotation, 'output_field', None)

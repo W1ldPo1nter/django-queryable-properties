@@ -15,7 +15,7 @@ except ImportError:
     Combinable = OrderBy = None
 
 from ..compat import LOOKUP_SEP
-from ..utils.internal import InjectableMixin, resolve_queryable_property
+from ..utils.internal import get_output_field, InjectableMixin, resolve_queryable_property
 
 
 class Error(BaseError):
@@ -36,13 +36,13 @@ class Error(BaseError):
 # TODO: alternative for Django < 1.9 validators
 class QueryablePropertiesChecksMixin(InjectableMixin):
 
-    def _check_queryable_property(self, obj, field_name, attribute_name, allow_relation=True):
+    def _check_queryable_property(self, obj, query_path, attribute_name, allow_relation=True):
         errors = []
-        path = field_name.split(LOOKUP_SEP) if allow_relation else [field_name]
+        path = query_path.split(LOOKUP_SEP) if allow_relation else [query_path]
         property_ref = resolve_queryable_property(obj.model, path)[0]
         if not property_ref.property.get_annotation:
             message = '"{}" refers to queryable property "{}", which does not implement annotation creation.'.format(
-                attribute_name, field_name)
+                attribute_name, query_path)
             errors.append(Error(message, obj, error_id=1))
         return property_ref and property_ref.property, errors
 
@@ -53,7 +53,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
 
         prop, property_errors = self._check_queryable_property(obj, obj.date_hierarchy, 'date_hierarchy')
         if prop and not property_errors:
-            output_field = getattr(prop.get_annotation(obj.model), 'output_field', None)
+            output_field = get_output_field(prop.get_annotation(obj.model))
             if output_field and not isinstance(output_field, DateField):
                 message = ('"date_hierarchy" refers to queryable property "{}", which does not annotate date values.'
                            .format(obj.date_hierarchy))
