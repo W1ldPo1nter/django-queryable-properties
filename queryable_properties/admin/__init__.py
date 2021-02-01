@@ -2,12 +2,13 @@
 
 import six
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
-
 from django.contrib.admin.options import BaseModelAdmin
 
 from ..compat import chain_queryset
+from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from .checks import QueryablePropertiesChecksMixin
+from .filters import QueryablePropertyField
 
 
 class QueryablePropertiesAdminMeta(type(BaseModelAdmin)):
@@ -43,6 +44,22 @@ class QueryablePropertiesAdminMixin(six.with_metaclass(QueryablePropertiesAdminM
         if list_select_properties:
             queryset = queryset.select_properties(*list_select_properties)
         return queryset
+
+    def get_list_filter(self, request):
+        list_filter = super(QueryablePropertiesAdminMixin, self).get_list_filter(request)
+        expanded_filters = []
+        for item in list_filter:
+            if not callable(item):
+                if isinstance(item, (tuple, list)):
+                    field_name, filter_class = item
+                else:
+                    field_name, filter_class = item, None
+                try:
+                    item = QueryablePropertyField(self, request, field_name).create_list_filter(filter_class)
+                except QueryablePropertyError:
+                    pass
+            expanded_filters.append(item)
+        return expanded_filters
 
     def get_list_select_properties(self):
         return self.list_select_properties
