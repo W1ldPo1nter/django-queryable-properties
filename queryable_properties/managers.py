@@ -255,8 +255,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # iterator() implementation, where the QueryablePropertiesModelIterable
         # will be already mixed in. In older Django versions, use a standalone
         # QueryablePropertiesModelIterable instead to perform the queryable
-        # properties processing (as long as this queryset returns model
-        # instances).
+        # properties processing.
         iterable = super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
         if '_iterable_class' not in self.__dict__:  # pragma: no cover
             return iter(QueryablePropertiesIterable(self, iterable=iterable))
