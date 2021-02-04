@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import six
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
-from django.contrib.admin.options import BaseModelAdmin
 
 from ..compat import chain_queryset
 from ..exceptions import QueryablePropertyError
@@ -11,27 +9,17 @@ from .checks import QueryablePropertiesChecksMixin
 from .filters import QueryablePropertyField
 
 
-class QueryablePropertiesAdminMeta(type(BaseModelAdmin)):
-
-    CHECK_ATTRIBUTES = ('checks_class', 'default_validator_class', 'validator_class')
-
-    def __new__(mcs, name, bases, attrs):
-        # Mix a check mixin into any checks/validator class if that hasn't
-        # happened already.
-        for attr in mcs.CHECK_ATTRIBUTES:
-            check_class = attrs.get(attr)
-            for base in bases:
-                if check_class is None:
-                    check_class = getattr(base, attr, None)
-            if check_class and not issubclass(check_class, QueryablePropertiesChecksMixin):
-                class_name = 'QueryableProperties' + check_class.__name__
-                attrs[attr] = QueryablePropertiesChecksMixin.mix_with_class(check_class, class_name)
-        return super(QueryablePropertiesAdminMeta, mcs).__new__(mcs, name, bases, attrs)
-
-
-class QueryablePropertiesAdminMixin(six.with_metaclass(QueryablePropertiesAdminMeta, object)):
+class QueryablePropertiesAdminMixin(object):
 
     list_select_properties = None
+
+    def check(self, **kwargs):
+        # Dynamically add a mixin that handles queryable properties into the
+        # admin's checks class.
+        if not issubclass(self.checks_class, QueryablePropertiesChecksMixin):
+            class_name = 'QueryableProperties' + self.checks_class.__name__
+            self.checks_class = QueryablePropertiesChecksMixin.mix_with_class(self.checks_class, class_name)
+        return super(QueryablePropertiesAdminMixin, self).check(**kwargs)
 
     def get_queryset(self, request):
         queryset = super(QueryablePropertiesAdminMixin, self).get_queryset(request)
