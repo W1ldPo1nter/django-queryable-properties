@@ -2,7 +2,7 @@
 
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
-from ..compat import chain_queryset
+from ..compat import admin_validation, chain_queryset
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from .checks import QueryablePropertiesChecksMixin
@@ -13,7 +13,18 @@ class QueryablePropertiesAdminMixin(object):
 
     list_select_properties = None
 
-    def check(self, **kwargs):
+    @classmethod
+    def validate(cls, model):
+        for attr_name, validator_class in (
+            ('validator_class', cls.validator_class),
+            ('default_validator_class', getattr(cls, 'default_validator_class', None)),
+        ):
+            if validator_class and not issubclass(validator_class, QueryablePropertiesChecksMixin):
+                class_name = 'QueryableProperties' + validator_class.__name__
+                cls.validator_class = QueryablePropertiesChecksMixin.mix_with_class(validator_class, class_name)
+        return super(QueryablePropertiesAdminMixin, cls).validate(model)
+
+    def check(self, **kwargs):  # TODO: Django 1.8 special case
         # Dynamically add a mixin that handles queryable properties into the
         # admin's checks class.
         if not issubclass(self.checks_class, QueryablePropertiesChecksMixin):
@@ -66,3 +77,17 @@ class QueryablePropertiesStackedInline(QueryablePropertiesAdminMixin, StackedInl
 class QueryablePropertiesTabularInline(QueryablePropertiesAdminMixin, TabularInline):
 
     pass
+
+
+# In very old django versions, the admin validation happens in one big function
+# that cannot really be extended well. Therefore, the Django module will be
+# monkeypatched in order to allow the queryable properties validation to take
+# effect.
+django_validate = getattr(admin_validation, 'validate', None)
+if django_validate:
+    def validate(cls, model):
+        if issubclass(cls, QueryablePropertiesAdminMixin):
+            cls = QueryablePropertiesChecksMixin()._validate_queryable_properties(cls, model)
+        django_validate(cls, model)
+
+    admin_validation.validate = validate
