@@ -2,27 +2,17 @@
 
 import six
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import DateField, F
+from django.db.models import DateField, expressions, F
 
-try:
-    from django.core.checks import Error as BaseError
-except ImportError:
-    BaseError = object
-
-try:
-    from django.db.models.expressions import Combinable, OrderBy
-except ImportError:
-    Combinable = OrderBy = None
-
-from ..compat import LOOKUP_SEP
+from ..compat import checks, LOOKUP_SEP
 from ..utils.internal import get_output_field, InjectableMixin, resolve_queryable_property
 
 
-class Error(BaseError):
+class Error(getattr(checks, 'Error', object)):
 
     def __init__(self, msg, obj, error_id):
         error_id = 'queryable_properties.admin.E{:03}'.format(error_id)
-        if BaseError is not object:
+        if self.__class__.__mro__[-2] is not self.__class__:
             super(Error, self).__init__(msg, obj=obj, id=error_id)
         else:
             self.msg = msg
@@ -33,43 +23,46 @@ class Error(BaseError):
         raise ImproperlyConfigured('{}: ({}) {}'.format(six.text_type(self.obj), self.error_id, self.msg))
 
 
-# TODO: alternative for Django < 1.6 validations
 class QueryablePropertiesChecksMixin(InjectableMixin):
 
-    def validate(self, cls, model):  # TODO: Django 1.6 to Django 1.8
+    def validate(self, cls, model):
+        fake_cls = self._validate_queryable_properties(cls, model)
+        super(QueryablePropertiesChecksMixin, self).validate(fake_cls, model)
+
+    def _validate_queryable_properties(self, cls, model):
         date_hierarchy = None
         list_filter = []
         ordering = []
+        errors = []
 
         if cls.date_hierarchy:
             prop, property_errors = self._check_date_hierarchy_queryable_property(cls, model)
-            if prop and property_errors:
-                property_errors[0].raise_exception()
-            elif not prop:
+            errors.extend(property_errors)
+            if not prop:
                 date_hierarchy = cls.date_hierarchy
 
         for i, item in enumerate(cls.list_filter or ()):
             prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
                                                                                'list_filter[{}]'.format(i))
-            if prop and property_errors:
-                property_errors[0].raise_exception()
+            errors.extend(property_errors)
             list_filter.append('pk' if prop else item)
 
         for i, field_name in enumerate(cls.ordering or ()):
             prop, property_errors = self._check_ordering_queryable_property(cls, model, field_name,
                                                                             'ordering[{}]'.format(i))
-            if prop and property_errors:
-                property_errors[0].raise_exception()
+            errors.extend(property_errors)
             ordering.append('pk' if prop else field_name)
+
+        if errors:
+            errors[0].raise_exception()
 
         # Build a fake admin class without queryable property references to be
         # validated by Django.
-        fake_cls = type(cls.__name__, (cls,), {
+        return type(cls.__name__, (cls,), {
             'date_hierarchy': date_hierarchy,
             'list_filter': list_filter,
             'ordering': ordering,
         })
-        super(QueryablePropertiesChecksMixin, self).validate(fake_cls, model)
 
     def _check_queryable_property(self, obj, model, query_path, label, allow_lookups=True):
         errors = []
@@ -79,7 +72,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                 label, query_path)
             errors.append(Error(message, obj, error_id=1))
         if lookups and not allow_lookups:
-            message = 'Queryable properties in "{}" must not contain lookups/transforms (invalid item: "{}").'.format(
+            message = 'The queryable property in "{}" must not contain lookups/transforms (invalid item: "{}").'.format(
                 label, query_path)
             errors.append(Error(message, obj, error_id=2))
         return property_ref and property_ref.property, errors
@@ -99,10 +92,10 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         return self._check_queryable_property(obj, model, field_name, label, allow_lookups=False)
 
     def _check_ordering_queryable_property(self, obj, model, field_name, label):
-        if not isinstance(field_name, six.string_types) and Combinable is not None:
-            if isinstance(field_name, Combinable):
+        if not isinstance(field_name, six.string_types) and hasattr(expressions, 'Combinable'):
+            if isinstance(field_name, expressions.Combinable):
                 field_name = field_name.asc()
-            if isinstance(field_name, OrderBy) and isinstance(field_name.expression, F):
+            if isinstance(field_name, expressions.OrderBy) and isinstance(field_name.expression, F):
                 field_name = field_name.expression.name
         if field_name.startswith('-') or field_name.startswith('+'):
             field_name = field_name[1:]
