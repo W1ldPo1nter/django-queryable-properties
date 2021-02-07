@@ -21,7 +21,7 @@ class QueryablePropertiesAdminMixin(object):
         ):
             if validator_class and not issubclass(validator_class, QueryablePropertiesChecksMixin):
                 class_name = 'QueryableProperties' + validator_class.__name__
-                cls.validator_class = QueryablePropertiesChecksMixin.mix_with_class(validator_class, class_name)
+                setattr(cls, attr_name, QueryablePropertiesChecksMixin.mix_with_class(validator_class, class_name))
         return super(QueryablePropertiesAdminMixin, cls).validate(model)
 
     def check(self, **kwargs):  # TODO: Django 1.8 special case
