@@ -15,6 +15,16 @@ from django.db.models.query import QuerySet
 from django.db.models.sql.query import Query
 
 try:  # pragma: no cover
+    from django.contrib.admin import validation as admin_validation  # noqa: F401
+except ImportError:  # pragma: no cover
+    admin_validation = None  # noqa: F401
+
+try:  # pragma: no cover
+    from django.core import checks  # noqa: F401
+except ImportError:  # pragma: no cover
+    checks = None  # noqa: F401
+
+try:  # pragma: no cover
     from django.db.models.constants import LOOKUP_SEP  # noqa: F401
 except ImportError:  # pragma: no cover
     from django.db.models.sql.constants import LOOKUP_SEP  # noqa: F401
