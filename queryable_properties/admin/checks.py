@@ -12,7 +12,7 @@ class Error(getattr(checks, 'Error', object)):
 
     def __init__(self, msg, obj, error_id):
         error_id = 'queryable_properties.admin.E{:03}'.format(error_id)
-        if self.__class__.__mro__[-2] is not self.__class__:
+        if self.__class__.__bases__ != (object,):
             super(Error, self).__init__(msg, obj=obj, id=error_id)
         else:
             self.msg = msg
