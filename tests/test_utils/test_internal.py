@@ -1,17 +1,19 @@
 # encoding: utf-8
 import pytest
 
-from django.db.models import Q
+from django import VERSION as DJANGO_VERSION
+from django.db.models import CharField, IntegerField, Q, Sum
 from six.moves import cPickle
 
 from queryable_properties.utils.internal import (
-    InjectableMixin, MISSING_OBJECT, ModelAttributeGetter, parametrizable_decorator, QueryablePropertyReference,
-    resolve_queryable_property, TreeNodeProcessor
+    get_output_field, InjectableMixin, MISSING_OBJECT, ModelAttributeGetter, parametrizable_decorator,
+    QueryablePropertyReference, resolve_queryable_property, TreeNodeProcessor
 )
 
 from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                                      CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
                                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from ..conftest import Concat, Value
 
 
 class DummyClass(object):
@@ -290,3 +292,21 @@ class TestResolveQueryableProperty(object):
     ])
     def test_unsuccessful(self, model, path):
         assert resolve_queryable_property(model, path) == (None, [])
+
+
+class TestGetOutputField(object):
+
+    CHAR_FIELD = CharField()
+    INTEGER_FIELD = IntegerField(null=True)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
+    @pytest.mark.parametrize('annotation, expected_result', [
+        (Concat(Value('test'), 'some_field', output_field=CHAR_FIELD), CHAR_FIELD),
+        (Sum('aggregate', output_field=INTEGER_FIELD), INTEGER_FIELD),
+    ])
+    def test_success(self, annotation, expected_result):
+        assert get_output_field(annotation) is expected_result
+
+    @pytest.mark.parametrize('annotation', [Concat(Value('test'), 'some_field'), Sum('aggregate')])
+    def test_none(self, annotation):
+        assert get_output_field(annotation) is None
