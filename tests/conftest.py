@@ -12,7 +12,7 @@ except ImportError:
 try:
     from django.db.models.functions import Concat
 except ImportError:
-    Concat = Mock(output_field=None)
+    Concat = Mock(return_value=Mock(output_field=None))
 
 from .app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties)
