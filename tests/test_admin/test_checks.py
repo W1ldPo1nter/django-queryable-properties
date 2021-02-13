@@ -51,7 +51,7 @@ class TestQueryablePropertiesChecksMixin(object):
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="output fields couldn't be declared before Django 1.8")
     def test_admin_date_hierarchy_invalid_type(self, monkeypatch):
-        monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'date_hierarchy', 'highest_version')
+        monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'date_hierarchy', 'has_version_with_changelog')
         assert_admin_validation(ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties,
                                 'queryable_properties.admin.E003')
 
