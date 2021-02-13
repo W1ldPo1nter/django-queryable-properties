@@ -101,12 +101,12 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
             field_name = field_name[1:]
         return self._check_queryable_property(obj, model, field_name, label)
 
-    def _check_date_hierarchy(self, obj, model=None):
-        errors = super(QueryablePropertiesChecksMixin, self)._check_date_hierarchy(obj)
+    def _check_date_hierarchy(self, obj, *args):
+        errors = super(QueryablePropertiesChecksMixin, self)._check_date_hierarchy(obj, *args)
         if not errors or errors[0].id != 'admin.E127':
             return errors
 
-        prop, property_errors = self._check_date_hierarchy_queryable_property(obj, model or obj.model)
+        prop, property_errors = self._check_date_hierarchy_queryable_property(obj, getattr(obj, 'model', args[0]))
         return property_errors if prop else errors
 
     def _check_list_filter_item(self, obj, *args):
