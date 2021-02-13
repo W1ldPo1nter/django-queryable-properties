@@ -25,7 +25,7 @@ class QueryablePropertiesAdminMixin(object):
         self._ensure_property_checks(self)
         return super(QueryablePropertiesAdminMixin, self).check(**kwargs)
 
-    if six.get_method_self(ModelAdmin.check):
+    if hasattr(ModelAdmin, 'check') and six.get_method_self(ModelAdmin.check):
         # In old Django versions, check was a classmethod.
         check = classmethod(check)
 
