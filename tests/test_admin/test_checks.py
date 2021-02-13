@@ -29,6 +29,7 @@ def assert_admin_validation(admin_class, model, error_id=None, exception_text=No
             else:
                 admin_validation.validate(admin_class, model)
         except ImproperlyConfigured as e:
+            assert exception_text is not None
             assert exception_text in six.text_type(e)
         else:
             assert exception_text is None
