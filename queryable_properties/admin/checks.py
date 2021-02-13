@@ -67,7 +67,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
     def _check_queryable_property(self, obj, model, query_path, label, allow_lookups=True):
         errors = []
         property_ref, lookups = resolve_queryable_property(model, query_path.split(LOOKUP_SEP))
-        if not property_ref.property.get_annotation:
+        if property_ref and not property_ref.property.get_annotation:
             message = '"{}" refers to queryable property "{}", which does not implement annotation creation.'.format(
                 label, query_path)
             errors.append(Error(message, obj, error_id=1))
