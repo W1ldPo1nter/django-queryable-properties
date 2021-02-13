@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import six
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
 from ..compat import admin_validation, chain_queryset
@@ -25,7 +24,7 @@ class QueryablePropertiesAdminMixin(object):
         self._ensure_property_checks(self)
         return super(QueryablePropertiesAdminMixin, self).check(**kwargs)
 
-    if hasattr(ModelAdmin, 'check') and six.get_method_self(ModelAdmin.check):
+    if getattr(getattr(ModelAdmin, 'check', None), '__self__', None):
         # In old Django versions, check was a classmethod.
         check = classmethod(check)
 
