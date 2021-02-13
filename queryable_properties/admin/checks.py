@@ -45,13 +45,13 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
             prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
                                                                                'list_filter[{}]'.format(i))
             errors.extend(property_errors)
-            list_filter.append('pk' if prop else item)
+            list_filter.append(model._meta.pk.name if prop else item)
 
         for i, field_name in enumerate(cls.ordering or ()):
             prop, property_errors = self._check_ordering_queryable_property(cls, model, field_name,
                                                                             'ordering[{}]'.format(i))
             errors.extend(property_errors)
-            ordering.append('pk' if prop else field_name)
+            ordering.append(model._meta.pk.name if prop else field_name)
 
         if errors:
             errors[0].raise_exception()
