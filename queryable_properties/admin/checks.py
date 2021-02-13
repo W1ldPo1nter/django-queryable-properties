@@ -106,7 +106,8 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         if not errors or errors[0].id != 'admin.E127':
             return errors
 
-        prop, property_errors = self._check_date_hierarchy_queryable_property(obj, getattr(obj, 'model', args[0]))
+        model = args[0] if args else obj.model
+        prop, property_errors = self._check_date_hierarchy_queryable_property(obj, model)
         return property_errors if prop else errors
 
     def _check_list_filter_item(self, obj, *args):
@@ -116,7 +117,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
 
         # The number of arguments differs between old and recent Django
         # versions.
-        model = getattr(obj, 'model', args[0])
+        model = args[0] if len(args) > 2 else obj.model
         prop, property_errors = self._check_list_filter_queryable_property(obj, model, *args[-2:])
         return property_errors if prop else errors
 
@@ -127,6 +128,6 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
 
         # The number of arguments differs between old and recent Django
         # versions.
-        model = getattr(obj, 'model', args[0])
+        model = args[0] if len(args) > 2 else obj.model
         prop, property_errors = self._check_ordering_queryable_property(obj, model, *args[-2:])
         return property_errors if prop else errors
