@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import six
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
 from ..compat import admin_validation, chain_queryset
@@ -15,22 +16,29 @@ class QueryablePropertiesAdminMixin(object):
 
     @classmethod
     def validate(cls, model):
-        for attr_name, validator_class in (
-            ('validator_class', cls.validator_class),
-            ('default_validator_class', getattr(cls, 'default_validator_class', None)),
-        ):
-            if validator_class and not issubclass(validator_class, QueryablePropertiesChecksMixin):
-                class_name = 'QueryableProperties' + validator_class.__name__
-                setattr(cls, attr_name, QueryablePropertiesChecksMixin.mix_with_class(validator_class, class_name))
+        cls._ensure_property_checks()
         return super(QueryablePropertiesAdminMixin, cls).validate(model)
 
-    def check(self, **kwargs):  # TODO: Django 1.8 special case
-        # Dynamically add a mixin that handles queryable properties into the
-        # admin's checks class.
-        if not issubclass(self.checks_class, QueryablePropertiesChecksMixin):
-            class_name = 'QueryableProperties' + self.checks_class.__name__
-            self.checks_class = QueryablePropertiesChecksMixin.mix_with_class(self.checks_class, class_name)
+    def check(self, model=None, **kwargs):
+        if model:
+            kwargs['model'] = model
+        self._ensure_property_checks(self)
         return super(QueryablePropertiesAdminMixin, self).check(**kwargs)
+
+    if six.get_method_self(ModelAdmin.check):
+        # In old Django versions, check was a classmethod.
+        check = classmethod(check)
+
+    @classmethod
+    def _ensure_property_checks(cls, obj=None):
+        obj = obj or cls
+        # Dynamically add a mixin that handles queryable properties into the
+        # admin's checks/validation class.
+        for attr_name in ('checks_class', 'validator_class', 'default_validator_class'):
+            checks_class = getattr(obj, attr_name, None)
+            if checks_class and not issubclass(checks_class, QueryablePropertiesChecksMixin):
+                class_name = 'QueryableProperties' + checks_class.__name__
+                setattr(obj, attr_name, QueryablePropertiesChecksMixin.mix_with_class(checks_class, class_name))
 
     def get_queryset(self, request):
         queryset = super(QueryablePropertiesAdminMixin, self).get_queryset(request)
