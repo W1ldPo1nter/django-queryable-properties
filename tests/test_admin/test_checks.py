@@ -7,8 +7,8 @@ from django.contrib.admin import ModelAdmin, site
 from django.core.exceptions import ImproperlyConfigured
 
 from queryable_properties.compat import admin_validation
-from ..app_management.admin import VersionWithClassBasedPropertiesAdmin
-from ..app_management.models import VersionWithClassBasedProperties
+from ..app_management.admin import ApplicationWithClassBasedPropertiesAdmin, VersionWithClassBasedPropertiesAdmin
+from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
 
 
 def assert_admin_validation(admin_class, model, error_id=None, exception_text=None):
@@ -39,6 +39,18 @@ class TestQueryablePropertiesChecksMixin(object):
 
     @pytest.mark.parametrize('admin, model', [
         (VersionWithClassBasedPropertiesAdmin, VersionWithClassBasedProperties),
+        (ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties),
     ])
     def test_admin_success(self, admin, model):
         assert_admin_validation(admin, model)
+
+    def test_admin_non_annotatable_date_hierarchy_property(self, monkeypatch):
+        monkeypatch.setattr(VersionWithClassBasedPropertiesAdmin, 'date_hierarchy', 'major_minor')
+        assert_admin_validation(VersionWithClassBasedPropertiesAdmin, VersionWithClassBasedProperties,
+                                'queryable_properties.admin.E001', '(queryable_properties.admin.E001)')
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="output fields couldn't be declared before Django 1.8")
+    def test_admin_date_hierarchy_invalid_type(self, monkeypatch):
+        monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'date_hierarchy', 'highest_version')
+        assert_admin_validation(ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties,
+                                'queryable_properties.admin.E003')
