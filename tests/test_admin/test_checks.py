@@ -2,6 +2,7 @@
 
 import pytest
 import six
+from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import ModelAdmin, site
 from django.core.exceptions import ImproperlyConfigured
 
@@ -12,7 +13,10 @@ from ..app_management.models import VersionWithClassBasedProperties
 
 def assert_admin_validation(admin_class, model, error_id=None, exception_text=None):
     if hasattr(ModelAdmin, 'check'):
-        errors = admin_class(model, site).check()
+        if DJANGO_VERSION >= (1, 9):
+            errors = admin_class(model, site).check()
+        else:
+            errors = admin_class.check(model)
         if error_id is None:
             assert not errors
         else:
