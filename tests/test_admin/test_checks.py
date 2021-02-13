@@ -54,3 +54,8 @@ class TestQueryablePropertiesChecksMixin(object):
         monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'date_hierarchy', 'highest_version')
         assert_admin_validation(ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties,
                                 'queryable_properties.admin.E003')
+
+    def test_admin_date_hierarchy_invalid_field(self, monkeypatch):
+        monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'date_hierarchy', 'neither_property_nor_field')
+        assert_admin_validation(ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties,
+                                'admin.E127', "'neither_property_nor_field' that is missing from model")
