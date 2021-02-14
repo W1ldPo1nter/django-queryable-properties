@@ -11,7 +11,7 @@ from .filters import QueryablePropertyField
 
 class QueryablePropertiesAdminMixin(object):
 
-    list_select_properties = None
+    list_select_properties = ()
 
     @classmethod
     def validate(cls, model):
