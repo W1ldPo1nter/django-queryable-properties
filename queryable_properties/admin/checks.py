@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from itertools import chain
+
 import six
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import DateField, expressions, F
@@ -25,6 +27,13 @@ class Error(getattr(checks, 'Error', object)):
 
 class QueryablePropertiesChecksMixin(InjectableMixin):
 
+    def check(self, admin_obj, model=None, **kwargs):
+        if model:
+            kwargs['model'] = model
+        errors = super(QueryablePropertiesChecksMixin, self).check(admin_obj, **kwargs)
+        errors.extend(self._check_list_select_properties(admin_obj, model))
+        return errors
+
     def validate(self, cls, model):
         fake_cls = self._validate_queryable_properties(cls, model)
         super(QueryablePropertiesChecksMixin, self).validate(fake_cls, model)
@@ -33,7 +42,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         date_hierarchy = None
         list_filter = []
         ordering = []
-        errors = []
+        errors = self._check_list_select_properties(cls, model)
 
         if cls.date_hierarchy:
             prop, property_errors = self._check_date_hierarchy_queryable_property(cls, model)
@@ -64,17 +73,25 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
             'ordering': ordering,
         })
 
-    def _check_queryable_property(self, obj, model, query_path, label, allow_lookups=True):
+    def _check_queryable_property(self, obj, model, query_path, label, allow_relation=True, allow_lookups=True):
         errors = []
         property_ref, lookups = resolve_queryable_property(model, query_path.split(LOOKUP_SEP))
-        if property_ref and not property_ref.property.get_annotation:
-            message = '"{}" refers to queryable property "{}", which does not implement annotation creation.'.format(
-                label, query_path)
+        if not property_ref:
+            message = '"{}" refers to "{}", which is not a queryable property.'.format(label, query_path)
             errors.append(Error(message, obj, error_id=1))
-        if lookups and not allow_lookups:
-            message = 'The queryable property in "{}" must not contain lookups/transforms (invalid item: "{}").'.format(
-                label, query_path)
-            errors.append(Error(message, obj, error_id=2))
+        else:
+            if not property_ref.property.get_annotation:
+                message = ('"{}" refers to queryable property "{}", which does not implement annotation creation.'
+                           .format(label, query_path))
+                errors.append(Error(message, obj, error_id=2))
+            if query_path.count(LOOKUP_SEP) > len(lookups) and not allow_relation:
+                message = ('The queryable property in "{}" must not be a property on a related model (invalid item: '
+                           '"{}").'.format(label, query_path))
+                errors.append(Error(message, obj, error_id=3))
+            if lookups and not allow_lookups:
+                message = ('The queryable property in "{}" must not contain lookups/transforms (invalid item: "{}").'
+                           .format(label, query_path))
+                errors.append(Error(message, obj, error_id=4))
         return property_ref and property_ref.property, errors
 
     def _check_date_hierarchy_queryable_property(self, obj, model):
@@ -84,7 +101,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
             if output_field and not isinstance(output_field, DateField):
                 message = ('"date_hierarchy" refers to queryable property "{}", which does not annotate date values.'
                            .format(obj.date_hierarchy))
-                property_errors.append(Error(message, obj, error_id=3))
+                property_errors.append(Error(message, obj, error_id=5))
         return prop, property_errors
 
     def _check_list_filter_queryable_property(self, obj, model, item, label):
@@ -131,3 +148,15 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         model = args[0] if len(args) > 2 else obj.model
         prop, property_errors = self._check_ordering_queryable_property(obj, model, *args[-2:])
         return property_errors if prop else errors
+
+    def _check_list_select_properties(self, obj, model=None):
+        model = model or obj.model
+        if not isinstance(obj.list_select_properties, (list, tuple)):
+            return [Error('The value of "list_select_properties" must be a list or tuple.', obj, error_id=6)]
+        return list(chain.from_iterable(
+            self._check_list_select_properties_item(obj, model, item, 'list_select_properties[{}]'.format(index))
+            for index, item in enumerate(obj.list_select_properties)
+        ))
+
+    def _check_list_select_properties_item(self, obj, model, item, label):
+        return self._check_queryable_property(obj, model, item, label, allow_relation=False, allow_lookups=False)[1]

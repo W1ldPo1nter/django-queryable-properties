@@ -47,13 +47,13 @@ class TestQueryablePropertiesChecksMixin(object):
     def test_admin_non_annotatable_date_hierarchy_property(self, monkeypatch):
         monkeypatch.setattr(VersionWithClassBasedPropertiesAdmin, 'date_hierarchy', 'major_minor')
         assert_admin_validation(VersionWithClassBasedPropertiesAdmin, VersionWithClassBasedProperties,
-                                'queryable_properties.admin.E001', '(queryable_properties.admin.E001)')
+                                'queryable_properties.admin.E002', '(queryable_properties.admin.E002)')
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="output fields couldn't be declared before Django 1.8")
     def test_admin_date_hierarchy_invalid_type(self, monkeypatch):
         monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'date_hierarchy', 'has_version_with_changelog')
         assert_admin_validation(ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties,
-                                'queryable_properties.admin.E003')
+                                'queryable_properties.admin.E005')
 
     def test_admin_date_hierarchy_invalid_field(self, monkeypatch):
         monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'date_hierarchy', 'neither_property_nor_field')
