@@ -3,12 +3,17 @@
 import pytest
 import six
 from django import VERSION as DJANGO_VERSION
-from django.contrib.admin import ModelAdmin, site
+from django.contrib.admin import ModelAdmin, SimpleListFilter, site
+from django.contrib.admin.filters import AllValuesFieldListFilter
 from django.core.exceptions import ImproperlyConfigured
 
 from queryable_properties.compat import admin_validation
 from ..app_management.admin import ApplicationWithClassBasedPropertiesAdmin, VersionWithClassBasedPropertiesAdmin
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
+
+
+class DummyListFilter(SimpleListFilter):
+    parameter_name = 'dummy'
 
 
 def assert_admin_validation(admin_class, model, error_id=None, exception_text=None):
@@ -44,7 +49,7 @@ class TestQueryablePropertiesChecksMixin(object):
     def test_admin_success(self, admin, model):
         assert_admin_validation(admin, model)
 
-    def test_admin_non_annotatable_date_hierarchy_property(self, monkeypatch):
+    def test_admin_date_hierarchy_non_annotatable_property(self, monkeypatch):
         monkeypatch.setattr(VersionWithClassBasedPropertiesAdmin, 'date_hierarchy', 'major_minor')
         assert_admin_validation(VersionWithClassBasedPropertiesAdmin, VersionWithClassBasedProperties,
                                 'queryable_properties.admin.E002', '(queryable_properties.admin.E002)')
@@ -59,3 +64,32 @@ class TestQueryablePropertiesChecksMixin(object):
         monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'date_hierarchy', 'neither_property_nor_field')
         assert_admin_validation(ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties,
                                 'admin.E127', "'neither_property_nor_field' that is missing from model")
+
+    @pytest.mark.parametrize('filter_item', [
+        DummyListFilter,
+        ('common_data', AllValuesFieldListFilter),
+        ('support_start_date', AllValuesFieldListFilter),
+    ])
+    def test_admin_list_filter_valid_items(self, monkeypatch, filter_item):
+        monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'list_filter', (filter_item,))
+        assert_admin_validation(ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties)
+
+    @pytest.mark.parametrize('filter_item, error_id', [
+        ('major_minor', 'queryable_properties.admin.E002'),
+        ('is_supported__isnull', 'queryable_properties.admin.E004'),
+    ])
+    def test_admin_list_filter_invalid_property(self, monkeypatch, filter_item, error_id):
+        monkeypatch.setattr(VersionWithClassBasedPropertiesAdmin, 'list_filter', (filter_item,))
+        assert_admin_validation(VersionWithClassBasedPropertiesAdmin, VersionWithClassBasedProperties,
+                                error_id, '({})'.format(error_id))
+
+    @pytest.mark.parametrize('filter_item, error_id, exception_text', [
+        (lambda: None, 'admin.E113', 'which is not a descendant of ListFilter'),
+        (AllValuesFieldListFilter, 'admin.E114', 'not associated with a field name'),
+        (('version_count', DummyListFilter), 'admin.E115', 'which is not of type FieldListFilter'),
+        ('neither_property_nor_field', 'admin.E116', "'neither_property_nor_field' which does not refer to a Field"),
+    ])
+    def test_admin_list_filter_invalid_items(self, monkeypatch, filter_item, error_id, exception_text):
+        monkeypatch.setattr(ApplicationWithClassBasedPropertiesAdmin, 'list_filter', (filter_item,))
+        assert_admin_validation(ApplicationWithClassBasedPropertiesAdmin, ApplicationWithClassBasedProperties,
+                                error_id, exception_text)
