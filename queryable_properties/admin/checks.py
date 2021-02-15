@@ -34,11 +34,11 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         errors.extend(self._check_list_select_properties(admin_obj, model))
         return errors
 
-    def validate(self, cls, model):
+    def validate(self, cls, model):  # pragma: no cover
         fake_cls = self._validate_queryable_properties(cls, model)
         super(QueryablePropertiesChecksMixin, self).validate(fake_cls, model)
 
-    def _validate_queryable_properties(self, cls, model):
+    def _validate_queryable_properties(self, cls, model):  # pragma: no cover
         date_hierarchy = None
         list_filter = []
         ordering = []

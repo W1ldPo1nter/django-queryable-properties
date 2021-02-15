@@ -3,7 +3,7 @@
 from queryable_properties.admin import QueryablePropertiesAdmin
 
 
-class ApplicationWithClassBasedPropertiesAdmin(QueryablePropertiesAdmin):
+class ApplicationAdmin(QueryablePropertiesAdmin):
     list_display = ('name', 'highest_version', 'version_count')
     list_filter = ('common_data', 'support_start_date', 'has_version_with_changelog')
     search_fields = ('name', 'highest_version')
@@ -12,7 +12,7 @@ class ApplicationWithClassBasedPropertiesAdmin(QueryablePropertiesAdmin):
     ordering = ('highest_version', 'name')
 
 
-class VersionWithClassBasedPropertiesAdmin(QueryablePropertiesAdmin):
+class VersionAdmin(QueryablePropertiesAdmin):
     list_display = ('version', 'application', 'is_supported')
     list_filter = ('is_supported', 'released_in_2018', 'major')
     search_fields = ('changes',)
