@@ -88,9 +88,9 @@ class TestQueryablePropertiesChecksMixin(object):
                                 error_id, '({})'.format(error_id))
 
     @pytest.mark.parametrize('filter_item, error_id, exception_text', [
-        (Dummy, 'admin.E113', 'which is not a descendant of ListFilter'),
-        (AllValuesFieldListFilter, 'admin.E114', 'not associated with a field name'),
-        (('version_count', DummyListFilter), 'admin.E115', 'which is not of type FieldListFilter'),
+        (Dummy, 'admin.E113', "'Dummy' which is not a descendant of ListFilter"),
+        (AllValuesFieldListFilter, 'admin.E114', "'AllValuesFieldListFilter' which is of type FieldListFilter"),
+        (('version_count', DummyListFilter), 'admin.E115', "'DummyListFilter' which is not of type FieldListFilter"),
         ('neither_property_nor_field', 'admin.E116', "'neither_property_nor_field' which does not refer to a Field"),
     ])
     def test_admin_list_filter_invalid_items(self, monkeypatch, filter_item, error_id, exception_text):
