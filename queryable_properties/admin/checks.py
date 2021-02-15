@@ -43,24 +43,31 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         list_filter = []
         ordering = []
         errors = self._check_list_select_properties(cls, model)
+        pk_name = model._meta.pk.name
 
         if cls.date_hierarchy:
             prop, property_errors = self._check_date_hierarchy_queryable_property(cls, model)
-            errors.extend(property_errors)
-            if not prop:
+            if prop:
+                errors.extend(property_errors)
+            else:
                 date_hierarchy = cls.date_hierarchy
 
         for i, item in enumerate(cls.list_filter or ()):
-            prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
-                                                                               'list_filter[{}]'.format(i))
-            errors.extend(property_errors)
-            list_filter.append(model._meta.pk.name if prop else item)
+            if not callable(item):
+                prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
+                                                                                   'list_filter[{}]'.format(i))
+                if prop:
+                    errors.extend(property_errors)
+                    item = (pk_name, item[1]) if isinstance(item, (tuple, list)) else pk_name
+            list_filter.append(item)
 
         for i, field_name in enumerate(cls.ordering or ()):
             prop, property_errors = self._check_ordering_queryable_property(cls, model, field_name,
                                                                             'ordering[{}]'.format(i))
-            errors.extend(property_errors)
-            ordering.append(model._meta.pk.name if prop else field_name)
+            if prop:
+                errors.extend(property_errors)
+                field_name = pk_name
+            ordering.append(field_name)
 
         if errors:
             errors[0].raise_exception()
@@ -105,6 +112,8 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         return prop, property_errors
 
     def _check_list_filter_queryable_property(self, obj, model, item, label):
+        if callable(item):
+            return None, []
         field_name = item[0] if isinstance(item, (tuple, list)) else item
         return self._check_queryable_property(obj, model, field_name, label, allow_lookups=False)
 
