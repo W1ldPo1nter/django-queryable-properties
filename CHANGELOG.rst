@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+- Fixed the construction of ``GROUP BY`` clauses when using annotations based on aggregate queryable properties in
+  Django 1.8
+
 1.5.0 (2020-12-30)
 ------------------
 
