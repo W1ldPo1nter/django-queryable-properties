@@ -9,7 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F
 
 from queryable_properties.compat import admin_validation
-from ..app_management.admin import ApplicationAdmin, VersionAdmin
+from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
 from ..conftest import Concat, Value
 
@@ -52,21 +52,21 @@ class TestQueryablePropertiesChecksMixin(object):
         (VersionAdmin, VersionWithClassBasedProperties),
         (ApplicationAdmin, ApplicationWithClassBasedProperties),
     ])
-    def test_admin_success(self, admin, model):
+    def test_success(self, admin, model):
         assert_admin_validation(admin, model)
 
-    def test_admin_date_hierarchy_non_annotatable_property(self, monkeypatch):
+    def test_date_hierarchy_non_annotatable_property(self, monkeypatch):
         monkeypatch.setattr(VersionAdmin, 'date_hierarchy', 'major_minor')
         assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties,
                                 'queryable_properties.admin.E002', '(queryable_properties.admin.E002)')
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="output fields couldn't be declared before Django 1.8")
-    def test_admin_date_hierarchy_invalid_type(self, monkeypatch):
+    def test_date_hierarchy_invalid_type(self, monkeypatch):
         monkeypatch.setattr(ApplicationAdmin, 'date_hierarchy', 'has_version_with_changelog')
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
                                 'queryable_properties.admin.E005')
 
-    def test_admin_date_hierarchy_invalid_field(self, monkeypatch):
+    def test_date_hierarchy_invalid_field(self, monkeypatch):
         monkeypatch.setattr(ApplicationAdmin, 'date_hierarchy', 'neither_property_nor_field')
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
                                 'admin.E127', "'neither_property_nor_field' that is missing from model")
@@ -76,7 +76,7 @@ class TestQueryablePropertiesChecksMixin(object):
         ('common_data', AllValuesFieldListFilter),
         ('support_start_date', AllValuesFieldListFilter),
     ])
-    def test_admin_list_filter_valid_items(self, monkeypatch, filter_item):
+    def test_list_filter_valid_items(self, monkeypatch, filter_item):
         monkeypatch.setattr(ApplicationAdmin, 'list_filter', (filter_item,))
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties)
 
@@ -84,7 +84,7 @@ class TestQueryablePropertiesChecksMixin(object):
         ('major_minor', 'queryable_properties.admin.E002'),
         ('is_supported__isnull', 'queryable_properties.admin.E004'),
     ])
-    def test_admin_list_filter_invalid_property(self, monkeypatch, filter_item, error_id):
+    def test_list_filter_invalid_property(self, monkeypatch, filter_item, error_id):
         monkeypatch.setattr(VersionAdmin, 'list_filter', (filter_item,))
         assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties, error_id, '({})'.format(error_id))
 
@@ -94,41 +94,57 @@ class TestQueryablePropertiesChecksMixin(object):
         (('version_count', DummyListFilter), 'admin.E115', "'DummyListFilter' which is not of type FieldListFilter"),
         ('neither_property_nor_field', 'admin.E116', "'neither_property_nor_field' which does not refer to a Field"),
     ])
-    def test_admin_list_filter_invalid_items(self, monkeypatch, filter_item, error_id, exception_text):
+    def test_list_filter_invalid_items(self, monkeypatch, filter_item, error_id, exception_text):
         monkeypatch.setattr(ApplicationAdmin, 'list_filter', (filter_item,))
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties, error_id, exception_text)
 
-    def test_admin_list_select_properties_invalid_type(self, monkeypatch):
-        monkeypatch.setattr(VersionAdmin, 'list_select_properties', None)
-        assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties,
+    @pytest.mark.parametrize('admin_class', [ApplicationAdmin, VersionInline])
+    def test_list_select_properties_invalid_type(self, monkeypatch, admin_class):
+        monkeypatch.setattr(admin_class, 'list_select_properties', None)
+        assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
                                 'queryable_properties.admin.E006', '(queryable_properties.admin.E006)')
 
-    @pytest.mark.parametrize('property_name, error_id', [
-        ('name', 'queryable_properties.admin.E001'),
-        ('dummy', 'queryable_properties.admin.E002'),
-        ('categories__version_count', 'queryable_properties.admin.E003'),
-        ('version_count__lt', 'queryable_properties.admin.E004'),
+    @pytest.mark.parametrize('admin_class, property_name, error_id', [
+        (ApplicationAdmin, 'name', 'queryable_properties.admin.E001'),
+        (VersionInline, 'major', 'queryable_properties.admin.E001'),
+        (ApplicationAdmin, 'dummy', 'queryable_properties.admin.E002'),
+        (VersionInline, 'major_minor', 'queryable_properties.admin.E002'),
+        (ApplicationAdmin, 'categories__version_count', 'queryable_properties.admin.E003'),
+        (VersionInline, 'application__categories__version_count', 'queryable_properties.admin.E003'),
+        (ApplicationAdmin, 'version_count__lt', 'queryable_properties.admin.E004'),
+        (VersionInline, 'version__regex', 'queryable_properties.admin.E004'),
     ])
-    def test_admin_list_select_properties_invalid_property(self, monkeypatch, property_name, error_id):
-        monkeypatch.setattr(ApplicationAdmin, 'list_select_properties', (property_name,))
+    def test_list_select_properties_invalid_property(self, monkeypatch, admin_class, property_name, error_id):
+        monkeypatch.setattr(admin_class, 'list_select_properties', (property_name,))
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
                                 error_id, '({})'.format(error_id))
 
-    def test_admin_ordering_valid_desc(self, monkeypatch):
-        monkeypatch.setattr(ApplicationAdmin, 'ordering', ('-version_count',))
+    @pytest.mark.parametrize('admin_class, property_name', [
+        (ApplicationAdmin, 'version_count'),
+        (VersionInline, 'version'),
+    ])
+    def test_ordering_valid_desc(self, monkeypatch, admin_class, property_name):
+        monkeypatch.setattr(admin_class, 'ordering', ('-' + property_name,))
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-    @pytest.mark.parametrize('expression', [
-        F('version'),
-        Concat(Value('V'), 'version'),
-        Concat(Value('V'), 'version').desc(),
+    @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Expression-based ordering wasn't supported before Django 2.0")
+    @pytest.mark.parametrize('admin_class, expression', [
+        (ApplicationAdmin, F('highest_version')),
+        (VersionInline, F('version')),
+        (ApplicationAdmin, Concat(Value('V'), 'highest_version')),
+        (VersionInline, Concat(Value('V'), 'version')),
+        (ApplicationAdmin, Concat(Value('V'), 'highest_version').desc()),
+        (VersionInline, Concat(Value('V'), 'version').desc()),
     ])
-    def test_admin_ordering_valid_expressions(self, monkeypatch, expression):
-        monkeypatch.setattr(VersionAdmin, 'ordering', (expression,))
-        assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties)
+    def test_ordering_valid_expressions(self, monkeypatch, admin_class, expression):
+        monkeypatch.setattr(admin_class, 'ordering', (expression,))
+        assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties)
 
-    def test_admin_ordering_invalid_property(self, monkeypatch):
-        monkeypatch.setattr(VersionAdmin, 'ordering', ('major_minor',))
-        assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties,
+    @pytest.mark.parametrize('admin_class, property_name', [
+        (ApplicationAdmin, 'dummy'),
+        (VersionInline, 'major_minor'),
+    ])
+    def test_ordering_invalid_property(self, monkeypatch, admin_class, property_name):
+        monkeypatch.setattr(admin_class, 'ordering', (property_name,))
+        assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
                                 'queryable_properties.admin.E002', '(queryable_properties.admin.E002)')
