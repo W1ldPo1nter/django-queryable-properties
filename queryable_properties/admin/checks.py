@@ -16,7 +16,7 @@ class Error(getattr(checks, 'Error', object)):
         error_id = 'queryable_properties.admin.E{:03}'.format(error_id)
         if self.__class__.__bases__ != (object,):
             super(Error, self).__init__(msg, obj=obj, id=error_id)
-        else:
+        else:  # pragma: no cover
             self.msg = msg
             self.obj = obj
             self.error_id = error_id
@@ -28,7 +28,7 @@ class Error(getattr(checks, 'Error', object)):
 class QueryablePropertiesChecksMixin(InjectableMixin):
 
     def check(self, admin_obj, model=None, **kwargs):
-        if model:
+        if model:  # pragma: no cover
             kwargs['model'] = model
         errors = super(QueryablePropertiesChecksMixin, self).check(admin_obj, **kwargs)
         errors.extend(self._check_list_select_properties(admin_obj, model))
@@ -112,8 +112,6 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         return prop, property_errors
 
     def _check_list_filter_queryable_property(self, obj, model, item, label):
-        if callable(item):
-            return None, []
         field_name = item[0] if isinstance(item, (tuple, list)) else item
         return self._check_queryable_property(obj, model, field_name, label, allow_lookups=False)
 
