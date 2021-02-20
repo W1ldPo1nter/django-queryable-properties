@@ -1,15 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from queryable_properties.admin import QueryablePropertiesAdmin
-
-
-class ApplicationAdmin(QueryablePropertiesAdmin):
-    list_display = ('name', 'highest_version', 'version_count')
-    list_filter = ('common_data', 'support_start_date', 'has_version_with_changelog')
-    search_fields = ('name', 'highest_version')
-    date_hierarchy = 'support_start_date'
-    list_select_properties = ('highest_version', 'version_count')
-    ordering = ('highest_version', 'name')
+from queryable_properties.admin import QueryablePropertiesAdmin, QueryablePropertiesTabularInline
+from ..app_management.models import VersionWithClassBasedProperties
 
 
 class VersionAdmin(QueryablePropertiesAdmin):
@@ -18,3 +10,19 @@ class VersionAdmin(QueryablePropertiesAdmin):
     search_fields = ('changes',)
     date_hierarchy = 'supported_from'
     ordering = ('application', 'major', 'minor', 'patch')
+
+
+class VersionInline(QueryablePropertiesTabularInline):
+    model = VersionWithClassBasedProperties
+    list_select_properties = ('changes_or_default',)
+    ordering = ('version',)
+
+
+class ApplicationAdmin(QueryablePropertiesAdmin):
+    list_display = ('name', 'highest_version', 'version_count')
+    list_filter = ('common_data', 'support_start_date', 'has_version_with_changelog')
+    list_select_properties = ('highest_version', 'version_count')
+    search_fields = ('name', 'highest_version')
+    date_hierarchy = 'support_start_date'
+    ordering = ('highest_version', 'name')
+    inlines = (VersionInline,)
