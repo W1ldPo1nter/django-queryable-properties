@@ -6,10 +6,12 @@ from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import ModelAdmin, SimpleListFilter, site
 from django.contrib.admin.filters import AllValuesFieldListFilter
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models import F
 
 from queryable_properties.compat import admin_validation
 from ..app_management.admin import ApplicationAdmin, VersionAdmin
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
+from ..conftest import Concat, Value
 
 
 class Dummy(object):
@@ -96,6 +98,11 @@ class TestQueryablePropertiesChecksMixin(object):
         monkeypatch.setattr(ApplicationAdmin, 'list_filter', (filter_item,))
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties, error_id, exception_text)
 
+    def test_admin_list_select_properties_invalid_type(self, monkeypatch):
+        monkeypatch.setattr(VersionAdmin, 'list_select_properties', None)
+        assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties,
+                                'queryable_properties.admin.E006', '(queryable_properties.admin.E006)')
+
     @pytest.mark.parametrize('property_name, error_id', [
         ('name', 'queryable_properties.admin.E001'),
         ('dummy', 'queryable_properties.admin.E002'),
@@ -106,3 +113,22 @@ class TestQueryablePropertiesChecksMixin(object):
         monkeypatch.setattr(ApplicationAdmin, 'list_select_properties', (property_name,))
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
                                 error_id, '({})'.format(error_id))
+
+    def test_admin_ordering_valid_desc(self, monkeypatch):
+        monkeypatch.setattr(ApplicationAdmin, 'ordering', ('-version_count',))
+        assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties)
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.parametrize('expression', [
+        F('version'),
+        Concat(Value('V'), 'version'),
+        Concat(Value('V'), 'version').desc(),
+    ])
+    def test_admin_ordering_valid_expressions(self, monkeypatch, expression):
+        monkeypatch.setattr(VersionAdmin, 'ordering', (expression,))
+        assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties)
+
+    def test_admin_ordering_invalid_property(self, monkeypatch):
+        monkeypatch.setattr(VersionAdmin, 'ordering', ('major_minor',))
+        assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties,
+                                'queryable_properties.admin.E002', '(queryable_properties.admin.E002)')
