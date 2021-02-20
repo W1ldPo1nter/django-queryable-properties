@@ -112,6 +112,9 @@ class TestAnnotationMixin(object):
         prop.name = 'test'
         return prop
 
+    def test_admin_order_field(self, prop):
+        assert prop.admin_order_field == 'test'
+
     @pytest.mark.parametrize('lookup, value', [
         ('exact', 'abc'),
         ('isnull', True),

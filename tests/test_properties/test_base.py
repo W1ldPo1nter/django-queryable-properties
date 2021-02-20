@@ -35,10 +35,26 @@ class TestBasics(object):
         instance.__class__.dummy.counter = 0
         return instance
 
+    @pytest.mark.parametrize('kwargs', [
+        {},
+        {'verbose_name': 'Test Property'},
+    ])
+    def test_initializer(self, kwargs):
+        prop = QueryableProperty(**kwargs)
+        assert prop.name is None
+        assert prop.model is None
+        assert prop.setter_cache_behavior is CLEAR_CACHE
+        assert prop.verbose_name == kwargs.get('verbose_name')
+
+    def test_short_description(self):
+        prop = QueryableProperty(verbose_name='Test Property')
+        assert prop.short_description == 'Test Property'
+
     def test_contribute_to_class(self, model_instance):
         prop = model_instance.__class__.dummy
         assert isinstance(prop, QueryableProperty)
         assert prop.name == 'dummy'
+        assert prop.verbose_name == 'Dummy'
         assert prop.model is model_instance.__class__
         assert six.get_method_function(model_instance.reset_property) is reset_queryable_property
         # TODO: test that an existing method with the name reset_property will not be overridden
