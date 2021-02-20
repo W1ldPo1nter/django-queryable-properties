@@ -8,6 +8,7 @@ from django.contrib.admin.filters import AllValuesFieldListFilter
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F
 
+from queryable_properties.admin.checks import Error
 from queryable_properties.compat import admin_validation
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
@@ -15,7 +16,9 @@ from ..conftest import Concat, Value
 
 
 class Dummy(object):
-    pass
+
+    def __str__(self):
+        return self.__class__.__name__
 
 
 class DummyListFilter(SimpleListFilter):
@@ -44,6 +47,20 @@ def assert_admin_validation(admin_class, model, error_id=None, exception_text=No
             assert exception_text in six.text_type(e)
         else:
             assert exception_text is None
+
+
+class TestError(object):
+
+    def test_initializer(self):
+        error = Error('test message', Dummy, 42)
+        assert error.msg == 'test message'
+        assert error.obj is Dummy
+        assert error.id == 'queryable_properties.admin.E042'
+
+    def test_raise_exception(self):
+        error = Error('test message', Dummy(), 42)
+        with pytest.raises(ImproperlyConfigured, match=r'Dummy: \(queryable_properties\.admin\.E042\) test message'):
+            error.raise_exception()
 
 
 class TestQueryablePropertiesChecksMixin(object):
