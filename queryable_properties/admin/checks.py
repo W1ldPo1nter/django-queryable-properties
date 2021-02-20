@@ -19,10 +19,10 @@ class Error(getattr(checks, 'Error', object)):
         else:  # pragma: no cover
             self.msg = msg
             self.obj = obj
-            self.error_id = error_id
+            self.id = error_id
 
     def raise_exception(self):
-        raise ImproperlyConfigured('{}: ({}) {}'.format(six.text_type(self.obj), self.error_id, self.msg))
+        raise ImproperlyConfigured('{}: ({}) {}'.format(six.text_type(self.obj), self.id, self.msg))
 
 
 class QueryablePropertiesChecksMixin(InjectableMixin):
