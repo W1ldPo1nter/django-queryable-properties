@@ -91,10 +91,20 @@ class QueryablePropertiesTabularInline(QueryablePropertiesAdminMixin, TabularInl
 # monkeypatched in order to allow the queryable properties validation to take
 # effect.
 django_validate = getattr(admin_validation, 'validate', None)
-if django_validate:
+django_validate_inline = getattr(admin_validation, 'validate_inline', None)
+
+if django_validate:  # pragma: no cover
     def validate(cls, model):
         if issubclass(cls, QueryablePropertiesAdminMixin):
             cls = QueryablePropertiesChecksMixin()._validate_queryable_properties(cls, model)
         django_validate(cls, model)
 
     admin_validation.validate = validate
+
+if django_validate_inline:  # pragma: no cover
+    def validate_inline(cls, parent, parent_model):
+        if issubclass(cls, QueryablePropertiesAdminMixin):
+            cls = QueryablePropertiesChecksMixin()._validate_queryable_properties(cls, cls.model)
+        django_validate_inline(cls, parent, parent_model)
+
+    admin_validation.validate_inline = validate_inline
