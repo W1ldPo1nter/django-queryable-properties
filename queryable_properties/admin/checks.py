@@ -3,6 +3,7 @@
 from itertools import chain
 
 import six
+from django.contrib.admin.options import InlineModelAdmin
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import DateField, expressions, F
 
@@ -27,11 +28,9 @@ class Error(getattr(checks, 'Error', object)):
 
 class QueryablePropertiesChecksMixin(InjectableMixin):
 
-    def check(self, admin_obj, model=None, **kwargs):
-        if model:  # pragma: no cover
-            kwargs['model'] = model
-        errors = super(QueryablePropertiesChecksMixin, self).check(admin_obj, **kwargs)
-        errors.extend(self._check_list_select_properties(admin_obj, model))
+    def check(self, admin_obj, *args, **kwargs):
+        errors = super(QueryablePropertiesChecksMixin, self).check(admin_obj, *args, **kwargs)
+        errors.extend(self._check_list_select_properties(admin_obj, args[0] if args else None))
         return errors
 
     def validate(self, cls, model):  # pragma: no cover
@@ -45,21 +44,22 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         errors = self._check_list_select_properties(cls, model)
         pk_name = model._meta.pk.name
 
-        if cls.date_hierarchy:
-            prop, property_errors = self._check_date_hierarchy_queryable_property(cls, model)
-            if prop:
-                errors.extend(property_errors)
-            else:
-                date_hierarchy = cls.date_hierarchy
-
-        for i, item in enumerate(cls.list_filter or ()):
-            if not callable(item):
-                prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
-                                                                                   'list_filter[{}]'.format(i))
+        if not issubclass(cls, InlineModelAdmin):
+            if cls.date_hierarchy:
+                prop, property_errors = self._check_date_hierarchy_queryable_property(cls, model)
                 if prop:
                     errors.extend(property_errors)
-                    item = (pk_name, item[1]) if isinstance(item, (tuple, list)) else pk_name
-            list_filter.append(item)
+                else:
+                    date_hierarchy = cls.date_hierarchy
+
+            for i, item in enumerate(cls.list_filter or ()):
+                if not callable(item):
+                    prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
+                                                                                       'list_filter[{}]'.format(i))
+                    if prop:
+                        errors.extend(property_errors)
+                        item = (pk_name, item[1]) if isinstance(item, (tuple, list)) else pk_name
+                list_filter.append(item)
 
         for i, field_name in enumerate(cls.ordering or ()):
             prop, property_errors = self._check_ordering_queryable_property(cls, model, field_name,
