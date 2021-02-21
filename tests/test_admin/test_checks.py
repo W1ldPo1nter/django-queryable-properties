@@ -81,7 +81,7 @@ class TestQueryablePropertiesChecksMixin(object):
     def test_date_hierarchy_invalid_type(self, monkeypatch):
         monkeypatch.setattr(ApplicationAdmin, 'date_hierarchy', 'has_version_with_changelog')
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
-                                'queryable_properties.admin.E005')
+                                'queryable_properties.admin.E005', '(queryable_properties.admin.E005)')
 
     def test_date_hierarchy_invalid_field(self, monkeypatch):
         monkeypatch.setattr(ApplicationAdmin, 'date_hierarchy', 'neither_property_nor_field')
