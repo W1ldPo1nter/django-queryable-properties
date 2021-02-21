@@ -36,7 +36,7 @@ def assert_admin_validation(admin_class, model, error_id=None, exception_text=No
         else:
             assert any(error.id == error_id for error in errors)
 
-    if hasattr(admin_validation or ModelAdmin, 'validate'):
+    if hasattr(admin_validation, 'validate') or hasattr(ModelAdmin, 'validate'):
         try:
             if hasattr(ModelAdmin, 'validate'):
                 admin_class.validate(model)
