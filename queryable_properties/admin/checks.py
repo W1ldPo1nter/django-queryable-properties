@@ -30,7 +30,10 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
 
     def check(self, admin_obj, *args, **kwargs):
         errors = super(QueryablePropertiesChecksMixin, self).check(admin_obj, *args, **kwargs)
-        errors.extend(self._check_list_select_properties(admin_obj, args[0] if args else None))
+        # The number of arguments differs between old and recent Django
+        # versions.
+        model = getattr(admin_obj, 'model', args[0] if args else None)
+        errors.extend(self._check_list_select_properties(admin_obj, model))
         return errors
 
     def validate(self, cls, model):  # pragma: no cover
@@ -156,8 +159,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         prop, property_errors = self._check_ordering_queryable_property(obj, model, *args[-2:])
         return property_errors if prop else errors
 
-    def _check_list_select_properties(self, obj, model=None):
-        model = model or obj.model
+    def _check_list_select_properties(self, obj, model):
         if not isinstance(obj.list_select_properties, (list, tuple)):
             return [Error('The value of "list_select_properties" must be a list or tuple.', obj, error_id=6)]
         return list(chain.from_iterable(
