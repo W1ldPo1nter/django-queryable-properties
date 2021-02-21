@@ -12,8 +12,21 @@ from ..utils.internal import get_output_field, InjectableMixin, resolve_queryabl
 
 
 class Error(getattr(checks, 'Error', object)):
+    """
+    Custom error class to normalize check/validation error handling across
+    all supported Django version. Also takes care of producing correct
+    queryable properties error IDs and raising exceptions for old-style
+    validations.
+    """
 
     def __init__(self, msg, obj, error_id):
+        """
+        Initialize a new error object with the given data.
+
+        :param str msg: The error message.
+        :param obj: The object which was checked/validated.
+        :param int error_id: A unique ID for the error.
+        """
         error_id = 'queryable_properties.admin.E{:03}'.format(error_id)
         if self.__class__.__bases__ != (object,):
             super(Error, self).__init__(msg, obj=obj, id=error_id)
@@ -23,10 +36,16 @@ class Error(getattr(checks, 'Error', object)):
             self.id = error_id
 
     def raise_exception(self):
+        """Raise an ImproperlyConfigured exception for this error."""
         raise ImproperlyConfigured('{}: ({}) {}'.format(six.text_type(self.obj), self.id, self.msg))
 
 
 class QueryablePropertiesChecksMixin(InjectableMixin):
+    """
+    A mixin for Django's recent admin checks classes as well as old-style
+    validation classes that allows to validate references to queryable
+    properties in admin class attributes.
+    """
 
     def check(self, admin_obj, *args, **kwargs):
         errors = super(QueryablePropertiesChecksMixin, self).check(admin_obj, *args, **kwargs)
@@ -41,6 +60,25 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         super(QueryablePropertiesChecksMixin, self).validate(fake_cls, model)
 
     def _validate_queryable_properties(self, cls, model):  # pragma: no cover
+        """
+        Main routine regarding queryable properties for old-style validations.
+
+        Since validations raise an error as soon as they find a problem, they
+        cannot be extended the same way checks can (by inspecting errors and
+        suppressing/replacing them) as a suppressed exception could leave
+        subsequent errors undetected.
+        Instead, all queryable property validations are performed first and
+        an exception is raised if there's a problem. If everything related to
+        queryable properties validates successfully, a fake admin class is
+        created on the fly, which is stripped of all queryable property
+        references and can therefore be subjected to Django's standard
+        validations.
+
+        :param cls: The admin class to validate.
+        :param model: The model the admin class is used for.
+        :return: A fake class to be validated by Django's standard validation.
+        :rtype: type
+        """
         date_hierarchy = None
         list_filter = []
         ordering = []
@@ -61,6 +99,10 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                                                                                        'list_filter[{}]'.format(i))
                     if prop:
                         errors.extend(property_errors)
+                        # Replace a valid reference to a queryable property
+                        # with a reference to the PK field so avoid Django
+                        # validation errors while not changing indexes of
+                        # other items.
                         item = (pk_name, item[1]) if isinstance(item, (tuple, list)) else pk_name
                 list_filter.append(item)
 
@@ -69,6 +111,9 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                                                                             'ordering[{}]'.format(i))
             if prop:
                 errors.extend(property_errors)
+                # Replace a valid reference to a queryable property with a
+                # reference to the PK field so avoid Django validation errors
+                # while not changing indexes of other items.
                 field_name = pk_name
             ordering.append(field_name)
 
@@ -78,12 +123,29 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         # Build a fake admin class without queryable property references to be
         # validated by Django.
         return type(cls.__name__, (cls,), {
+            '__module__': cls.__module__,
             'date_hierarchy': date_hierarchy,
             'list_filter': list_filter,
             'ordering': ordering,
         })
 
     def _check_queryable_property(self, obj, model, query_path, label, allow_relation=True, allow_lookups=True):
+        """
+        Perform common checks for a (potential) referenced queryable property.
+
+        :param obj: The admin object or class.
+        :param model: The model the admin class is used for.
+        :param str query_path: The query path to the queryable property.
+        :param str label: A label to use for error messages.
+        :param bool allow_relation: Whether or not the queryable property
+                                    should be considered valid if it is
+                                    reached via relations.
+        :param bool allow_lookups: Whether or not the reference to the
+                                   queryable property may contain lookups.
+        :return: A 2-tuple containing the resolved queryable property (if any)
+                 as well as a list of check errors.
+        :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
+        """
         errors = []
         property_ref, lookups = resolve_queryable_property(model, query_path.split(LOOKUP_SEP))
         if not property_ref:
@@ -105,6 +167,16 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         return property_ref and property_ref.property, errors
 
     def _check_date_hierarchy_queryable_property(self, obj, model):
+        """
+        Perform checks for a (potential) queryable property used as date
+        hierarchy.
+
+        :param obj: The admin object or class.
+        :param model: The model the admin class is used for.
+        :return: A 2-tuple containing the resolved queryable property (if any)
+                 as well as a list of check errors.
+        :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
+        """
         prop, property_errors = self._check_queryable_property(obj, model, obj.date_hierarchy, 'date_hierarchy')
         if prop and not property_errors:
             output_field = get_output_field(prop.get_annotation(model))
@@ -115,10 +187,34 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         return prop, property_errors
 
     def _check_list_filter_queryable_property(self, obj, model, item, label):
+        """
+        Perform checks for a (potential) queryable property used as a list
+        filter item.
+
+        :param obj: The admin object or class.
+        :param model: The model the admin class is used for.
+        :param str | list | tuple item: The list filter item.
+        :param str label: A label to use for error messages.
+        :return: A 2-tuple containing the resolved queryable property (if any)
+                 as well as a list of check errors.
+        :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
+        """
         field_name = item[0] if isinstance(item, (tuple, list)) else item
         return self._check_queryable_property(obj, model, field_name, label, allow_lookups=False)
 
     def _check_ordering_queryable_property(self, obj, model, field_name, label):
+        """
+        Perform checks for a (potential) queryable property used as an ordering
+        item.
+
+        :param obj: The admin object or class.
+        :param model: The model the admin class is used for.
+        :param str | expressions.BaseExpression field_name: The ordering item.
+        :param str label: A label to use for error messages.
+        :return: A 2-tuple containing the resolved queryable property (if any)
+                 as well as a list of check errors.
+        :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
+        """
         if not isinstance(field_name, six.string_types) and hasattr(expressions, 'Combinable'):
             if isinstance(field_name, expressions.Combinable):
                 field_name = field_name.asc()
@@ -133,6 +229,8 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         if not errors or errors[0].id != 'admin.E127':
             return errors
 
+        # The number of arguments differs between old and recent Django
+        # versions.
         model = args[0] if args else obj.model
         prop, property_errors = self._check_date_hierarchy_queryable_property(obj, model)
         return property_errors if prop else errors
@@ -160,6 +258,15 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         return property_errors if prop else errors
 
     def _check_list_select_properties(self, obj, model):
+        """
+        Perform checks for the `list_select_properties` value as a whole.
+
+        :param obj: The admin object or class.
+        :param model: The model the admin class is used for.
+        :return: A 2-tuple containing the resolved queryable property (if any)
+                 as well as a list of check errors.
+        :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
+        """
         if not isinstance(obj.list_select_properties, (list, tuple)):
             return [Error('The value of "list_select_properties" must be a list or tuple.', obj, error_id=6)]
         return list(chain.from_iterable(
@@ -168,4 +275,16 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         ))
 
     def _check_list_select_properties_item(self, obj, model, item, label):
+        """
+        Perform checks for a (potential) queryable property used as a
+        `list_select_properties` item.
+
+        :param obj: The admin object or class.
+        :param model: The model the admin class is used for.
+        :param str item: The list_select_properties item.
+        :param str label: A label to use for error messages.
+        :return: A 2-tuple containing the resolved queryable property (if any)
+                 as well as a list of check errors.
+        :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
+        """
         return self._check_queryable_property(obj, model, item, label, allow_relation=False, allow_lookups=False)[1]
