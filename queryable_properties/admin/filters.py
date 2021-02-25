@@ -5,6 +5,7 @@ from collections import OrderedDict
 import six
 from django.contrib.admin.filters import (BooleanFieldListFilter, ChoicesFieldListFilter, DateFieldListFilter,
                                           FieldListFilter)
+from django.contrib.admin.views import main
 from django.db.models import BooleanField, DateField, F
 
 from ..compat import LOOKUP_SEP
@@ -33,17 +34,21 @@ class QueryablePropertyField(object):
         return getattr(self.property, item)
 
     @property
+    def empty_value_display(self):
+        return getattr(main, 'EMPTY_CHANGELIST_VALUE', None) or self.model_admin.get_empty_value_display()
+
+    @property
     def flatchoices(self):
         if isinstance(self.property, MappingProperty):
             options = OrderedDict((to_value, to_value) for from_value, to_value in self.property.mappings)
-            options.setdefault(self.property.default, self.model_admin.get_empty_value_display())
+            options.setdefault(self.property.default, self.empty_value_display)
             for value, label in six.iteritems(options):
                 yield value, label
         elif not isinstance(self.output_field, BooleanField):
             annotation_name = '{}value'.format(LOOKUP_SEP)
             queryset = self.model_admin.get_queryset(self.request).annotate(**{annotation_name: F(self.property_path)})
             for value in queryset.order_by(annotation_name).distinct().values_list(annotation_name, flat=True):
-                yield value, value if value is not None else self.model_admin.get_empty_value_display()
+                yield value, value if value is not None else self.empty_value_display
 
     def get_filter_creator(self, list_filter_class=None):
         list_filter_class = list_filter_class or QueryablePropertyListFilter.get_class(self)
