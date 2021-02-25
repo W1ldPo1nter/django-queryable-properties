@@ -42,11 +42,10 @@ class QueryablePropertyField(object):
         elif not isinstance(self.output_field, BooleanField):
             annotation_name = '{}value'.format(LOOKUP_SEP)
             queryset = self.model_admin.get_queryset(self.request).annotate(**{annotation_name: F(self.property_path)})
-            queryset = queryset.order_by(annotation_name).distinct().values_list(annotation_name, flat=True)
-            for value in queryset:
-                yield value, value
+            for value in queryset.order_by(annotation_name).distinct().values_list(annotation_name, flat=True):
+                yield value, value if value is not None else self.model_admin.get_empty_value_display()
 
-    def create_list_filter(self, list_filter_class=None):
+    def get_filter_creator(self, list_filter_class=None):
         list_filter_class = list_filter_class or QueryablePropertyListFilter.get_class(self)
 
         def creator(request, params, model, model_admin):

@@ -61,7 +61,7 @@ class QueryablePropertiesAdminMixin(object):
                 else:
                     field_name, filter_class = item, None
                 try:
-                    item = QueryablePropertyField(self, request, field_name).create_list_filter(filter_class)
+                    item = QueryablePropertyField(self, request, field_name).get_filter_creator(filter_class)
                 except QueryablePropertyError:
                     pass
             expanded_filters.append(item)
