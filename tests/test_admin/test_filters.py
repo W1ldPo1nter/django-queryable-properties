@@ -28,7 +28,7 @@ class TestQueryablePropertyField(object):
         request = rf.get('/')
         field = QueryablePropertyField(admin_instance, request, query_path)
         output_field = get_output_field(expected_property.get_annotation(expected_property.model))
-        assert field.output_field == output_field
+        assert type(field.output_field) is type(output_field)  # Old django versions don't implement field comparison
         assert field.model_admin is admin_instance
         assert field.request is request
         assert field.property is expected_property
