@@ -24,5 +24,5 @@ class ApplicationAdmin(QueryablePropertiesAdmin):
     list_select_properties = ('version_count',)
     search_fields = ('name', 'highest_version')
     date_hierarchy = 'support_start_date'
-    ordering = ('highest_version', 'name')
+    ordering = ('name', 'version_count')
     inlines = (VersionInline,)
