@@ -22,7 +22,7 @@ class ReleaseTypeModel(models.Model):
     is_beta = ValueCheckProperty('release_type', BETA)
     is_stable = ValueCheckProperty('release_type', STABLE)
     is_unstable = ValueCheckProperty('release_type', ALPHA, BETA)
-    release_type_verbose_name = MappingProperty('release_type', models.CharField(), RELEASE_TYPE_CHOICES)
+    release_type_verbose_name = MappingProperty('release_type', models.CharField(null=True), RELEASE_TYPE_CHOICES)
 
     class Meta:
         abstract = True

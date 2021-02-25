@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from queryable_properties.managers import QueryablePropertiesManager
@@ -170,7 +171,11 @@ class ApplicationWithClassBasedProperties(Application):
     highest_version = HighestVersionProperty()
     version_count = VersionCountProperty()
     major_sum = AggregateProperty(models.Sum('versions__major'))
-    support_start_date = AggregateProperty(models.Min('versions__supported_from'))
+    if DJANGO_VERSION < (1, 8):
+        support_start_date = AggregateProperty(models.Min('versions__supported_from'))
+    else:
+        support_start_date = AggregateProperty(models.Min('versions__supported_from',
+                                                          output_field=models.DateField(null=True)))
     lowered_version_changes = LoweredVersionChangesProperty()
     has_version_with_changelog = RelatedExistenceCheckProperty('versions__changes')
     dummy = DummyProperty()
