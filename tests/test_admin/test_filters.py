@@ -55,7 +55,7 @@ class TestQueryablePropertyField(object):
             ('Alpha', 'Alpha'),
             ('Beta', 'Beta'),
             ('Stable', 'Stable'),
-            (None, admin.get_empty_value_display()),
+            (None, field.empty_value_display),
         )
 
     def test_flatchoices_boolean_property(self, admin_instance, rf):
