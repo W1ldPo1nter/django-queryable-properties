@@ -6,7 +6,7 @@ import six
 from django.contrib.admin.filters import (BooleanFieldListFilter, ChoicesFieldListFilter, DateFieldListFilter,
                                           FieldListFilter)
 from django.contrib.admin.views import main
-from django.db.models import BooleanField, DateField, F
+from django.db.models import BooleanField, DateField
 
 from ..compat import LOOKUP_SEP
 from ..exceptions import QueryablePropertyError
@@ -16,7 +16,7 @@ from ..utils.internal import get_output_field, resolve_queryable_property
 
 class QueryablePropertyField(object):
 
-    def __init__(self, model_admin, request, query_path):
+    def __init__(self, model_admin, query_path):
         property_ref, lookups = resolve_queryable_property(model_admin.model, query_path.split(LOOKUP_SEP))
         if not property_ref or lookups:
             raise QueryablePropertyError('The query path must point to a valid queryable property and may not contain'
@@ -24,8 +24,8 @@ class QueryablePropertyField(object):
 
         self.output_field = get_output_field(property_ref.get_annotation())
         self.model_admin = model_admin
-        self.request = request
         self.property = property_ref.property
+        self.property_ref = property_ref
         self.property_path = query_path
         self.null = self.output_field is None or self.output_field.null
         self.empty_strings_allowed = self.output_field is None or self.output_field.empty_strings_allowed
@@ -45,9 +45,9 @@ class QueryablePropertyField(object):
             for value, label in six.iteritems(options):
                 yield value, label
         elif not isinstance(self.output_field, BooleanField):
-            annotation_name = '{}value'.format(LOOKUP_SEP)
-            queryset = self.model_admin.get_queryset(self.request).annotate(**{annotation_name: F(self.property_path)})
-            for value in queryset.order_by(annotation_name).distinct().values_list(annotation_name, flat=True):
+            annotation = self.property_ref.get_annotation()
+            queryset = self.property_ref.model._base_manager.annotate(**{self.property.name: annotation})
+            for value in queryset.order_by(self.property.name).distinct().values_list(self.property.name, flat=True):
                 yield value, value if value is not None else self.empty_value_display
 
     def get_filter_creator(self, list_filter_class=None):
