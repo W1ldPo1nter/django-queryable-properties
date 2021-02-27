@@ -19,12 +19,12 @@ class QueryablePropertiesAdminMixin(object):
         return super(QueryablePropertiesAdminMixin, cls).validate(model)
 
     def check(self, model=None, **kwargs):
-        if model:
+        if model:  # pragma: no cover
             kwargs['model'] = model
         self._ensure_property_checks(self)
         return super(QueryablePropertiesAdminMixin, self).check(**kwargs)
 
-    if getattr(getattr(ModelAdmin, 'check', None), '__self__', None):
+    if getattr(getattr(ModelAdmin, 'check', None), '__self__', None):  # pragma: no cover
         # In old Django versions, check was a classmethod.
         check = classmethod(check)
 
@@ -46,7 +46,7 @@ class QueryablePropertiesAdminMixin(object):
             queryset = chain_queryset(queryset)
             QueryablePropertiesQuerySetMixin.inject_into_object(queryset)
         # Apply list_select_properties.
-        list_select_properties = self.get_list_select_properties()
+        list_select_properties = self.get_list_select_properties(request)
         if list_select_properties:
             queryset = queryset.select_properties(*list_select_properties)
         return queryset
@@ -67,7 +67,7 @@ class QueryablePropertiesAdminMixin(object):
             expanded_filters.append(item)
         return expanded_filters
 
-    def get_list_select_properties(self):
+    def get_list_select_properties(self, request):
         return self.list_select_properties
 
 
