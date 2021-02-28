@@ -20,7 +20,7 @@ class VersionInline(QueryablePropertiesTabularInline):
 
 class ApplicationAdmin(QueryablePropertiesAdmin):
     list_display = ('name', 'highest_version', 'version_count')
-    list_filter = ('common_data', 'support_start_date', 'has_version_with_changelog')
+    list_filter = ('common_data', 'support_start_date')
     list_select_properties = ('version_count',)
     search_fields = ('name', 'highest_version')
     date_hierarchy = 'support_start_date'
