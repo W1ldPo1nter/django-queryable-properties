@@ -11,6 +11,7 @@ except ImportError:  # pragma: no cover
         yield enter_result
 
 import six
+from django.contrib.admin.options import ModelAdmin
 from django.db.models.query import QuerySet
 from django.db.models.sql.query import Query
 
@@ -94,6 +95,10 @@ if not hasattr(Query, 'annotation_select'):  # pragma: no cover
 # while older versions only have the clone method.
 QUERYSET_CHAIN_METHOD_NAME = '_chain' if hasattr(QuerySet, '_chain') else '_clone'
 QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
+
+# The `get_queryset` method of ModelAdmins was called `queryset` in very old
+# Django versions.
+ADMIN_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
 
 
 def convert_build_filter_to_add_q_kwargs(**build_filter_kwargs):

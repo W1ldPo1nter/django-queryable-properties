@@ -2,7 +2,7 @@
 
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
-from ..compat import admin_validation, chain_queryset
+from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation, chain_queryset
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from .checks import QueryablePropertiesChecksMixin
@@ -40,7 +40,10 @@ class QueryablePropertiesAdminMixin(object):
                 setattr(obj, attr_name, QueryablePropertiesChecksMixin.mix_with_class(checks_class, class_name))
 
     def get_queryset(self, request):
-        queryset = super(QueryablePropertiesAdminMixin, self).get_queryset(request)
+        # The base method has different names in different Django versions (see
+        # comment on the constant definition).
+        base_method = getattr(super(QueryablePropertiesAdminMixin, self), ADMIN_QUERYSET_METHOD_NAME)
+        queryset = base_method(request)
         # Make sure to use a queryset with queryable properties features.
         if not isinstance(queryset, QueryablePropertiesQuerySetMixin):
             queryset = chain_queryset(queryset)
@@ -50,6 +53,13 @@ class QueryablePropertiesAdminMixin(object):
         if list_select_properties:
             queryset = queryset.select_properties(*list_select_properties)
         return queryset
+
+    def queryset(self, request):  # pragma: no cover
+        # Same as get_queryset, but for very old Django versions. Simply
+        # delegate to need_having, which is aware of the different methods in
+        # different versions and therefore calls the correct super methods if
+        # necessary.
+        return self.get_queryset(request)
 
     def get_list_filter(self, request):
         list_filter = super(QueryablePropertiesAdminMixin, self).get_list_filter(request)
