@@ -13,15 +13,23 @@ class QueryablePropertiesAdminMixin(object):
 
     list_select_properties = ()
 
+    def __init__(self, *args, **kwargs):
+        super(QueryablePropertiesAdminMixin, self).__init__(*args, **kwargs)
+        if hasattr(self, 'list_filter') and not hasattr(ModelAdmin, 'get_list_filter'):  # pragma: no cover
+            # In very old Django versions, there was no get_list_filter method,
+            # therefore the processed queryable property filters must be stored
+            # directly in the list_filter attribute.
+            self.list_filter = self._process_queryable_property_filters(self.list_filter)
+
     @classmethod
     def validate(cls, model):  # pragma: no cover
-        cls._ensure_property_checks()
+        cls._ensure_queryable_property_checks()
         return super(QueryablePropertiesAdminMixin, cls).validate(model)
 
     def check(self, model=None, **kwargs):
         if model:  # pragma: no cover
             kwargs['model'] = model
-        self._ensure_property_checks(self)
+        self._ensure_queryable_property_checks(self)
         return super(QueryablePropertiesAdminMixin, self).check(**kwargs)
 
     if getattr(getattr(ModelAdmin, 'check', None), '__self__', None):  # pragma: no cover
@@ -29,7 +37,7 @@ class QueryablePropertiesAdminMixin(object):
         check = classmethod(check)
 
     @classmethod
-    def _ensure_property_checks(cls, obj=None):
+    def _ensure_queryable_property_checks(cls, obj=None):
         obj = obj or cls
         # Dynamically add a mixin that handles queryable properties into the
         # admin's checks/validation class.
@@ -61,9 +69,15 @@ class QueryablePropertiesAdminMixin(object):
         # necessary.
         return self.get_queryset(request)
 
+    def get_list_select_properties(self, request):
+        return self.list_select_properties
+
     def get_list_filter(self, request):
         list_filter = super(QueryablePropertiesAdminMixin, self).get_list_filter(request)
-        expanded_filters = []
+        return self._process_queryable_property_filters(list_filter)
+
+    def _process_queryable_property_filters(self, list_filter):
+        processed_filters = []
         for item in list_filter:
             if not callable(item):
                 if isinstance(item, (tuple, list)):
@@ -74,11 +88,8 @@ class QueryablePropertiesAdminMixin(object):
                     item = QueryablePropertyField(self, field_name).get_filter_creator(filter_class)
                 except QueryablePropertyError:
                     pass
-            expanded_filters.append(item)
-        return expanded_filters
-
-    def get_list_select_properties(self, request):
-        return self.list_select_properties
+            processed_filters.append(item)
+        return processed_filters
 
 
 class QueryablePropertiesAdmin(QueryablePropertiesAdminMixin, ModelAdmin):
