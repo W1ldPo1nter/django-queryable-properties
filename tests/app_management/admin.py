@@ -6,7 +6,7 @@ from ..app_management.models import VersionWithClassBasedProperties
 
 class VersionAdmin(QueryablePropertiesAdmin):
     list_display = ('version', 'application', 'is_supported')
-    list_filter = ('is_supported', 'released_in_2018', 'major')
+    list_filter = ('application', 'major')
     search_fields = ('changes',)
     date_hierarchy = 'supported_from'
     ordering = ('application', 'major', 'minor', 'patch')
