@@ -86,7 +86,7 @@ class QueryablePropertyField(object):
             name = '{}value'.format(self.property.name)
             queryset = self.property_ref.model._default_manager.annotate(**{name: self.property_ref.get_annotation()})
             for value in queryset.order_by(name).distinct().values_list(name, flat=True):
-                yield value, value if value is not None else self.empty_value_display
+                yield value, str(value) if value is not None else self.empty_value_display
 
     def get_filter_creator(self, list_filter_class=None):
         """
