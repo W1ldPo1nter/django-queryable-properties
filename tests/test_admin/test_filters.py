@@ -89,7 +89,10 @@ class TestQueryablePropertyField(object):
         list_filter = field.get_filter_creator()(request, {}, admin_instance.model, admin_instance)
         changelist = self.get_changelist(request, admin_instance)
         display_values = [item['display'] for item in list_filter.choices(changelist)]
-        assert display_values == ['Any date', 'Today', 'Past 7 days', 'This month', 'This year', 'No date', 'Has date']
+        expected_values = ['Any date', 'Today', 'Past 7 days', 'This month', 'This year']
+        if DJANGO_VERSION >= (1, 10):
+            expected_values += ['No date', 'Has date']
+        assert display_values == expected_values
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.django_db
