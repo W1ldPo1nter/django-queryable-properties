@@ -1,9 +1,9 @@
-name: Test django-queryable-properties
+name: Run tests
 
 on: [push]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -18,7 +18,9 @@ jobs:
     - name: Install test utilities
       run: pip install tox codecov
     - name: Test via tox
-      run: tox -e py -- -p no:warnings
+      run: |
+        TOXENV=$(echo "${{ matrix.python-version }}" | sed 's/\.//g')
+        tox -- -p no:warnings
     - name: Lint with flake8
       run: tox -e flake8
-      if: matrix.python-version == 3.9
+      if: matrix.python-version == '3.9'
