@@ -94,6 +94,23 @@ class TestQueryablePropertyField(object):
             expected_values += ['No date', 'Has date']
         assert display_values == expected_values
 
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('params, expected_count', [
+        ({}, 2),
+        ({'support_start_date__gte': '2016-12-15', 'support_start_date__lt': '2017-01-15'}, 2),
+        ({'support_start_date__gte': '2016-12-31', 'support_start_date__lt': '2017-01-31'}, 2),
+        ({'support_start_date__gte': '2016-11-15', 'support_start_date__lt': '2016-12-31'}, 0),
+        ({'support_start_date__gte': '2018-01-01', 'support_start_date__lt': '2018-12-31'}, 0),
+    ])
+    @pytest.mark.usefixtures('versions')
+    def test_date_list_filter_application(self, rf, admin_user, admin_instance, params, expected_count):
+        field = QueryablePropertyField(admin_instance, 'support_start_date')
+        field.output_field = DateField(null=True)  # To set an output field for Django versions that don't support it
+        request = rf.get('/')
+        request.user = admin_user
+        list_filter = field.get_filter_creator()(request, params, admin_instance.model, admin_instance)
+        assert list_filter.queryset(request, admin_instance.get_queryset(request)).count() == expected_count
+
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.django_db
     def test_boolean_list_filter(self, rf, admin_user, admin_instance):
@@ -106,6 +123,21 @@ class TestQueryablePropertyField(object):
         changelist = self.get_changelist(request, admin_instance)
         display_values = [item['display'] for item in list_filter.choices(changelist)]
         assert display_values == ['All', 'Yes', 'No']
+
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('params, expected_count', [
+        ({}, 2),
+        ({'has_version_with_changelog__exact': '0'}, 1),
+        ({'has_version_with_changelog__exact': '1'}, 1),
+    ])
+    def test_boolean_list_filter_application(self, rf, admin_user, versions, admin_instance, params, expected_count):
+        versions[3].delete()
+        field = QueryablePropertyField(admin_instance, 'has_version_with_changelog')
+        request = rf.get('/')
+        request.user = admin_user
+        list_filter = field.get_filter_creator()(request, params, admin_instance.model, admin_instance)
+        assert list_filter.queryset(request, admin_instance.get_queryset(request)).count() == expected_count
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.django_db
@@ -126,6 +158,23 @@ class TestQueryablePropertyField(object):
         display_values = [item['display'] for item in list_filter.choices(changelist)]
         assert display_values == ['All', 'Alpha', 'Beta', 'Stable', field.empty_value_display]
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('params, expected_count', [
+        ({}, 8),
+        ({'release_type_verbose_name__exact': 'Alpha'}, 2),
+        ({'release_type_verbose_name__exact': 'Beta'}, 2),
+        ({'release_type_verbose_name__exact': 'Stable'}, 4),
+    ])
+    @pytest.mark.usefixtures('versions')
+    def test_mapping_choices_list_filter_application(self, rf, admin_user, params, expected_count):
+        admin = VersionAdmin(VersionWithClassBasedProperties, site)
+        field = QueryablePropertyField(admin, 'release_type_verbose_name')
+        request = rf.get('/')
+        request.user = admin_user
+        list_filter = field.get_filter_creator()(request, params, admin.model, admin)
+        assert list_filter.queryset(request, admin.get_queryset(request)).count() == expected_count
+
     @pytest.mark.django_db
     @pytest.mark.parametrize('query_path, expected_choices', [
         ('version_count', ((3, '3'), (4, '4'))),
@@ -143,7 +192,20 @@ class TestQueryablePropertyField(object):
         display_values = [item['display'] for item in list_filter.choices(changelist)]
         assert display_values == ['All'] + [display_value for value, display_value in expected_choices]
 
-    # TODO: filter application tests
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('params, expected_count', [
+        ({}, 2),
+        ({'version_count__exact': '3'}, 1),
+        ({'version_count__exact': '4'}, 1),
+        ({'version_count__exact': '5'}, 0),
+    ])
+    def test_choices_list_filter_application(self, rf, admin_user, versions, admin_instance, params, expected_count):
+        versions[0].delete()
+        field = QueryablePropertyField(admin_instance, 'version_count')
+        request = rf.get('/')
+        request.user = admin_user
+        list_filter = field.get_filter_creator()(request, params, admin_instance.model, admin_instance)
+        assert list_filter.queryset(request, admin_instance.get_queryset(request)).count() == expected_count
 
 
 class TestQueryablePropertyListFilter(object):
