@@ -2,8 +2,8 @@
 django-queryable-properties
 ===========================
 
-.. image:: https://travis-ci.com/W1ldPo1nter/django-queryable-properties.svg?branch=master
-   :target: https://travis-ci.com/W1ldPo1nter/django-queryable-properties
+.. image:: https://github.com/W1ldPo1nter/django-queryable-properties/actions/workflows/test.yaml/badge.svg?branch=master
+   :target: https://github.com/W1ldPo1nter/django-queryable-properties/actions/workflows/test.yaml
 .. image:: https://codecov.io/gh/W1ldPo1nter/django-queryable-properties/branch/master/graph/badge.svg
    :target: https://codecov.io/gh/W1ldPo1nter/django-queryable-properties
 .. image:: https://readthedocs.org/projects/django-queryable-properties/badge/?version=latest
