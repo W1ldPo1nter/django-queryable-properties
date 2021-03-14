@@ -19,7 +19,7 @@ jobs:
       run: pip install tox tox-factor codecov
     - name: Test via tox
       run: |
-        export TOXFACTOR=$(echo "${{ matrix.python-version }}" | sed 's/\.//g')
+        export TOXFACTOR=$(echo "py${{ matrix.python-version }}" | sed 's/\.//g')
         tox -- -p no:warnings
     - name: Lint with flake8
       run: tox -e flake8
