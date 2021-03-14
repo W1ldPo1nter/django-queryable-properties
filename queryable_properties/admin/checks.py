@@ -79,20 +79,12 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         :return: A fake class to be validated by Django's standard validation.
         :rtype: type
         """
-        date_hierarchy = None
         list_filter = []
         ordering = []
         errors = self._check_list_select_properties(cls, model)
         pk_name = model._meta.pk.name
 
         if not issubclass(cls, InlineModelAdmin):
-            if cls.date_hierarchy:
-                prop, property_errors = self._check_date_hierarchy_queryable_property(cls, model)
-                if prop:
-                    errors.extend(property_errors)
-                else:
-                    date_hierarchy = cls.date_hierarchy
-
             for i, item in enumerate(cls.list_filter or ()):
                 if not callable(item):
                     prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
@@ -124,7 +116,6 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         # validated by Django.
         return type(cls.__name__, (cls,), {
             '__module__': cls.__module__,
-            'date_hierarchy': date_hierarchy,
             'list_filter': list_filter,
             'ordering': ordering,
         })
@@ -166,26 +157,6 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                 errors.append(Error(message, obj, error_id=4))
         return property_ref and property_ref.property, errors
 
-    def _check_date_hierarchy_queryable_property(self, obj, model):
-        """
-        Perform checks for a (potential) queryable property used as date
-        hierarchy.
-
-        :param obj: The admin object or class.
-        :param model: The model the admin class is used for.
-        :return: A 2-tuple containing the resolved queryable property (if any)
-                 as well as a list of check errors.
-        :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
-        """
-        prop, property_errors = self._check_queryable_property(obj, model, obj.date_hierarchy, 'date_hierarchy')
-        if prop and not property_errors:
-            output_field = get_output_field(prop.get_annotation(model))
-            if output_field and not isinstance(output_field, DateField):
-                message = ('"date_hierarchy" refers to queryable property "{}", which does not annotate date values.'
-                           .format(obj.date_hierarchy))
-                property_errors.append(Error(message, obj, error_id=5))
-        return prop, property_errors
-
     def _check_list_filter_queryable_property(self, obj, model, item, label):
         """
         Perform checks for a (potential) queryable property used as a list
@@ -224,17 +195,6 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
             field_name = field_name[1:]
         return self._check_queryable_property(obj, model, field_name, label)
 
-    def _check_date_hierarchy(self, obj, *args):
-        errors = super(QueryablePropertiesChecksMixin, self)._check_date_hierarchy(obj, *args)
-        if not errors or errors[0].id != 'admin.E127':
-            return errors
-
-        # The number of arguments differs between old and recent Django
-        # versions.
-        model = args[0] if args else obj.model
-        prop, property_errors = self._check_date_hierarchy_queryable_property(obj, model)
-        return property_errors if prop else errors
-
     def _check_list_filter_item(self, obj, *args):
         errors = super(QueryablePropertiesChecksMixin, self)._check_list_filter_item(obj, *args)
         if not errors or errors[0].id != 'admin.E116':
@@ -268,7 +228,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
         """
         if not isinstance(obj.list_select_properties, (list, tuple)):
-            return [Error('The value of "list_select_properties" must be a list or tuple.', obj, error_id=6)]
+            return [Error('The value of "list_select_properties" must be a list or tuple.', obj, error_id=5)]
         return list(chain.from_iterable(
             self._check_list_select_properties_item(obj, model, item, 'list_select_properties[{}]'.format(index))
             for index, item in enumerate(obj.list_select_properties)

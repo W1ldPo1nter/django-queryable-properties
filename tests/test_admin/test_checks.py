@@ -72,22 +72,6 @@ class TestQueryablePropertiesChecksMixin(object):
     def test_success(self, admin, model):
         assert_admin_validation(admin, model)
 
-    def test_date_hierarchy_non_annotatable_property(self, monkeypatch):
-        monkeypatch.setattr(VersionAdmin, 'date_hierarchy', 'major_minor')
-        assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties,
-                                'queryable_properties.admin.E002', '(queryable_properties.admin.E002)')
-
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
-    def test_date_hierarchy_invalid_type(self, monkeypatch):
-        monkeypatch.setattr(ApplicationAdmin, 'date_hierarchy', 'has_version_with_changelog')
-        assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
-                                'queryable_properties.admin.E005', '(queryable_properties.admin.E005)')
-
-    def test_date_hierarchy_invalid_field(self, monkeypatch):
-        monkeypatch.setattr(ApplicationAdmin, 'date_hierarchy', 'neither_property_nor_field')
-        assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
-                                'admin.E127', "'neither_property_nor_field' that is missing from model")
-
     @pytest.mark.parametrize('filter_item', [
         DummyListFilter,
         ('common_data', AllValuesFieldListFilter),
@@ -119,7 +103,7 @@ class TestQueryablePropertiesChecksMixin(object):
     def test_list_select_properties_invalid_type(self, monkeypatch, admin_class):
         monkeypatch.setattr(admin_class, 'list_select_properties', None)
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
-                                'queryable_properties.admin.E006', '(queryable_properties.admin.E006)')
+                                'queryable_properties.admin.E005', '(queryable_properties.admin.E005)')
 
     @pytest.mark.parametrize('admin_class, property_name, error_id', [
         (ApplicationAdmin, 'name', 'queryable_properties.admin.E001'),
