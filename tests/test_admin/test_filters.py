@@ -210,7 +210,7 @@ class TestQueryablePropertyField(object):
 
 class TestQueryablePropertyListFilter(object):
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="output fields couldn't be declared before Django 1.8")
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
     @pytest.mark.parametrize('prop, admin_class, expected_filter_class', [
         (ApplicationWithClassBasedProperties.has_version_with_changelog, ApplicationAdmin, BooleanFieldListFilter),
         (VersionWithClassBasedProperties.release_type_verbose_name, VersionAdmin, ChoicesFieldListFilter),

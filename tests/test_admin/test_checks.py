@@ -77,7 +77,7 @@ class TestQueryablePropertiesChecksMixin(object):
         assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties,
                                 'queryable_properties.admin.E002', '(queryable_properties.admin.E002)')
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="output fields couldn't be declared before Django 1.8")
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
     def test_date_hierarchy_invalid_type(self, monkeypatch):
         monkeypatch.setattr(ApplicationAdmin, 'date_hierarchy', 'has_version_with_changelog')
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties,
