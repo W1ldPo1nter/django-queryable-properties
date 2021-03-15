@@ -26,6 +26,20 @@ class DummyListFilter(SimpleListFilter):
 
 
 def assert_admin_validation(admin_class, model, error_id=None, exception_text=None):
+    """
+    Validate an admin class and compare the result to the given expectation.
+
+    :param admin_class: The admin class to validate (may be an inline class).
+    :param model: The model class the admin class is intended for.
+    :param str | None error_id: The expected error ID, which is used for new
+                                Django versions. A value of None means that
+                                the validation is expected to not find any
+                                errors.
+    :param str | None exception_text: The expected error text, which is used
+                                for old Django versions. A value of None means
+                                that the validation is expected to not find any
+                                errors.
+    """
     if hasattr(ModelAdmin, 'check'):
         if DJANGO_VERSION >= (1, 9):
             errors = admin_class(model, site).check()

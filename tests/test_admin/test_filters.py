@@ -22,6 +22,17 @@ class TestQueryablePropertyField(object):
         return ApplicationAdmin(ApplicationWithClassBasedProperties, site)
 
     def get_changelist(self, request, model_admin, **kwargs):
+        """
+        Build a changelist instance for the given admin for testing purposes.
+
+        :param django.http.HttpRequest request: An HTTP request.
+        :param model_admin: The model admin to create the changelist for.
+        :param kwargs: Further keyword arguments for the changelist
+                       constructor, which will otherwise be filled with
+                       proper default values.
+        :return: The changelist instance.
+        :rtype: ChangeList
+        """
         list_display = kwargs.get('list_display', model_admin.get_list_display(request))
         defaults = dict(
             model=model_admin.model,
