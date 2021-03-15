@@ -31,7 +31,7 @@ class QueryablePropertiesAdminMixin(object):
             # In very old Django versions, there was no get_list_filter method,
             # therefore the processed queryable property filters must be stored
             # directly in the list_filter attribute.
-            self.list_filter = self._process_queryable_property_filters(self.list_filter)
+            self.list_filter = self.process_queryable_property_filters(self.list_filter)
 
     @classmethod
     def validate(cls, model):  # pragma: no cover
@@ -103,9 +103,9 @@ class QueryablePropertiesAdminMixin(object):
 
     def get_list_filter(self, request):
         list_filter = super(QueryablePropertiesAdminMixin, self).get_list_filter(request)
-        return self._process_queryable_property_filters(list_filter)
+        return self.process_queryable_property_filters(list_filter)
 
-    def _process_queryable_property_filters(self, list_filter):
+    def process_queryable_property_filters(self, list_filter):
         """
         Process a sequence of list filters to create a new sequence in which
         queryable property references are replaced with custom callables that
