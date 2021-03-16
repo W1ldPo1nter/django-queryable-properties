@@ -5,10 +5,10 @@ from itertools import chain
 import six
 from django.contrib.admin.options import InlineModelAdmin
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import DateField, expressions, F
+from django.db.models import expressions, F
 
 from ..compat import checks, LOOKUP_SEP
-from ..utils.internal import get_output_field, InjectableMixin, resolve_queryable_property
+from ..utils.internal import InjectableMixin, resolve_queryable_property
 
 
 class Error(getattr(checks, 'Error', object)):
