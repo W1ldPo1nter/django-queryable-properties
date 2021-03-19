@@ -89,8 +89,8 @@ decorator methods can simply be chained together (this also works for all decora
 
         version_str = queryable_property(get_version_str).setter(set_version_str)
 
-By not passing anything to the ``queryable_property`` constructor, a queryable property without a getter can be defined
-(``queryable_property().setter(set_version_str)`` for the example above).
+By not passing a getter function to the ``queryable_property`` constructor, a queryable property without a getter can
+be defined (``queryable_property().setter(set_version_str)`` for the example above).
 This can even be used to make a getter-less queryable property while still decorating the setter (or mixing and
 matching chaining and decorating in general):
 
@@ -136,6 +136,40 @@ Using the class-based approach, the queryable property is implemented as a subcl
         ...
 
         version_str = VersionStringProperty()
+
+Common property arguments
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Queryable properties that are created using either approach take additional, common keyword arguments that can be used
+to configure property instances further.
+These are:
+
+``verbose_name``
+  A human-readable name for the property instance, similar to the verbose name of an instance of one of Django's model
+  fields.
+  Used for UI representations of queryable properties.
+  If no verbose name is set up for a property, one will be generated based on the property's name.
+
+For both the class-based and the decorator-based approach, these keyword arguments can be set via their respective
+constructor.
+For the example property above, this could look like the following example:
+
+.. code-block:: python
+
+    from django.utils.translation import gettext_lazy as _
+
+
+    class ApplicationVersion(models.Model):
+        ...
+
+        # Class-based
+        version_str = VersionStringProperty(verbose_name=_('Full Version Number'))
+
+        # Decorator-based
+        @queryable_property(verbose_name=_('Full Version Number'))
+        def version_str(self):
+            ...
+
 
 When to use which approach
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
