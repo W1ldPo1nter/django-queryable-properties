@@ -8,6 +8,13 @@ Module ``queryable_properties.properties``
    :members:
    :member-order: bysource
 
+Module ``queryable_properties.admin``
+-------------------------------------
+
+.. automodule:: queryable_properties.admin
+   :members:
+   :member-order: bysource
+
 Module ``queryable_properties.managers``
 ----------------------------------------
 

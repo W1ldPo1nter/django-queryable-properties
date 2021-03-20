@@ -113,7 +113,7 @@ class QueryablePropertiesAdminMixin(object):
 
         :param collections.Sequence list_filter: The list filter sequence.
         :return: The processed list filter sequence.
-        :rtype: collections.Sequence
+        :rtype: list
         """
         processed_filters = []
         for item in list_filter:
