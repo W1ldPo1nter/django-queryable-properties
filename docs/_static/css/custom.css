@@ -2,3 +2,7 @@
 .wy-table-responsive td, .wy-table-responsive th {
     white-space: normal !important;
 }
+
+.wy-table-responsive ul {
+    margin-bottom: 0 !important;
+}
