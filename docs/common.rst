@@ -270,6 +270,7 @@ For a quick reference, all possible configuration combinations are listed in the
 
 .. list-table::
    :header-rows: 1
+   :widths: 15 15 15 55
 
    * - ``include_boundaries``
      - ``include_missing``

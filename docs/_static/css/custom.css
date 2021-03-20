@@ -1,0 +1,4 @@
+/* Prevent tables from getting a horizontal scrollbar. */
+.wy-table-responsive td, .wy-table-responsive th {
+    white-space: normal !important;
+}
