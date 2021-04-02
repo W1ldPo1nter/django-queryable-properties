@@ -8,6 +8,7 @@ from collections import namedtuple
 from copy import deepcopy
 from functools import wraps
 
+import six
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.utils.tree import Node
@@ -15,6 +16,50 @@ from django.utils.tree import Node
 from . import get_queryable_property, MISSING_OBJECT
 from ..compat import get_related_model, LOOKUP_SEP
 from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
+
+
+@six.python_2_unicode_compatible
+class QueryPath(tuple):
+    """
+    A utility class to represent query paths, i.e. paths using Django's
+    LOOKUP_SEP as their separator.
+
+    Objects can be used to build the string representation of a query path and
+    to combine paths using the `+` operator.
+    """
+
+    def __new__(cls, path=()):
+        """
+        Build a new query path instance using the given path, which may be
+        either a string that will be split up using the LOOKUP_SEP or another
+        type of iterable that already contains the individual path parts.
+
+        :param collections.Iterable path: The query path to represent as string
+                                          or other iterable.
+        """
+        if isinstance(path, six.text_type):
+            path = path.split(LOOKUP_SEP)
+        return super(QueryPath, cls).__new__(cls, path)
+
+    def __add__(self, other):
+        if not isinstance(other, self.__class__):
+            other = self.__class__(other)
+        return self.__class__(tuple(self) + tuple(other))
+
+    def __getitem__(self, item):
+        result = super(QueryPath, self).__getitem__(item)
+        if isinstance(item, slice):
+            result = self.__class__(result)
+        return result
+
+    def __getslice__(self, i, j):  # pragma: no cover
+        return self.__class__(super(QueryPath, self).__getslice__(i, j))
+
+    def __str__(self):
+        return LOOKUP_SEP.join(self)
+
+    def __repr__(self):
+        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
 
 
 class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):

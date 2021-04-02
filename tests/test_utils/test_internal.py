@@ -1,13 +1,14 @@
 # encoding: utf-8
 import pytest
 
+import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import CharField, IntegerField, Q, Sum
 from six.moves import cPickle
 
 from queryable_properties.utils.internal import (
     get_output_field, InjectableMixin, MISSING_OBJECT, ModelAttributeGetter, parametrizable_decorator,
-    QueryablePropertyReference, resolve_queryable_property, TreeNodeProcessor
+    QueryablePropertyReference, QueryPath, resolve_queryable_property, TreeNodeProcessor
 )
 
 from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
@@ -34,6 +35,47 @@ class DummyMixin(InjectableMixin):
     def init_injected_attrs(self):
         self.mixin_attr1 = 1.337
         self.mixin_attr2 = 'test'
+
+
+class TestQueryPath(object):
+
+    @pytest.mark.parametrize('path, expected_result', [
+        ([], QueryPath()),
+        (('a', 'b'), QueryPath(('a', 'b'))),
+        ('a__b', QueryPath(('a', 'b'))),
+    ])
+    def test_constructor(self, path, expected_result):
+        query_path = QueryPath(path)
+        assert query_path == expected_result
+
+    @pytest.mark.parametrize('query_path, addition, expected_result', [
+        (QueryPath(), QueryPath(['a']), QueryPath(('a',))),
+        (QueryPath('a'), ('b', 'c'), QueryPath(('a', 'b', 'c'))),
+        (QueryPath('a'), ['b'], QueryPath(('a', 'b'))),
+        (QueryPath(('a', 'b')), 'c__d', QueryPath(('a', 'b', 'c', 'd'))),
+    ])
+    def test_add(self, query_path, addition, expected_result):
+        result = query_path + addition
+        assert isinstance(result, QueryPath)
+        assert result == expected_result
+
+    @pytest.mark.parametrize('query_path, item, expected_result', [
+        (QueryPath('a__b'), 0, 'a'),
+        (QueryPath('a__b'), slice(0, 1), QueryPath('a')),
+        (QueryPath('a__b'), slice(5, 10), QueryPath()),
+    ])
+    def test_get_item(self, query_path, item, expected_result):
+        result = query_path[item]
+        assert isinstance(result, expected_result.__class__)
+        assert result == expected_result
+
+    def test_string_representation(self):
+        query_path = QueryPath(('a', 'b', 'c'))
+        assert six.text_type(query_path) == 'a__b__c'
+
+    def test_representation(self):
+        query_path = QueryPath(('a', 'b'))
+        assert repr(query_path) == '<QueryPath: a__b>'
 
 
 class TestInjectableMixin(object):
