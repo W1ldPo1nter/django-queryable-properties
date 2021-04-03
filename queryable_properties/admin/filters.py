@@ -83,7 +83,7 @@ class QueryablePropertyField(object):
             for value, label in six.iteritems(options):
                 yield value, label
         elif not isinstance(self.output_field, BooleanField):
-            name = '{}value'.format(self.property.name)
+            name = '{}value'.format(LOOKUP_SEP)
             queryset = self.property_ref.model._default_manager.annotate(**{name: self.property_ref.get_annotation()})
             for value in queryset.order_by(name).distinct().values_list(name, flat=True):
                 yield value, six.text_type(value) if value is not None else self.empty_value_display
