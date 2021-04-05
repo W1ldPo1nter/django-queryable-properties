@@ -61,6 +61,16 @@ class QueryPath(tuple):
     def __repr__(self):
         return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
 
+    def build_filter(self, value):
+        """
+        Build a filter condition based on this query path and the given value.
+
+        :param value: The value to filter against.
+        :return: The filter condition as a Q object.
+        :rtype: django.db.models.Q
+        """
+        return Q(**{six.text_type(self): value})
+
 
 class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):
     """
@@ -72,15 +82,13 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
     @property
     def full_path(self):
         """
-        Return the full path to the queryable property (including the relation
-        prefix) in the query filter format.
+        Return the full query path to the queryable property (including the
+        relation prefix).
 
         :return: The full path to the queryable property.
-        :rtype: str
+        :rtype: QueryPath
         """
-        if not self.relation_path:
-            return self.property.name
-        return LOOKUP_SEP.join(self.relation_path + (self.property.name,))
+        return self.relation_path + self.property.name
 
     def get_filter(self, lookups, value):
         """
@@ -88,8 +96,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         points to. It checks if the property actually supports filtering and
         applies the relation path (if any) to the returned Q object.
 
-        :param collections.Sequence[str] lookups: The lookups/transforms to use
-                                                  for the filter.
+        :param QueryPath lookups: The lookups/transforms to use for the filter.
         :param value: The value passed to the filter condition.
         :return: A Q object to filter using this property.
         :rtype: django.db.models.Q
@@ -101,13 +108,13 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         # Use the model stored on this reference instead of the one on the
         # property since the query may be happening from a subclass of the
         # model the property is defined on.
-        q_obj = self.property.get_filter(self.model, LOOKUP_SEP.join(lookups) or 'exact', value)
+        q_obj = self.property.get_filter(self.model, six.text_type(lookups) or 'exact', value)
         if self.relation_path:
             # If the resolved property belongs to a related model, all actual
             # conditions in the returned Q object must be modified to use the
             # current relation path as prefix.
             def prefix_condition(item):
-                return LOOKUP_SEP.join(self.relation_path + (item[0],)), item[1]
+                return six.text_type(self.relation_path + item[0]), item[1]
             q_obj = TreeNodeProcessor(q_obj).modify_leaves(prefix_condition)
         return q_obj
 
@@ -306,7 +313,7 @@ class ModelAttributeGetter(object):
                                    will simply be replaced with the lookup
                                    separator (``__``).
         """
-        self.path_parts = attribute_path.split(self.ATTRIBUTE_SEPARATOR)
+        self.query_path = QueryPath(attribute_path.split(self.ATTRIBUTE_SEPARATOR))
 
     def get_value(self, obj):
         """
@@ -328,7 +335,7 @@ class ModelAttributeGetter(object):
                                            value for.
         :return: The value retrieved from the model object.
         """
-        for attribute_name in self.path_parts:
+        for attribute_name in self.query_path:
             try:
                 obj = getattr(obj, attribute_name)
             except ObjectDoesNotExist:
@@ -353,7 +360,7 @@ class ModelAttributeGetter(object):
         :return: The filter condition as a Q object.
         :rtype: django.db.models.Q
         """
-        return Q(**{LOOKUP_SEP.join(self.path_parts + [lookup]): value})
+        return (self.query_path + lookup).build_filter(value)
 
 
 def parametrizable_decorator(method):
@@ -379,25 +386,23 @@ def parametrizable_decorator(method):
     return wrapper
 
 
-def resolve_queryable_property(model, path):
+def resolve_queryable_property(model, query_path):
     """
     Resolve the given path into a queryable property on the given model.
 
     :param type model: The model to start resolving from.
-    :param collections.Sequence[str] path: The path to resolve (a string of
-                                           Django's query expression split
-                                           up by the lookup separator).
+    :param QueryPath query_path: The query path to resolve.
     :return: A 2-tuple containing a queryable property reference for the
-             resolved property and a list containing the parts of the path
-             that represent lookups (or transforms). The first item will be
-             None and the list will be empty if no queryable property could
-             be resolved.
-    :rtype: (QueryablePropertyReference, list[str])
+             resolved property and a query path containing the parts of the
+             path that represent lookups (or transforms). The first item will
+             be None and the query path will be empty if no queryable property
+             could be resolved.
+    :rtype: (QueryablePropertyReference, QueryPath)
     """
-    property_ref, lookups = None, []
+    property_ref, lookups = None, QueryPath()
     # Try to follow the given path to allow to use queryable properties
     # across relations.
-    for index, name in enumerate(path):
+    for index, name in enumerate(query_path):
         try:
             related_model = get_related_model(model, name)
         except FieldDoesNotExist:
@@ -408,8 +413,8 @@ def resolve_queryable_property(model, path):
                 # invalid name. Do nothing and let Django deal with it.
                 pass
             else:
-                property_ref = QueryablePropertyReference(prop, model, tuple(path[:index]))
-                lookups = path[index + 1:]
+                property_ref = QueryablePropertyReference(prop, model, query_path[:index])
+                lookups = query_path[index + 1:]
             # The current name was not a field and either a queryable
             # property or invalid. Either way, resolving ends here.
             break

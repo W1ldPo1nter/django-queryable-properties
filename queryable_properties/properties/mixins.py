@@ -3,11 +3,9 @@
 from functools import wraps
 
 import six
-from django.db.models import Q
 
-from ..compat import LOOKUP_SEP
 from ..exceptions import QueryablePropertyError
-from ..utils.internal import InjectableMixin
+from ..utils.internal import InjectableMixin, QueryPath
 
 
 class LookupFilterMeta(type):
@@ -161,7 +159,7 @@ class AnnotationMixin(InjectableMixin):
     def get_filter(self, cls, lookup, value):
         # Since annotations can be filtered like regular fields, a Q object
         # that simply passes the filter through can be used.
-        return Q(**{LOOKUP_SEP.join((self.name, lookup)): value})
+        return (QueryPath(self.name) + lookup).build_filter(value)
 
 
 class AnnotationGetterMixin(AnnotationMixin):

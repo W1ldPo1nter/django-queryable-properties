@@ -5,8 +5,7 @@ import operator
 import six
 from django.db.models import BooleanField, Field, Q
 
-from ..compat import LOOKUP_SEP
-from ..utils.internal import MISSING_OBJECT, ModelAttributeGetter
+from ..utils.internal import MISSING_OBJECT, ModelAttributeGetter, QueryPath
 from .base import QueryableProperty
 from .mixins import AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin
 
@@ -182,14 +181,14 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
                                   relations.
         """
         super(RelatedExistenceCheckProperty, self).__init__(**kwargs)
-        self.filters = {LOOKUP_SEP.join((relation_path, 'isnull')): False}
+        self.filter = (QueryPath(relation_path) + 'isnull').build_filter(False)
 
     def get_value(self, obj):
-        return self.get_queryset_for_object(obj).filter(**self.filters).exists()
+        return self.get_queryset_for_object(obj).filter(self.filter).exists()
 
     def _get_condition(self, cls):
         # Perform the filtering via a subquery to avoid any side-effects that may be introduced by JOINs.
-        subquery = self.get_queryset(cls).filter(**self.filters)
+        subquery = self.get_queryset(cls).filter(self.filter)
         return Q(pk__in=subquery)
 
 

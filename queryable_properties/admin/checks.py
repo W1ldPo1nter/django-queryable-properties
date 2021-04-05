@@ -7,8 +7,8 @@ from django.contrib.admin.options import InlineModelAdmin
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import expressions, F
 
-from ..compat import checks, LOOKUP_SEP
-from ..utils.internal import InjectableMixin, resolve_queryable_property
+from ..compat import checks
+from ..utils.internal import InjectableMixin, QueryPath, resolve_queryable_property
 
 
 class Error(getattr(checks, 'Error', object)):
@@ -126,7 +126,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
 
         :param obj: The admin object or class.
         :param model: The model the admin class is used for.
-        :param str query_path: The query path to the queryable property.
+        :param QueryPath query_path: The query path to the queryable property.
         :param str label: A label to use for error messages.
         :param bool allow_relation: Whether or not the queryable property
                                     should be considered valid if it is
@@ -138,7 +138,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
         """
         errors = []
-        property_ref, lookups = resolve_queryable_property(model, query_path.split(LOOKUP_SEP))
+        property_ref, lookups = resolve_queryable_property(model, query_path)
         if not property_ref:
             message = '"{}" refers to "{}", which is not a queryable property.'.format(label, query_path)
             errors.append(Error(message, obj, error_id=1))
@@ -147,7 +147,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                 message = ('"{}" refers to queryable property "{}", which does not implement annotation creation.'
                            .format(label, query_path))
                 errors.append(Error(message, obj, error_id=2))
-            if query_path.count(LOOKUP_SEP) > len(lookups) and not allow_relation:
+            if len(query_path) > len(lookups) + 1 and not allow_relation:
                 message = ('The queryable property in "{}" must not be a property on a related model (invalid item: '
                            '"{}").'.format(label, query_path))
                 errors.append(Error(message, obj, error_id=3))
@@ -171,7 +171,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
         """
         field_name = item[0] if isinstance(item, (tuple, list)) else item
-        return self._check_queryable_property(obj, model, field_name, label, allow_lookups=False)
+        return self._check_queryable_property(obj, model, QueryPath(field_name), label, allow_lookups=False)
 
     def _check_ordering_queryable_property(self, obj, model, field_name, label):
         """
@@ -193,7 +193,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                 field_name = field_name.expression.name
         if field_name.startswith('-') or field_name.startswith('+'):
             field_name = field_name[1:]
-        return self._check_queryable_property(obj, model, field_name, label)
+        return self._check_queryable_property(obj, model, QueryPath(field_name), label)
 
     def _check_list_filter_item(self, obj, *args):
         errors = super(QueryablePropertiesChecksMixin, self)._check_list_filter_item(obj, *args)
@@ -247,4 +247,5 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                  as well as a list of check errors.
         :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
         """
-        return self._check_queryable_property(obj, model, item, label, allow_relation=False, allow_lookups=False)[1]
+        return self._check_queryable_property(obj, model, QueryPath(item), label,
+                                              allow_relation=False, allow_lookups=False)[1]

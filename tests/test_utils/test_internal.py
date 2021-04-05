@@ -77,6 +77,15 @@ class TestQueryPath(object):
         query_path = QueryPath(('a', 'b'))
         assert repr(query_path) == '<QueryPath: a__b>'
 
+    def test_build_filter(self):
+        path = 'a__b__c'
+        value = 1337
+        query_path = QueryPath(path)
+        condition = query_path.build_filter(value)
+        assert isinstance(condition, Q)
+        assert len(condition.children) == 1
+        assert condition.children[0] == (path, value)
+
 
 class TestInjectableMixin(object):
 
@@ -164,14 +173,14 @@ class TestTreeNodeProcessor(object):
 
 class TestModelAttributeGetter(object):
 
-    @pytest.mark.parametrize('path, expected_parts', [
-        ('attr', ['attr']),
-        ('attr1.attr2', ['attr1', 'attr2']),
-        ('attr1.attr2.attr3', ['attr1', 'attr2', 'attr3']),
+    @pytest.mark.parametrize('path, expected_query_path', [
+        ('attr', QueryPath('attr')),
+        ('attr1.attr2', QueryPath('attr1__attr2')),
+        ('attr1.attr2.attr3', QueryPath('attr1__attr2__attr3')),
     ])
-    def test_initializer(self, path, expected_parts):
+    def test_initializer(self, path, expected_query_path):
         getter = ModelAttributeGetter(path)
-        assert getter.path_parts == expected_parts
+        assert getter.query_path == expected_query_path
 
     @pytest.mark.django_db
     @pytest.mark.parametrize('path, expected_value', [
@@ -214,6 +223,7 @@ class TestModelAttributeGetter(object):
         getter = ModelAttributeGetter(path)
         condition = getter.build_filter(lookup, value)
         assert isinstance(condition, Q)
+        assert len(condition.children) == 1
         assert condition.children[0] == (expected_query_name, value)
 
 
@@ -243,97 +253,98 @@ def test_parametrizable_decorator():
 
 class TestResolveQueryableProperty(object):
 
-    @pytest.mark.parametrize('model, path, expected_property, expected_lookups', [
+    @pytest.mark.parametrize('model, query_path, expected_property, expected_lookups', [
         # No relation involved
-        (VersionWithClassBasedProperties, ['version'], VersionWithClassBasedProperties.version, []),
-        (VersionWithDecoratorBasedProperties, ['version'], VersionWithDecoratorBasedProperties.version, []),
-        (VersionWithClassBasedProperties, ['version', 'lower', 'exact'],
-         VersionWithClassBasedProperties.version, ['lower', 'exact']),
-        (VersionWithDecoratorBasedProperties, ['version', 'lower', 'exact'],
-         VersionWithDecoratorBasedProperties.version, ['lower', 'exact']),
+        (VersionWithClassBasedProperties, QueryPath('version'), VersionWithClassBasedProperties.version, QueryPath()),
+        (VersionWithDecoratorBasedProperties, QueryPath('version'),
+         VersionWithDecoratorBasedProperties.version, QueryPath()),
+        (VersionWithClassBasedProperties, QueryPath('version__lower__exact'),
+         VersionWithClassBasedProperties.version, QueryPath('lower__exact')),
+        (VersionWithDecoratorBasedProperties, QueryPath('version__lower__exact'),
+         VersionWithDecoratorBasedProperties.version, QueryPath('lower__exact')),
         # FK forward relation
-        (VersionWithClassBasedProperties, ['application', 'version_count'],
-         ApplicationWithClassBasedProperties.version_count, []),
-        (VersionWithDecoratorBasedProperties, ['application', 'version_count'],
-         ApplicationWithDecoratorBasedProperties.version_count, []),
-        (VersionWithClassBasedProperties, ['application', 'major_sum', 'gt'],
-         ApplicationWithClassBasedProperties.major_sum, ['gt']),
-        (VersionWithDecoratorBasedProperties, ['application', 'major_sum', 'gt'],
-         ApplicationWithDecoratorBasedProperties.major_sum, ['gt']),
+        (VersionWithClassBasedProperties, QueryPath('application__version_count'),
+         ApplicationWithClassBasedProperties.version_count, QueryPath()),
+        (VersionWithDecoratorBasedProperties, QueryPath('application__version_count'),
+         ApplicationWithDecoratorBasedProperties.version_count, QueryPath()),
+        (VersionWithClassBasedProperties, QueryPath('application__major_sum__gt'),
+         ApplicationWithClassBasedProperties.major_sum, QueryPath('gt')),
+        (VersionWithDecoratorBasedProperties, QueryPath('application__major_sum__gt'),
+         ApplicationWithDecoratorBasedProperties.major_sum, QueryPath('gt')),
         # FK reverse relation
-        (ApplicationWithClassBasedProperties, ['versions', 'major_minor'],
-         VersionWithClassBasedProperties.major_minor, []),
-        (ApplicationWithDecoratorBasedProperties, ['versions', 'major_minor'],
-         VersionWithDecoratorBasedProperties.major_minor, []),
-        (ApplicationWithClassBasedProperties, ['versions', 'version', 'lower', 'contains'],
-         VersionWithClassBasedProperties.version, ['lower', 'contains']),
-        (ApplicationWithDecoratorBasedProperties, ['versions', 'version', 'lower', 'contains'],
-         VersionWithDecoratorBasedProperties.version, ['lower', 'contains']),
+        (ApplicationWithClassBasedProperties, QueryPath('versions__major_minor'),
+         VersionWithClassBasedProperties.major_minor, QueryPath()),
+        (ApplicationWithDecoratorBasedProperties, QueryPath('versions__major_minor'),
+         VersionWithDecoratorBasedProperties.major_minor, QueryPath()),
+        (ApplicationWithClassBasedProperties, QueryPath('versions__version__lower__contains'),
+         VersionWithClassBasedProperties.version, QueryPath('lower__contains')),
+        (ApplicationWithDecoratorBasedProperties, QueryPath('versions__version__lower__contains'),
+         VersionWithDecoratorBasedProperties.version, QueryPath('lower__contains')),
         # M2M forward relation
-        (ApplicationWithClassBasedProperties, ['categories', 'circular'],
-         CategoryWithClassBasedProperties.circular, []),
-        (ApplicationWithDecoratorBasedProperties, ['categories', 'circular'],
-         CategoryWithDecoratorBasedProperties.circular, []),
-        (ApplicationWithClassBasedProperties, ['categories', 'circular', 'exact'],
-         CategoryWithClassBasedProperties.circular, ['exact']),
-        (ApplicationWithDecoratorBasedProperties, ['categories', 'circular', 'exact'],
-         CategoryWithDecoratorBasedProperties.circular, ['exact']),
+        (ApplicationWithClassBasedProperties, QueryPath('categories__circular'),
+         CategoryWithClassBasedProperties.circular, QueryPath()),
+        (ApplicationWithDecoratorBasedProperties, QueryPath('categories__circular'),
+         CategoryWithDecoratorBasedProperties.circular, QueryPath()),
+        (ApplicationWithClassBasedProperties, QueryPath('categories__circular__exact'),
+         CategoryWithClassBasedProperties.circular, QueryPath('exact')),
+        (ApplicationWithDecoratorBasedProperties, QueryPath('categories__circular__exact'),
+         CategoryWithDecoratorBasedProperties.circular, QueryPath('exact')),
         # M2M reverse relation
-        (CategoryWithClassBasedProperties, ['applications', 'major_sum'],
-         ApplicationWithClassBasedProperties.major_sum, []),
-        (CategoryWithDecoratorBasedProperties, ['applications', 'major_sum'],
-         ApplicationWithDecoratorBasedProperties.major_sum, []),
-        (CategoryWithClassBasedProperties, ['applications', 'version_count', 'lt'],
-         ApplicationWithClassBasedProperties.version_count, ['lt']),
-        (CategoryWithDecoratorBasedProperties, ['applications', 'version_count', 'lt'],
-         ApplicationWithDecoratorBasedProperties.version_count, ['lt']),
+        (CategoryWithClassBasedProperties, QueryPath('applications__major_sum'),
+         ApplicationWithClassBasedProperties.major_sum, QueryPath()),
+        (CategoryWithDecoratorBasedProperties, QueryPath('applications__major_sum'),
+         ApplicationWithDecoratorBasedProperties.major_sum, QueryPath()),
+        (CategoryWithClassBasedProperties, QueryPath('applications__version_count__lt'),
+         ApplicationWithClassBasedProperties.version_count, QueryPath('lt')),
+        (CategoryWithDecoratorBasedProperties, QueryPath('applications__version_count__lt'),
+         ApplicationWithDecoratorBasedProperties.version_count, QueryPath('lt')),
         # Multiple relations
-        (CategoryWithClassBasedProperties, ['applications', 'versions', 'application', 'categories', 'circular'],
-         CategoryWithClassBasedProperties.circular, []),
-        (CategoryWithDecoratorBasedProperties, ['applications', 'versions', 'application', 'categories', 'circular'],
-         CategoryWithDecoratorBasedProperties.circular, []),
-        (VersionWithClassBasedProperties, ['application', 'categories', 'circular', 'in'],
-         CategoryWithClassBasedProperties.circular, ['in']),
-        (VersionWithDecoratorBasedProperties, ['application', 'categories', 'circular', 'in'],
-         CategoryWithDecoratorBasedProperties.circular, ['in']),
+        (CategoryWithClassBasedProperties, QueryPath('applications__versions__application__categories__circular'),
+         CategoryWithClassBasedProperties.circular, QueryPath()),
+        (CategoryWithDecoratorBasedProperties, QueryPath('applications__versions__application__categories__circular'),
+         CategoryWithDecoratorBasedProperties.circular, QueryPath()),
+        (VersionWithClassBasedProperties, QueryPath('application__categories__circular__in'),
+         CategoryWithClassBasedProperties.circular, QueryPath('in')),
+        (VersionWithDecoratorBasedProperties, QueryPath('application__categories__circular__in'),
+         CategoryWithDecoratorBasedProperties.circular, QueryPath('in')),
     ])
-    def test_successful(self, model, path, expected_property, expected_lookups):
+    def test_successful(self, model, query_path, expected_property, expected_lookups):
         expected_ref = QueryablePropertyReference(expected_property, expected_property.model,
-                                                  tuple(path[:-len(expected_lookups) - 1]))
-        assert resolve_queryable_property(model, path) == (expected_ref, expected_lookups)
+                                                  query_path[:-len(expected_lookups) - 1])
+        assert resolve_queryable_property(model, query_path) == (expected_ref, expected_lookups)
 
-    @pytest.mark.parametrize('model, path', [
+    @pytest.mark.parametrize('model, query_path', [
         # No relation involved
-        (VersionWithClassBasedProperties, ['non_existent']),
-        (VersionWithDecoratorBasedProperties, ['non_existent']),
-        (VersionWithClassBasedProperties, ['major']),
-        (VersionWithDecoratorBasedProperties, ['major']),
+        (VersionWithClassBasedProperties, QueryPath('non_existent')),
+        (VersionWithDecoratorBasedProperties, QueryPath('non_existent')),
+        (VersionWithClassBasedProperties, QueryPath('major')),
+        (VersionWithDecoratorBasedProperties, QueryPath('major')),
         # FK forward relation
-        (VersionWithClassBasedProperties, ['application', 'non_existent', 'exact']),
-        (VersionWithDecoratorBasedProperties, ['application', 'non_existent', 'exact']),
-        (VersionWithClassBasedProperties, ['application', 'name']),
-        (VersionWithDecoratorBasedProperties, ['application', 'name']),
+        (VersionWithClassBasedProperties, QueryPath('application__non_existent__exact')),
+        (VersionWithDecoratorBasedProperties, QueryPath('application__non_existent__exact')),
+        (VersionWithClassBasedProperties, QueryPath('application__name')),
+        (VersionWithDecoratorBasedProperties, QueryPath('application__name')),
         # FK reverse relation
-        (ApplicationWithClassBasedProperties, ['versions', 'non_existent']),
-        (ApplicationWithDecoratorBasedProperties, ['versions', 'non_existent']),
-        (ApplicationWithClassBasedProperties, ['versions', 'minor', 'gt']),
-        (ApplicationWithDecoratorBasedProperties, ['versions', 'minor', 'gt']),
+        (ApplicationWithClassBasedProperties, QueryPath('versions__non_existent')),
+        (ApplicationWithDecoratorBasedProperties, QueryPath('versions__non_existent')),
+        (ApplicationWithClassBasedProperties, QueryPath('versions__minor__gt')),
+        (ApplicationWithDecoratorBasedProperties, QueryPath('versions__minor__gt')),
         # M2M forward relation
-        (ApplicationWithClassBasedProperties, ['categories', 'non_existent']),
-        (ApplicationWithDecoratorBasedProperties, ['categories', 'non_existent']),
-        (ApplicationWithClassBasedProperties, ['categories', 'name']),
-        (ApplicationWithDecoratorBasedProperties, ['categories', 'name']),
+        (ApplicationWithClassBasedProperties, QueryPath('categories__non_existent')),
+        (ApplicationWithDecoratorBasedProperties, QueryPath('categories__non_existent')),
+        (ApplicationWithClassBasedProperties, QueryPath('categories__name')),
+        (ApplicationWithDecoratorBasedProperties, QueryPath('categories__name')),
         # M2M reverse relation
-        (CategoryWithClassBasedProperties, ['applications', 'non_existent']),
-        (CategoryWithDecoratorBasedProperties, ['applications', 'non_existent']),
-        (CategoryWithClassBasedProperties, ['applications', 'name']),
-        (CategoryWithDecoratorBasedProperties, ['applications', 'name']),
+        (CategoryWithClassBasedProperties, QueryPath('applications__non_existent')),
+        (CategoryWithDecoratorBasedProperties, QueryPath('applications__non_existent')),
+        (CategoryWithClassBasedProperties, QueryPath('applications__name')),
+        (CategoryWithDecoratorBasedProperties, QueryPath('applications__name')),
         # Non existent relation
-        (VersionWithClassBasedProperties, ['non_existent_relation', 'non_existent', 'in']),
-        (VersionWithDecoratorBasedProperties, ['non_existent_relation', 'non_existent', 'in']),
+        (VersionWithClassBasedProperties, QueryPath('non_existent_relation__non_existent__in')),
+        (VersionWithDecoratorBasedProperties, QueryPath('non_existent_relation__non_existent__in')),
     ])
-    def test_unsuccessful(self, model, path):
-        assert resolve_queryable_property(model, path) == (None, [])
+    def test_unsuccessful(self, model, query_path):
+        assert resolve_queryable_property(model, query_path) == (None, QueryPath())
 
 
 class TestGetOutputField(object):

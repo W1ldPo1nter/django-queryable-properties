@@ -7,11 +7,11 @@ from django.db.models import Manager
 from django.db.models.query import QuerySet
 
 from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, chain_query, chain_queryset,
-                     LOOKUP_SEP, ModelIterable, ValuesQuerySet)
+                     ModelIterable, ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
-from .utils.internal import InjectableMixin, QueryablePropertyReference
+from .utils.internal import InjectableMixin, QueryPath, QueryablePropertyReference
 
 
 class QueryablePropertiesIterable(InjectableMixin):
@@ -105,7 +105,7 @@ class QueryablePropertiesIterable(InjectableMixin):
         select = dict(query.annotation_select)
 
         for property_ref in query._queryable_property_annotations:
-            annotation_name = property_ref.full_path
+            annotation_name = six.text_type(property_ref.full_path)
 
             # Older Django versions don't work with the annotation select dict
             # when it comes to ordering, so queryable property annotations used
@@ -128,7 +128,7 @@ class QueryablePropertiesIterable(InjectableMixin):
             # create a non-clashing name: both model field an queryable
             # property names are not allowed to contain the separator and a
             # relation path ending with the separator would be invalid as well.
-            changed_name = ''.join((annotation_name, LOOKUP_SEP))
+            changed_name = six.text_type(property_ref.full_path + '')
             final_aliases[changed_name] = final_aliases.pop(annotation_name, property_ref)
             select[changed_name] = select.pop(annotation_name)
             for index in order_by_occurrences:  # pragma: no cover
@@ -240,7 +240,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         """
         queryset = chain_queryset(self)
         for name in names:
-            property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, ())
+            property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, QueryPath())
             # A full GROUP BY is required if the query is not limited to
             # certain fields. Since only certain types of queries had the
             # _fields attribute in old Django versions, fall back to checking

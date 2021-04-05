@@ -189,7 +189,9 @@ class TestRelatedExistenceCheckProperty(object):
     ])
     def test_initializer(self, path, cached, expected_filter, expected_cached):
         prop = RelatedExistenceCheckProperty(path, cached=cached)
-        assert prop.filters == {expected_filter: False}
+        assert isinstance(prop.filter, Q)
+        assert len(prop.filter.children) == 1
+        assert prop.filter.children[0] == (expected_filter, False)
         assert prop.cached is expected_cached
 
     def test_getter(self, categories, applications):

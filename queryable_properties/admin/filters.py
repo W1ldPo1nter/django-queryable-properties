@@ -8,10 +8,9 @@ from django.contrib.admin.filters import (BooleanFieldListFilter, ChoicesFieldLi
 from django.contrib.admin.views import main
 from django.db.models import BooleanField, DateField
 
-from ..compat import LOOKUP_SEP
 from ..exceptions import QueryablePropertyError
 from ..properties import MappingProperty
-from ..utils.internal import get_output_field, resolve_queryable_property
+from ..utils.internal import get_output_field, QueryPath, resolve_queryable_property
 
 
 class QueryablePropertyField(object):
@@ -30,9 +29,9 @@ class QueryablePropertyField(object):
         :param model_admin: The admin instance for which a filter based on the
                             given queryable property should be created.
         :type model_admin: django.contrib.admin.options.BaseModelAdmin
-        :param str query_path: The query path to the queryable property.
+        :param QueryPath query_path: The query path to the queryable property.
         """
-        property_ref, lookups = resolve_queryable_property(model_admin.model, query_path.split(LOOKUP_SEP))
+        property_ref, lookups = resolve_queryable_property(model_admin.model, query_path)
         if not property_ref or lookups:
             raise QueryablePropertyError('The query path must point to a valid queryable property and may not contain'
                                          'lookups/transforms.')
@@ -83,7 +82,7 @@ class QueryablePropertyField(object):
             for value, label in six.iteritems(options):
                 yield value, label
         elif not isinstance(self.output_field, BooleanField):
-            name = '{}value'.format(LOOKUP_SEP)
+            name = six.text_type(QueryPath(('', 'value')))
             queryset = self.property_ref.model._default_manager.annotate(**{name: self.property_ref.get_annotation()})
             for value in queryset.order_by(name).distinct().values_list(name, flat=True):
                 yield value, six.text_type(value) if value is not None else self.empty_value_display
@@ -103,7 +102,7 @@ class QueryablePropertyField(object):
         list_filter_class = list_filter_class or QueryablePropertyListFilter.get_class(self)
 
         def creator(request, params, model, model_admin):
-            return list_filter_class(self, request, params, model, model_admin, self.property_path)
+            return list_filter_class(self, request, params, model, model_admin, six.text_type(self.property_path))
         return creator
 
 

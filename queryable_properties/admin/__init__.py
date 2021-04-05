@@ -5,6 +5,7 @@ from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation, chain_queryset
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
+from ..utils.internal import QueryPath
 from .checks import QueryablePropertiesChecksMixin
 from .filters import QueryablePropertyField
 
@@ -123,7 +124,7 @@ class QueryablePropertiesAdminMixin(object):
                 else:
                     field_name, filter_class = item, None
                 try:
-                    item = QueryablePropertyField(self, field_name).get_filter_creator(filter_class)
+                    item = QueryablePropertyField(self, QueryPath(field_name)).get_filter_creator(filter_class)
                 except QueryablePropertyError:
                     pass
             processed_filters.append(item)

@@ -8,11 +8,10 @@ from django.utils.tree import Node
 
 from .compat import (
     ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, contains_aggregate,
-    convert_build_filter_to_add_q_kwargs, LOOKUP_SEP, NEED_HAVING_METHOD_NAME, nullcontext, QUERY_CHAIN_METHOD_NAME,
-    ValuesQuerySet
+    convert_build_filter_to_add_q_kwargs, NEED_HAVING_METHOD_NAME, nullcontext, QUERY_CHAIN_METHOD_NAME, ValuesQuerySet
 )
 from .exceptions import QueryablePropertyError
-from .utils.internal import InjectableMixin, resolve_queryable_property, TreeNodeProcessor
+from .utils.internal import InjectableMixin, QueryPath, resolve_queryable_property, TreeNodeProcessor
 
 
 class QueryablePropertiesQueryMixin(InjectableMixin):
@@ -61,7 +60,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
                                          .format(property_ref.property))
 
-        annotation_name = property_ref.full_path
+        annotation_name = six.text_type(property_ref.full_path)
         annotation_mask = set(self.annotations) if self.annotation_select_mask is None else self.annotation_select_mask
         self._queryable_property_stack.append(property_ref)
         try:
@@ -92,16 +91,14 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                     self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
                 self.set_group_by()
 
-    def _auto_annotate(self, path, full_group_by=None):
+    def _auto_annotate(self, query_path, full_group_by=None):
         """
         Try to resolve the given path into a queryable property and annotate
         the property as a non-selected property (if the property wasn't added
         as an annotation already). Do nothing if the path does not match a
         queryable property.
 
-        :param collections.Sequence path: The path to resolve (a string of
-                                          Django's query expression split up
-                                          by the lookup separator).
+        :param QueryPath query_path: The query path to resolve.
         :param bool | None full_group_by: Optional override to indicate whether
                                           or not all fields must be contained
                                           in a GROUP BY clause for aggregate
@@ -111,7 +108,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         :return: The resolved annotation or None if the path couldn't be
                  resolved.
         """
-        property_ref = resolve_queryable_property(self.model, path)[0]
+        property_ref = resolve_queryable_property(self.model, query_path)[0]
         if not property_ref:
             return None
         if full_group_by is None:
@@ -140,15 +137,15 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # This method is called in older versions to add an aggregate, which
         # may be based on a queryable property annotation, which in turn must
         # be auto-annotated here.
-        path = tuple(aggregate.lookup.split(LOOKUP_SEP))
+        query_path = QueryPath(aggregate.lookup)
         if self._queryable_property_stack:
-            path = self._queryable_property_stack[-1].relation_path + path
-        property_annotation = self._auto_annotate(path)
+            query_path = self._queryable_property_stack[-1].relation_path + query_path
+        property_annotation = self._auto_annotate(query_path)
         if property_annotation:
             # If it is based on a queryable property annotation, annotating the
             # current aggregate cannot be delegated to Django as it couldn't
             # deal with annotations containing the lookup separator.
-            aggregate.add_to_query(self, alias, LOOKUP_SEP.join(path), property_annotation, is_summary)
+            aggregate.add_to_query(self, alias, six.text_type(query_path), property_annotation, is_summary)
         else:
             # The overridden method also allows to set a default value for the
             # model parameter, which will be missing if add_annotation calls are
@@ -180,7 +177,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             if isinstance(field_name, six.string_types) and field_name != '?':
                 if field_name.startswith('-') or field_name.startswith('+'):
                     field_name = field_name[1:]
-                self._auto_annotate(field_name.split(LOOKUP_SEP))
+                self._auto_annotate(QueryPath(field_name))
         return super(QueryablePropertiesQueryMixin, self).add_ordering(*ordering, **kwargs)
 
     def build_filter(self, filter_expr, *args, **kwargs):
@@ -195,7 +192,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # and delegate it to Django.
             property_ref = None
         else:
-            property_ref, lookups = resolve_queryable_property(self.model, arg.split(LOOKUP_SEP))
+            property_ref, lookups = resolve_queryable_property(self.model, QueryPath(arg))
 
         # If no queryable property could be determined for the filter
         # expression (either because a regular/non-existent field is referenced
@@ -233,7 +230,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # a subquery), all queryable property annotations must be added to the
         # select mask to avoid potentially empty SELECT clauses.
         if self.annotation_select_mask is not None and self._queryable_property_annotations:
-            annotation_names = (property_ref.full_path for property_ref in self._queryable_property_annotations)
+            annotation_names = (six.text_type(property_ref.full_path) for property_ref
+                                in self._queryable_property_annotations)
             self.set_annotation_mask(self.annotation_select_mask.union(annotation_names))
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
 
@@ -251,8 +249,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # annotation during the actual filter application, this method must
         # return True if a filter condition contains such a property.
         def is_aggregate_property(item, ignored_refs=set()):
-            path = item[0].split(LOOKUP_SEP)
-            property_ref, lookups = resolve_queryable_property(self.model, path)
+            property_ref, lookups = resolve_queryable_property(self.model, QueryPath(item[0]))
             if not property_ref or property_ref in ignored_refs:
                 return False
             if property_ref.property.filter_requires_annotation:
@@ -278,10 +275,10 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # This method is used to resolve field names in complex expressions. If
         # a queryable property is used in such an expression, it needs to be
         # auto-annotated (while taking the stack into account) and returned.
-        path = tuple(name.split(LOOKUP_SEP))
+        query_path = QueryPath(name)
         if self._queryable_property_stack:
-            path = self._queryable_property_stack[-1].relation_path + path
-        property_annotation = self._auto_annotate(path, full_group_by=ValuesQuerySet is not None)
+            query_path = self._queryable_property_stack[-1].relation_path + query_path
+        property_annotation = self._auto_annotate(query_path, full_group_by=ValuesQuerySet is not None)
         if property_annotation:
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
@@ -299,7 +296,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # relation path on top of the stack must be prepended to trick Django
         # into resolving correctly.
         if self._queryable_property_stack:
-            names = self._queryable_property_stack[-1].relation_path + tuple(names)
+            names = self._queryable_property_stack[-1].relation_path + names
         return super(QueryablePropertiesQueryMixin, self).setup_joins(names, *args, **kwargs)
 
     def clone(self, *args, **kwargs):
