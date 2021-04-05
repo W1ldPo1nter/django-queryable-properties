@@ -37,7 +37,7 @@ class QueryPath(tuple):
         :param collections.Iterable path: The query path to represent as string
                                           or other iterable.
         """
-        if isinstance(path, six.text_type):
+        if isinstance(path, six.string_types):
             path = path.split(LOOKUP_SEP)
         return super(QueryPath, cls).__new__(cls, path)
 
