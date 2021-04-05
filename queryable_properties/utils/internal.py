@@ -11,6 +11,7 @@ from functools import wraps
 import six
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
+from django.utils.decorators import method_decorator
 from django.utils.tree import Node
 
 from . import get_queryable_property, MISSING_OBJECT
@@ -369,27 +370,30 @@ class ModelAttributeGetter(object):
         return (self.query_path + lookup).build_filter(value)
 
 
-def parametrizable_decorator(method):
+def parametrizable_decorator(function):
     """
-    A decorator for methods (not regular functions!) who themselves are to be
-    used as decorators and are to support both a parameter-less decorator usage
-    (``@my_decorator``) as well as parametrized decorator usage
-    (``@my_decorator(some_param=5)``). This decorator takes care of making the
-    distinction between both usages and returning the correct object.
+    A decorator for functions who themselves are to be used as decorators and
+    are to support both a parameter-less decorator usage (``@my_decorator``) as
+    well as parametrized decorator usage (``@my_decorator(some_param=5)``).
+    This decorator takes care of making the distinction between both usages and
+    returning the correct object.
 
-    :param function method: The decorator method to decorate.
-    :return: A wrapper method that will replace the decorated method.
+    :param function function: The decorator function to decorate.
+    :return: A wrapper function that will replace the decorated function.
     :rtype: function
     """
-    @wraps(method)
-    def wrapper(self, function=None, *args, **kwargs):
+    @wraps(function)
+    def wrapper(decorated_function=None, *args, **kwargs):
         def decorator(func):
-            return method(self, func, *args, **kwargs)
+            return function(func, *args, **kwargs)
 
-        if function:  # A function was given directly -> apply the decorator directly (@my_decorator usage).
-            return decorator(function)
+        if decorated_function:  # A function was given directly -> apply the decorator directly (@my_decorator usage).
+            return decorator(decorated_function)
         return decorator  # No function -> return the actual decorator (@my_decorator(some_param=5) usage).
     return wrapper
+
+
+parametrizable_decorator_method = method_decorator(parametrizable_decorator)
 
 
 def resolve_queryable_property(model, query_path):

@@ -10,7 +10,7 @@ import six
 from ..compat import LOOKUP_SEP, pretty_name
 from ..exceptions import QueryablePropertyError
 from ..utils import get_queryable_property, reset_queryable_property
-from ..utils.internal import parametrizable_decorator
+from ..utils.internal import parametrizable_decorator_method
 from .cache_behavior import CLEAR_CACHE
 from .mixins import AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin
 
@@ -255,7 +255,7 @@ class queryable_property(QueryableProperty):
         clone.__dict__.update(attrs)
         return clone
 
-    @parametrizable_decorator
+    @parametrizable_decorator_method
     def getter(self, method, cached=None):
         """
         Decorator for a function or method that is used as the getter of this
@@ -275,7 +275,7 @@ class queryable_property(QueryableProperty):
             clone.cached = cached
         return clone(method, force_getter=True)
 
-    @parametrizable_decorator
+    @parametrizable_decorator_method
     def setter(self, method, cache_behavior=None):
         """
         Decorator for a function or method that is used as the setter of this
@@ -296,7 +296,7 @@ class queryable_property(QueryableProperty):
             attrs['setter_cache_behavior'] = cache_behavior
         return self._clone(**attrs)
 
-    @parametrizable_decorator
+    @parametrizable_decorator_method
     def filter(self, method, requires_annotation=None, lookups=None, boolean=False):
         """
         Decorator for a function or method that is used to generate a filter

@@ -31,12 +31,6 @@ class DummyClass(object):
         self.attr1 = attr1
         self.attr2 = attr2
 
-    @parametrizable_decorator
-    def decorator(self, function, *args, **kwargs):
-        function.args = args
-        function.kwargs = kwargs
-        return function
-
 
 class DummyMixin(InjectableMixin):
 
@@ -51,6 +45,13 @@ class DummyClassWithMetaclass(six.with_metaclass(BaseMetaclass)):
 
 class DummyMixinWithMetaclass(six.with_metaclass(MixinMetaclass, InjectableMixin)):
     pass
+
+
+@parametrizable_decorator
+def decorator(function, *args, **kwargs):
+    function.args = args
+    function.kwargs = kwargs
+    return function
 
 
 class TestQueryPath(object):
@@ -257,20 +258,19 @@ class TestModelAttributeGetter(object):
 
 
 def test_parametrizable_decorator():
-    dummy = DummyClass(1, 2)
 
-    @dummy.decorator
+    @decorator
     def func1():
         pass
 
-    @dummy.decorator(some_kwarg=1, another_kwarg='test')
+    @decorator(some_kwarg=1, another_kwarg='test')
     def func2():
         pass
 
     def func3():
         pass
 
-    func3 = dummy.decorator(func3, 1, 2, kwarg='test')
+    func3 = decorator(func3, 1, 2, kwarg='test')
 
     assert func1.args == ()
     assert func1.kwargs == {}
