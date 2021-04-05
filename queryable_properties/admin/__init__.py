@@ -75,8 +75,7 @@ class QueryablePropertiesAdminMixin(object):
         queryset = base_method(request)
         # Make sure to use a queryset with queryable properties features.
         if not isinstance(queryset, QueryablePropertiesQuerySetMixin):
-            queryset = chain_queryset(queryset)
-            QueryablePropertiesQuerySetMixin.inject_into_object(queryset)
+            queryset = QueryablePropertiesQuerySetMixin.inject_into_object(chain_queryset(queryset))
         # Apply list_select_properties.
         list_select_properties = self.get_list_select_properties(request)
         if list_select_properties:

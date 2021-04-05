@@ -178,6 +178,11 @@ class InjectableMixin(object):
         class_name = str(class_name or base_class.__name__)
         cache_key = (base_class, cls, class_name)
         created_class = cls._created_classes.get(cache_key)
+        metaclass = type
+        if not issubclass(cls.__class__, base_class.__class__) and not issubclass(base_class.__class__, cls.__class__):
+            # If the metaclasses of both classes are unrelated, try to build
+            # a new metaclass based on both dynamically.
+            metaclass = type(base_class.__class__.__name__, (cls.__class__, base_class.__class__), {})
         if created_class is None:
             attrs = {}
             if cls._dynamic_pickling:
@@ -187,7 +192,7 @@ class InjectableMixin(object):
                     return _unpickle_injected_object, (base_class, cls, class_name), get_state()
                 attrs['__reduce__'] = __reduce__
 
-            created_class = cls._created_classes[cache_key] = type(class_name, (cls, base_class), attrs)
+            created_class = cls._created_classes[cache_key] = metaclass(class_name, (cls, base_class), attrs)
         return created_class
 
     @classmethod
@@ -202,9 +207,11 @@ class InjectableMixin(object):
                                class. If None is supplied (default), the class
                                name of the dynamically created class will be
                                the one of the object's original class.
+        :return: The modified object.
         """
         obj.__class__ = cls.mix_with_class(obj.__class__, class_name)
         obj.init_injected_attrs()
+        return obj
 
 
 # This must be a standalone function for Python 2, where it could not be
@@ -226,8 +233,7 @@ def _unpickle_injected_object(base_class, mixin_class, class_name=None):
              object's state).
     """
     obj = base_class.__new__(base_class, ())
-    mixin_class.inject_into_object(obj, class_name)
-    return obj
+    return mixin_class.inject_into_object(obj, class_name)
 
 
 _unpickle_injected_object.__safe_for_unpickling__ = True

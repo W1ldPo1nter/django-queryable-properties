@@ -17,6 +17,14 @@ from ..app_management.models import (ApplicationWithClassBasedProperties, Applic
 from ..conftest import Concat, Value
 
 
+class BaseMetaclass(type):
+    pass
+
+
+class MixinMetaclass(type):
+    pass
+
+
 class DummyClass(object):
 
     def __init__(self, attr1, attr2):
@@ -35,6 +43,14 @@ class DummyMixin(InjectableMixin):
     def init_injected_attrs(self):
         self.mixin_attr1 = 1.337
         self.mixin_attr2 = 'test'
+
+
+class DummyClassWithMetaclass(six.with_metaclass(BaseMetaclass)):
+    pass
+
+
+class DummyMixinWithMetaclass(six.with_metaclass(MixinMetaclass, InjectableMixin)):
+    pass
 
 
 class TestQueryPath(object):
@@ -113,9 +129,22 @@ class TestInjectableMixin(object):
             assert obj.mixin_attr1 == 1.337
             assert obj.mixin_attr2 == 'test'
 
+    @pytest.mark.parametrize('base_class, mixin_class', [
+        (DummyClass, DummyMixin),
+        (DummyClass, DummyMixinWithMetaclass),
+        (DummyClassWithMetaclass, DummyMixin),
+        (DummyClassWithMetaclass, DummyMixinWithMetaclass),
+    ])
+    def test_mix_with_class_metaclasses(self, base_class, mixin_class):
+        cls = mixin_class.mix_with_class(base_class)
+        assert issubclass(cls, base_class)
+        assert issubclass(cls, mixin_class)
+        assert isinstance(cls, base_class.__class__)
+        assert isinstance(cls, mixin_class.__class__)
+
     def test_inject_into_object(self):
         obj = DummyClass(5, 'abc')
-        DummyMixin.inject_into_object(obj)
+        assert DummyMixin.inject_into_object(obj) is obj
         assert isinstance(obj, DummyClass)
         assert isinstance(obj, DummyMixin)
         assert obj.attr1 == 5
