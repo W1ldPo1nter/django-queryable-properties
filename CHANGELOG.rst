@@ -4,6 +4,7 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 3.2
 - Fixed the construction of ``GROUP BY`` clauses when using annotations based on aggregate queryable properties in
   Django 1.8
 
