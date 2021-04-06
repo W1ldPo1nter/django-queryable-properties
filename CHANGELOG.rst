@@ -4,6 +4,7 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 3.2
 - Queryable properties can now define a verbose name that can be used in UI representations
 - Added a Django admin integration that allows to reference queryable properties like regular model fields in various
   admin options

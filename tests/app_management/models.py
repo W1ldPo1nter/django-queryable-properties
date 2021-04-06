@@ -102,7 +102,7 @@ class DefaultChangesProperty(AnnotationMixin, QueryableProperty):
     def get_annotation(self, cls):
         from django.db.models import Value
         from django.db.models.functions import Coalesce
-        return Coalesce('changes', Value('(No data)'))
+        return Coalesce('changes', Value('(No data)'), output_field=models.TextField())
 
 
 class Version2Property(LookupFilterMixin, QueryableProperty):
@@ -327,7 +327,7 @@ class VersionWithDecoratorBasedProperties(Version):
     def changes_or_default(cls):
         from django.db.models import Value
         from django.db.models.functions import Coalesce
-        return Coalesce('changes', Value('(No data)'))
+        return Coalesce('changes', Value('(No data)'), output_field=models.TextField())
 
     @queryable_property
     def is_version_2(self):

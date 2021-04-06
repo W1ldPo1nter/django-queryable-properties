@@ -13,13 +13,13 @@ Introduction
 
 Since Django offers a lot of powerful options when working with querysets (like ``select_related``, annotations, etc.),
 it is generally not an issue to solve these problems and implement a solution, which will likely be based on one of the
-following options (from bad to good):
+following options:
 
-- Performing special annotations only in the exact places that they are needed in while possibly even duplicating the
-  code if there are multiple such places.
-- Implementing functions/methods that perform the annotations to avoid duplicating code.
+- Performing special annotations only in the exact places that they are needed or in utility functions/methods.
 - Implementing a custom model manager/queryset class to allow the usage of these special annotations whenever dealing
   with a queryset.
+- Using ``queryset.alias()`` to build up a collection of available queryset annotations that resemble the properties
+  (requires Django 3.2 or higher).
 
 While especially the latter options are not *wrong*, they do require some boilerplate and will likely split up the
 business logic into multiple parts (e.g. the property for single objects is implemented on the model class while
