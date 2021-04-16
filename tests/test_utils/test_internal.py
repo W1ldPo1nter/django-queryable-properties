@@ -118,6 +118,9 @@ class TestInjectableMixin(object):
         # Execute the code twice to test the cache
         for _ in range(2):
             cls = DummyMixin.mix_with_class(DummyClass, class_name)
+            # Test that trying to mix in the class a second time returns the
+            # base class unchanged.
+            assert cls is DummyMixin.mix_with_class(cls)
             created_classes.add(cls)
             assert issubclass(cls, DummyClass)
             assert issubclass(cls, DummyMixin)
@@ -152,6 +155,11 @@ class TestInjectableMixin(object):
         assert obj.attr2 == 'abc'
         assert obj.mixin_attr1 == 1.337
         assert obj.mixin_attr2 == 'test'
+        # Test that init_injected_attrs is not called when no injection takes
+        # places due to the object already using the mixin.
+        obj.mixin_attr1 = obj.mixin_attr2 = None
+        DummyMixin.inject_into_object(obj)
+        assert obj.mixin_attr1 is obj.mixin_attr2 is None
 
     def test_pickle_unpickle(self):
         base_obj = DummyClass('xyz', 42.42)

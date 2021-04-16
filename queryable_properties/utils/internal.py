@@ -165,17 +165,22 @@ class InjectableMixin(object):
     def mix_with_class(cls, base_class, class_name=None):
         """
         Create a new class based on the given base class and this mixin class.
-        The created class will also receive a custom :meth:`__reduce__`
-        implementation to make its objects picklable.
+        If this mixin class is already part of the class hierarchy of the given
+        base class, the base class will be returned unchanged.
 
         :param type base_class: The base class to mix the mixin into.
         :param str class_name: An optional name for the dynamically created
                                class. If None is supplied (default), the class
                                name of the dynamically created class will be
-                               the one of the object's original class.
-        :return: The generated class.
+                               the one of the object's original class. Will
+                               be applied if a new class is created.
+        :return: The generated class or the base class if it already uses this
+                 mixin.
         :rtype: type
         """
+        if issubclass(base_class, cls):
+            return base_class
+
         class_name = str(class_name or base_class.__name__)
         cache_key = (base_class, cls, class_name)
         created_class = cls._created_classes.get(cache_key)
@@ -201,17 +206,22 @@ class InjectableMixin(object):
         """
         Update the given object's class by dynamically generating a new class
         based on the object's original class and this mixin class and changing
-        the given object into an object of this new class.
+        the given object into an object of this new class. If this mixin is
+        already part of the object's class hierarchy, its class will not
+        change.
 
         :param obj: The object whose class should be changed.
         :param str class_name: An optional name for the dynamically created
                                class. If None is supplied (default), the class
                                name of the dynamically created class will be
-                               the one of the object's original class.
-        :return: The modified object.
+                               the one of the object's original class. Will
+                               be applied if a new class is created.
+        :return: The (potentially) modified object.
         """
-        obj.__class__ = cls.mix_with_class(obj.__class__, class_name)
-        obj.init_injected_attrs()
+        new_class = cls.mix_with_class(obj.__class__, class_name)
+        if new_class is not obj.__class__:
+            obj.__class__ = new_class
+            obj.init_injected_attrs()
         return obj
 
 
