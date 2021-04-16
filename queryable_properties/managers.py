@@ -148,15 +148,19 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
     to use queryable properties in filters, annotations and update queries.
     """
 
+    @classmethod
+    def inject_into_object(cls, obj, class_name=None):
+        # Make sure the mixin is always applied to a cloned queryset to leave
+        # the original one untouched.
+        return super(QueryablePropertiesQuerySetMixin, cls).inject_into_object(chain_queryset(obj), class_name)
+
     def init_injected_attrs(self):
         # To work correctly, a query using the QueryablePropertiesQueryMixin is
         # required. If the current query is not using the mixin already, it
         # will be dynamically injected into the query. That way, other Django
         # extensions using custom query objects are also supported.
-        if not isinstance(self.query, QueryablePropertiesQueryMixin):
-            self.query = chain_query(self.query)
-            class_name = 'QueryableProperties' + self.query.__class__.__name__
-            QueryablePropertiesQueryMixin.inject_into_object(self.query, class_name)
+        class_name = 'QueryableProperties' + self.query.__class__.__name__
+        self.query = QueryablePropertiesQueryMixin.inject_into_object(chain_query(self.query), class_name)
 
     @property
     def _iterable_class(self):

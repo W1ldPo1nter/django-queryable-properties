@@ -2,7 +2,7 @@
 
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
-from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation, chain_queryset
+from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import QueryPath
@@ -64,7 +64,7 @@ class QueryablePropertiesAdminMixin(object):
         # admin's checks/validation class.
         for attr_name in ('checks_class', 'validator_class', 'default_validator_class'):
             checks_class = getattr(obj, attr_name, None)
-            if checks_class and not issubclass(checks_class, QueryablePropertiesChecksMixin):
+            if checks_class:
                 class_name = 'QueryableProperties' + checks_class.__name__
                 setattr(obj, attr_name, QueryablePropertiesChecksMixin.mix_with_class(checks_class, class_name))
 
@@ -72,10 +72,8 @@ class QueryablePropertiesAdminMixin(object):
         # The base method has different names in different Django versions (see
         # comment on the constant definition).
         base_method = getattr(super(QueryablePropertiesAdminMixin, self), ADMIN_QUERYSET_METHOD_NAME)
-        queryset = base_method(request)
         # Make sure to use a queryset with queryable properties features.
-        if not isinstance(queryset, QueryablePropertiesQuerySetMixin):
-            queryset = QueryablePropertiesQuerySetMixin.inject_into_object(chain_queryset(queryset))
+        queryset = QueryablePropertiesQuerySetMixin.inject_into_object(base_method(request))
         # Apply list_select_properties.
         list_select_properties = self.get_list_select_properties(request)
         if list_select_properties:

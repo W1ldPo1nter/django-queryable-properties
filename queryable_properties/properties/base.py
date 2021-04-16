@@ -352,7 +352,7 @@ class queryable_property(QueryableProperty):
         # If the decorated function/method is used for certain lookups only,
         # add the LookupFilterMixin into the new property to be able to reuse
         # its filter implementation based on the lookup mappings.
-        if lookups is not None and not isinstance(clone, LookupFilterMixin):
+        if lookups is not None:
             LookupFilterMixin.inject_into_object(clone)
         return clone
 
@@ -373,9 +373,7 @@ class queryable_property(QueryableProperty):
         # to use the default filter implementation. Since an explicitly set
         # filter implementation is stored in the instance dict, it will be used
         # over the default implementation.
-        if not isinstance(clone, AnnotationMixin):
-            AnnotationMixin.inject_into_object(clone)
-        return clone
+        return AnnotationMixin.inject_into_object(clone)
 
     def updater(self, method):
         """

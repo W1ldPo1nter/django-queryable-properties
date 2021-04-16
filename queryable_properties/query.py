@@ -126,10 +126,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         :return: The postprocessed cloned query.
         :rtype: django.db.models.sql.Query
         """
-        if not isinstance(clone, QueryablePropertiesQueryMixin):
-            QueryablePropertiesQueryMixin.inject_into_object(clone)
-        else:
-            clone.init_injected_attrs()
+        QueryablePropertiesQueryMixin.inject_into_object(clone)
+        clone.init_injected_attrs()
         clone._queryable_property_annotations.update(self._queryable_property_annotations)
         return clone
 
