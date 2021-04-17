@@ -2,7 +2,7 @@
 import pytest
 
 from django import VERSION as DJANGO_VERSION
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin,
@@ -42,6 +42,12 @@ class AnnotationGetterProperty(AnnotationGetterMixin, QueryableProperty):
 
     def get_annotation(self, cls):
         return Count('versions')
+
+
+class NestedAnnotationGetterProperty(AnnotationGetterMixin, QueryableProperty):
+
+    def get_annotation(self, cls):
+        return F('version_count') + 1
 
 
 class TestLookupFilterMixin(object):
@@ -130,10 +136,19 @@ class TestAnnotationMixin(object):
 class TestAnnotationGetterMixin(object):
 
     @pytest.fixture
-    def prop(self):
+    def prop(self, monkeypatch):
         prop = AnnotationGetterProperty()
         prop.name = 'test'
         prop.model = ApplicationWithClassBasedProperties
+        monkeypatch.setattr(ApplicationWithClassBasedProperties, 'test', prop, raising=False)
+        return prop
+
+    @pytest.fixture
+    def nested_prop(self, monkeypatch):
+        prop = NestedAnnotationGetterProperty()
+        prop.name = 'test'
+        prop.model = ApplicationWithClassBasedProperties
+        monkeypatch.setattr(ApplicationWithClassBasedProperties, 'test', prop, raising=False)
         return prop
 
     @pytest.mark.parametrize('kwargs, expected_cached', [
@@ -161,6 +176,12 @@ class TestAnnotationGetterMixin(object):
     def test_get_value(self, prop, applications):
         for application in applications[:2]:
             assert prop.get_value(application) == 4
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    def test_get_value_nested_properties(self, nested_prop, applications):
+        for application in applications[:2]:
+            assert nested_prop.get_value(application) == 5
 
     @pytest.mark.django_db
     def test_get_value_unsaved_object(self, prop):

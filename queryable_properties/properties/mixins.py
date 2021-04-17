@@ -5,6 +5,7 @@ from functools import wraps
 import six
 
 from ..exceptions import QueryablePropertyError
+from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import InjectableMixin, QueryPath
 
 
@@ -183,8 +184,7 @@ class AnnotationGetterMixin(AnnotationMixin):
             self.cached = cached
 
     def get_value(self, obj):
-        queryset = self.get_queryset_for_object(obj).distinct()
-        queryset = queryset.annotate(**{self.name: self.get_annotation(obj.__class__)})
+        queryset = self.get_queryset_for_object(obj).distinct().select_properties(self.name)
         return queryset.values_list(self.name, flat=True).get()
 
     def get_queryset(self, model):
@@ -194,7 +194,8 @@ class AnnotationGetterMixin(AnnotationMixin):
 
         :param model: The model class to build the queryset for.
         """
-        return model._base_manager.all()
+        # Inject the mixin to be able to use select_properties in the getter.
+        return QueryablePropertiesQuerySetMixin.inject_into_object(model._base_manager.all())
 
     def get_queryset_for_object(self, obj):
         """
