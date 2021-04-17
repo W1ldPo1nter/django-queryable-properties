@@ -2,7 +2,7 @@
 import pytest
 
 from django import VERSION as DJANGO_VERSION
-from django.db.models import Count, F, Q
+from django.db.models import Q
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin,
@@ -36,18 +36,6 @@ class DerivedLookupFilterProperty(BaseLookupFilterProperty):
     def filter_in(self, cls, lookup, value):
         value = list(value) + ['test']
         return Q(dummy__in=value)
-
-
-class AnnotationGetterProperty(AnnotationGetterMixin, QueryableProperty):
-
-    def get_annotation(self, cls):
-        return Count('versions')
-
-
-class NestedAnnotationGetterProperty(AnnotationGetterMixin, QueryableProperty):
-
-    def get_annotation(self, cls):
-        return F('version_count') + 1
 
 
 class TestLookupFilterMixin(object):
@@ -136,20 +124,14 @@ class TestAnnotationMixin(object):
 class TestAnnotationGetterMixin(object):
 
     @pytest.fixture
-    def prop(self, monkeypatch):
-        prop = AnnotationGetterProperty()
-        prop.name = 'test'
-        prop.model = ApplicationWithClassBasedProperties
-        monkeypatch.setattr(ApplicationWithClassBasedProperties, 'test', prop, raising=False)
-        return prop
+    def prop(self):
+        assert isinstance(ApplicationWithClassBasedProperties.version_count, AnnotationGetterMixin)
+        return ApplicationWithClassBasedProperties.version_count
 
     @pytest.fixture
-    def nested_prop(self, monkeypatch):
-        prop = NestedAnnotationGetterProperty()
-        prop.name = 'test'
-        prop.model = ApplicationWithClassBasedProperties
-        monkeypatch.setattr(ApplicationWithClassBasedProperties, 'test', prop, raising=False)
-        return prop
+    def nested_prop(self):
+        assert isinstance(ApplicationWithClassBasedProperties.major_avg, AnnotationGetterMixin)
+        return ApplicationWithClassBasedProperties.major_avg
 
     @pytest.mark.parametrize('kwargs, expected_cached', [
         ({}, QueryableProperty.cached),
@@ -177,12 +159,12 @@ class TestAnnotationGetterMixin(object):
         for application in applications[:2]:
             assert prop.get_value(application) == 4
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 10), reason="The Cast() expression didn't exist before Django 1.10")
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
     def test_get_value_nested_properties(self, nested_prop, applications):
         for application in applications[:2]:
-            assert nested_prop.get_value(application) == 5
+            assert nested_prop.get_value(application) == 1.25
 
     @pytest.mark.django_db
     def test_get_value_unsaved_object(self, prop):

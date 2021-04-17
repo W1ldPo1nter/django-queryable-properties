@@ -47,6 +47,14 @@ class VersionCountProperty(AnnotationGetterMixin, QueryableProperty):
         return models.Count('versions')
 
 
+class MajorAverageProperty(AnnotationGetterMixin, QueryableProperty):
+
+    def get_annotation(self, cls):
+        from django.db.models.functions import Cast
+        output_field = models.FloatField()
+        return Cast('major_sum', output_field=output_field) / Cast('version_count', output_field=output_field)
+
+
 class LoweredVersionChangesProperty(AnnotationMixin, QueryableProperty):
 
     def get_annotation(self, cls):
@@ -171,6 +179,7 @@ class ApplicationWithClassBasedProperties(Application):
     highest_version = HighestVersionProperty()
     version_count = VersionCountProperty()
     major_sum = AggregateProperty(models.Sum('versions__major'))
+    major_avg = MajorAverageProperty()
     if DJANGO_VERSION < (1, 8):
         support_start_date = AggregateProperty(models.Min('versions__supported_from'))
     else:
