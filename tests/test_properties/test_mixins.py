@@ -177,6 +177,7 @@ class TestAnnotationGetterMixin(object):
         for application in applications[:2]:
             assert prop.get_value(application) == 4
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
     def test_get_value_nested_properties(self, nested_prop, applications):
