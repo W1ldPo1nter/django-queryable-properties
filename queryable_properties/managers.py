@@ -113,7 +113,7 @@ class QueryablePropertiesIterable(InjectableMixin):
             order_by_occurrences = []
             if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:  # pragma: no cover
                 order_by_occurrences = [index for index, field_name in enumerate(query.order_by)
-                                        if field_name == annotation_name or field_name[1:] == annotation_name]
+                                        if field_name in (annotation_name, '-{}'.format(annotation_name))]
                 if order_by_occurrences and annotation_name not in select and annotation_name in query.annotations:
                     select[annotation_name] = query.annotations[annotation_name]
                     final_aliases[annotation_name] = None
