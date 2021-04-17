@@ -148,12 +148,6 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
     to use queryable properties in filters, annotations and update queries.
     """
 
-    @classmethod
-    def inject_into_object(cls, obj, class_name=None):
-        # Make sure the mixin is always applied to a cloned queryset to leave
-        # the original one untouched.
-        return super(QueryablePropertiesQuerySetMixin, cls).inject_into_object(chain_queryset(obj), class_name)
-
     def init_injected_attrs(self):
         # To work correctly, a query using the QueryablePropertiesQueryMixin is
         # required. If the current query is not using the mixin already, it
