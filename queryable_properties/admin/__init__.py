@@ -82,7 +82,7 @@ class QueryablePropertiesAdminMixin(object):
 
     def queryset(self, request):  # pragma: no cover
         # Same as get_queryset, but for very old Django versions. Simply
-        # delegate to need_having, which is aware of the different methods in
+        # delegate to get_queryset, which is aware of the different methods in
         # different versions and therefore calls the correct super methods if
         # necessary.
         return self.get_queryset(request)
