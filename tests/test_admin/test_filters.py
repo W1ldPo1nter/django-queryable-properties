@@ -195,9 +195,12 @@ class TestQueryablePropertyField(object):
     @pytest.mark.parametrize('query_path, expected_choices', [
         (QueryPath('version_count'), ((3, '3'), (4, '4'))),
         (QueryPath('categories__version_count'), ((4, '4'), (7, '7'))),
+        pytest.param(QueryPath('major_avg'), ((1.0, '1.0'), (1.25, '1.25')),
+                     marks=pytest.mark.skipif(DJANGO_VERSION < (1, 10),
+                                              reason="The Cast() expression didn't exist before Django 1.10")),
     ])
     def test_choices_list_filter(self, rf, admin_user, versions, admin_instance, query_path, expected_choices):
-        versions[0].delete()
+        versions[3].delete()
         field = QueryablePropertyField(admin_instance, query_path)
         assert tuple(field.flatchoices) == expected_choices
 
