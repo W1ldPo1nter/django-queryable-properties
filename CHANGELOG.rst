@@ -4,6 +4,11 @@ Changelog
 master (unreleased)
 -------------------
 
+- Fixed the ``AnnotationGetterMixin`` and its subclasses to be able to work with nested properties correctly regardless
+  of whether or not the model's base manager uses the queryable properties extensions
+- Fixed the admin filter that displays all possible options to be able to work with nested properties correctly
+  regardless of whether or not the model's default manager uses the queryable properties extensions
+
 1.6.0 (2021-04-06)
 ------------------
 
