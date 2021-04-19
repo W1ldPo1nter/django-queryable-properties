@@ -3,9 +3,9 @@
 
 from __future__ import unicode_literals
 
-__version__ = '1.6.0'
+__version__ = '1.6.1'
 __author__ = 'Marcus Klöpfel'
-__copyright__ = 'Copyright 2020, Marcus Klöpfel'
+__copyright__ = 'Copyright 2021, Marcus Klöpfel'
 __license__ = 'BSD'
 __maintainer__ = 'Marcus Klöpfel'
 __email__ = 'marcus.kloepfel@gmail.com'
