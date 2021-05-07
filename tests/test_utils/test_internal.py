@@ -1,6 +1,7 @@
 # encoding: utf-8
-import pytest
+from collections import Counter
 
+import pytest
 import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import CharField, IntegerField, Q, Sum
@@ -215,10 +216,38 @@ class TestModelAttributeGetter(object):
         ('attr', QueryPath('attr')),
         ('attr1.attr2', QueryPath('attr1__attr2')),
         ('attr1.attr2.attr3', QueryPath('attr1__attr2__attr3')),
+        (['attr1', 'attr2'], QueryPath('attr1__attr2')),
+        (('attr1', 'attr2', 'attr3'), QueryPath('attr1__attr2__attr3')),
     ])
     def test_initializer(self, path, expected_query_path):
         getter = ModelAttributeGetter(path)
         assert getter.query_path == expected_query_path
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('attribute_name, expected_value', [
+        ('major', 1),
+        ('changes', None),
+    ])
+    def test_get_attribute(self, versions, attribute_name, expected_value):
+        getter = ModelAttributeGetter(())
+        assert getter._get_attribute(versions[0], attribute_name) == expected_value
+
+    def test_get_attribute_catch_attribute_error_on_none(self):
+        getter = ModelAttributeGetter(())
+        assert getter._get_attribute(None, 'non_existent') is MISSING_OBJECT
+
+    @pytest.mark.django_db
+    def test_get_attribute_bubble_attribute_error(self, versions):
+        getter = ModelAttributeGetter(())
+        with pytest.raises(AttributeError):
+            getter._get_attribute(versions[0], 'non_existent')
+
+    @pytest.mark.django_db
+    def test_get_attribute_catch_object_does_not_exist(self, applications, versions):
+        obj = versions[0].__class__.objects.get(pk=versions[0].pk)  # Refresh from DB
+        applications[0].delete()
+        getter = ModelAttributeGetter(())
+        assert getter._get_attribute(obj, 'application') is MISSING_OBJECT
 
     @pytest.mark.django_db
     @pytest.mark.parametrize('path, expected_value', [
@@ -232,25 +261,26 @@ class TestModelAttributeGetter(object):
         assert getter.get_value(obj) == expected_value
 
     @pytest.mark.django_db
-    def test_get_value_catch_attribute_error_on_none(self, versions):
-        obj = versions[0]
-        getter = ModelAttributeGetter('changes.strip')
-        assert getter.get_value(obj) is MISSING_OBJECT
-
-    @pytest.mark.django_db
-    @pytest.mark.parametrize('path', ['non_existent', 'non.existent', 'application.non_existent'])
-    def test_get_value_bubble_attribute_error(self, versions, path):
-        obj = versions[0]
-        getter = ModelAttributeGetter(path)
-        with pytest.raises(AttributeError):
-            getter.get_value(obj)
-
-    @pytest.mark.django_db
-    def test_get_value_catch_object_does_not_exist(self, applications, versions):
+    def test_get_value_missing_object(self, applications, versions):
         obj = versions[0].__class__.objects.get(pk=versions[0].pk)  # Refresh from DB
         applications[0].delete()
         getter = ModelAttributeGetter('application.name')
         assert getter.get_value(obj) is MISSING_OBJECT
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    def test_get_values(self, categories):
+        getter = ModelAttributeGetter('applications.versions.major')
+        assert Counter(getter.get_values(categories[0])) == Counter({2: 2, 1: 6})
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    def test_get_values_missing_object(self, categories):
+        getter = ModelAttributeGetter('applications.versions.major')
+        VersionWithClassBasedProperties.objects.all().delete()
+        assert getter.get_values(categories[0]) == []
+        ApplicationWithClassBasedProperties.objects.all().delete()
+        assert getter.get_values(categories[0]) == []
 
     @pytest.mark.parametrize('path, lookup, value, expected_query_name', [
         ('attr', 'exact', 1337, 'attr__exact'),

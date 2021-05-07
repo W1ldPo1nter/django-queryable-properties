@@ -10,7 +10,7 @@ from functools import wraps
 
 import six
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
+from django.db.models import Manager, Q
 from django.utils.decorators import method_decorator
 from django.utils.tree import Node
 
@@ -323,14 +323,40 @@ class ModelAttributeGetter(object):
         Initialize a new model attribute getter using the specified attribute
         path.
 
-        :param str attribute_path: The path to the attribute to retrieve in
-                                   dot-notation (see the docs for
-                                   :func:`operator.attrgetter` for examples).
-                                   For queryset-related operations, all dots
-                                   will simply be replaced with the lookup
-                                   separator (``__``).
+        :param attribute_path: The path to the attribute to retrieve in as
+                               an iterable containing the individual parts or
+                               a string using dot-notation (see the docs for
+                               :func:`operator.attrgetter` for examples). For
+                               queryset-related operations, all parts will be
+                               combined using the lookup separator (``__``).
+        :type attribute_path: collections.Iterable
         """
-        self.query_path = QueryPath(attribute_path.split(self.ATTRIBUTE_SEPARATOR))
+        if isinstance(attribute_path, six.string_types):
+            attribute_path = attribute_path.split(self.ATTRIBUTE_SEPARATOR)
+        self.query_path = QueryPath(attribute_path)
+
+    def _get_attribute(self, obj, attribute_name):
+        """
+        Get and return the value for a single non-nested attribute from the
+        given object, catching certain exceptions and returning the
+        ``MISSING_OBJECT`` constant in such cases.
+
+        :param obj: The object to get the attribute value from.
+        :param str attribute_name: The name of the attribute.
+        :return: The attribute value or the ``MISSING_OBJECT`` constant.
+        """
+        try:
+            return getattr(obj, attribute_name)
+        except ObjectDoesNotExist:
+            # Allow missing DB objects without raising an error, e.g. for
+            # reverse one-to-one relations.
+            return MISSING_OBJECT
+        except AttributeError:
+            # Allow objects in between to be None without raising an error,
+            # e.g. for nullable fields.
+            if obj is None:
+                return MISSING_OBJECT
+            raise
 
     def get_value(self, obj):
         """
@@ -353,19 +379,36 @@ class ModelAttributeGetter(object):
         :return: The value retrieved from the model object.
         """
         for attribute_name in self.query_path:
-            try:
-                obj = getattr(obj, attribute_name)
-            except ObjectDoesNotExist:
-                # Allow missing DB objects without raising an error, e.g. for
-                # reverse one-to-one relations.
-                return MISSING_OBJECT
-            except AttributeError:
-                # Allow objects in between to be None without raising an error,
-                # e.g. for nullable fields.
-                if obj is None:
-                    return MISSING_OBJECT
-                raise
+            obj = self._get_attribute(obj, attribute_name)
+            if obj is MISSING_OBJECT:
+                break
         return obj
+
+    def get_values(self, obj):
+        """
+        Similar to :meth:`get_value`, but also handles m2m relations and can
+        therefore return multiple values.
+
+        The result is always a list, even if there is only one value. The
+        ``MISSING_OBJECT`` constant will never be part of the resulting list
+        and simply be omitted instead.
+
+        :param django.db.models.Model obj: The model object to retrieve the
+                                           values for.
+        :return: A list containing the retrieved values.
+        :rtype: list
+        """
+        values = [obj]
+        for attribute_name in self.query_path:
+            new_values = []
+            for value in values:
+                new_value = self._get_attribute(value, attribute_name)
+                if isinstance(new_value, Manager):
+                    new_values.extend(new_value.all())
+                elif new_value is not MISSING_OBJECT:
+                    new_values.append(new_value)
+            values = new_values
+        return values
 
     def build_filter(self, lookup, value):
         """
