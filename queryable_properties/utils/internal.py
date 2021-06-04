@@ -14,9 +14,11 @@ from django.db.models import Manager, Q
 from django.utils.decorators import method_decorator
 from django.utils.tree import Node
 
-from . import get_queryable_property, MISSING_OBJECT
 from ..compat import get_related_model, LOOKUP_SEP
 from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
+
+
+MISSING_OBJECT = object()  #: Arbitrary object to represent that an object in an attribute chain is missing.
 
 
 @six.python_2_unicode_compatible
@@ -462,6 +464,8 @@ def resolve_queryable_property(model, query_path):
              could be resolved.
     :rtype: (QueryablePropertyReference, QueryPath)
     """
+    from . import get_queryable_property
+
     property_ref, lookups = None, QueryPath()
     # Try to follow the given path to allow to use queryable properties
     # across relations.
