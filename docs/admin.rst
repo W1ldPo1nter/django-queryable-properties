@@ -17,7 +17,7 @@ For more complex inheritance scenarios, there is also the
 :class:`queryable_properties.admin.QueryablePropertiesAdminMixin`, which can be added to both admin and inline classes
 to enable queryable properties functionality while using different admin/inline base classes.
 
-The following table shows the admin/inline options that queryable properties may be referenced in an whether or not
+The following table shows the admin/inline options that queryable properties may be referenced in and whether or not
 each feature requires the use of one of the specialized base classes mentioned above.
 Queryable properties may be refenced via name in either the listed admin/inline class attributes or in the result of
 their corresponding ``get_*`` methods (although there is a special case for ``get_list_filter`` as described in
@@ -33,7 +33,7 @@ their corresponding ``get_*`` methods (although there is a special case for ``ge
    * - ``fields``/``fieldsets``
      - No
      - * For properties with a getter or selected properties only
-       * Properties must also be part of in ``readonly_fields``
+       * Properties must also be part of ``readonly_fields``
    * - ``list_display``
      - No
      - * For properties with a getter or selected properties only
