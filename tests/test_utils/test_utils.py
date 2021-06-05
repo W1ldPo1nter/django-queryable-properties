@@ -100,7 +100,7 @@ class TestPrefetchQueryableProperties(object):
         cached values on instances.
         """
         prop = ApplicationWithClassBasedProperties.version_count
-        application = ApplicationWithClassBasedProperties.objects.select_properties('version_count').first()
+        application = ApplicationWithClassBasedProperties.objects.select_properties('version_count')[0]
         self.assert_cached(prop, application)
         application.versions.all().delete()
         assert application.version_count > 0  # The cached value is still present
