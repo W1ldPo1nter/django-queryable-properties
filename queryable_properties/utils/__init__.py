@@ -56,6 +56,7 @@ def prefetch_queryable_properties(model_instances, *property_paths):
                             for. The instances may be objects of different
                             models as long as the given property paths are
                             valid for all of them.
+    :type model_instances: collections.Sequence
     :param str property_paths: The paths to the properties whose values should
                                be fetched, which are need to be annotatable.
                                The paths may contain the lookup separator to

@@ -94,7 +94,7 @@ class TestPrefetchQueryableProperties(object):
             self.assert_cached(cls.version_count, *instances)
 
     @pytest.mark.usefixtures('versions')
-    def test_refresh_cache(self, applications):
+    def test_refresh_cache(self):
         """
         Test that prefetch_queryable_properties can be used to update already
         cached values on instances.
