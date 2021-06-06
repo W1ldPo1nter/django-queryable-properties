@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added the ``prefetch_queryable_properties`` utility function which allows to efficiently query property values for
+  model instances that were already loaded from the database beforehand
+
 1.6.1 (2021-04-19)
 ------------------
 
