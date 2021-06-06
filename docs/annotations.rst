@@ -332,6 +332,49 @@ This solves the problems mentioned above:
 - You will have to make sure that the related values in conjunction with the relation type make sense and yield the
   results you expect.
 
+Querying properties for already loaded model instances
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Queryable property values may also be queried for model instances that were previously queried from the database.
+The utility function :func:`queryable_properties.utils.prefetch_queryable_properties` can be used for this purpose,
+which is akin to Django's |prefetch-related-objects|_ function, which serves a similar purpose for related objects.
+This function can be used to load the values of one or multiple annotatable queryable properties for a sequence of
+model instances at once, which is especially useful to improve performance for queryable properties whose getter would
+otherwise execute a query.
+
+:func:`queryable_properties.utils.prefetch_queryable_properties` takes the sequence of model instances as well as any
+number of query paths to the queryable properties to load the values for.
+For the ``version_str`` property from the examples above, this could be achieved like this:
+
+.. code-block:: python
+
+    from queryable_properties.utils import prefetch_queryable_properties
+
+    versions = load_versions()  # A sequence of ApplicationVersion instances
+    prefetch_queryable_properties(versions, 'version_str')
+
+Notes:
+
+- Unlike the ``select_properties`` queryset method described above, the query paths supplied to
+  ``prefetch_queryable_properties`` may contain the lookup separator (``__``) to reference queryable properties on
+  related objects (even via many-to-many relations) and populate the queryable property cache on these objects.
+  This works because the function figures out the property and its corresponding model on its own by accessing the
+  relations on the individual objects and performing the query for the property the model is defined on.
+  Since the related objects are accessed, make sure that they were already loaded beforehand (e.g. via Django's
+  |prefetch-related-objects|_ function) to avoid additional queries.
+- The sequence of model instances may contain objects of different, unrelated models as long as all given query paths
+  are valid for all instances.
+  The function will figure out which models it needs to perform queries for.
+- As a consequence of the previous notes, queryable property values may need to be queried for multiple different
+  models.
+  However, ``prefetch_queryable_properties`` will only ever perform one query per affected model.
+- ``prefetch_queryable_properties`` can even be used when the referenced properties already have cached values on the
+  given model instances.
+  This refreshes the cached values with the current values from the database.
+
+.. |prefetch-related-objects| replace:: ``prefetch_related_objects``
+.. _prefetch-related-objects: https://docs.djangoproject.com/en/stable/ref/models/querysets/#prefetch-related-objects
+
 Regarding aggregate annotations across relations
 ------------------------------------------------
 
