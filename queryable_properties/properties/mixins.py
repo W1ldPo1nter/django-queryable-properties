@@ -9,6 +9,9 @@ from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import InjectableMixin, QueryPath
 
 
+REMAINING_LOOKUPS = '*'
+
+
 class LookupFilterMeta(type):
     """
     Metaclass for classes that use the :class:`LookupFilterMixin` to detect the
@@ -44,6 +47,8 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
     # Stores mappings of lookups to the names of their corresponding filter
     # functions.
     _lookup_mappings = {}
+
+    remaining_lookups_via_parent = False
 
     def __init__(self, *args, **kwargs):
         self.lookup_mappings = {lookup: getattr(self, name) for lookup, name in six.iteritems(self._lookup_mappings)}
@@ -92,12 +97,18 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
         return lookup_decorator(filter_wrapper)
 
     def get_filter(self, cls, lookup, value):
-        method = self.lookup_mappings.get(lookup)
+        # Resolve the correct method to call for the given lookup in this order:
+        # 1. Check if there is an explicit method for the given lookup.
+        # 2. Check if a method is configured for REMAINING_LOOKUPS.
+        # 3. Check if a fallback to the parent class implementation is allowed.
+        method = self.lookup_mappings.get(lookup) or self.lookup_mappings.get(REMAINING_LOOKUPS)
         if not method:
-            raise QueryablePropertyError(
-                'Queryable property "{prop}" does not implement filtering with lookup "{lookup}".'
-                .format(prop=self, lookup=lookup)
-            )
+            if not self.remaining_lookups_via_parent:
+                raise QueryablePropertyError(
+                    'Queryable property "{prop}" does not implement filtering with lookup "{lookup}".'
+                    .format(prop=self, lookup=lookup)
+                )
+            method = super(LookupFilterMixin, self).get_filter
         return method(cls, lookup, value)
 
 

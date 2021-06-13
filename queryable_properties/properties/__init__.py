@@ -6,7 +6,7 @@ from .cache_behavior import CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOT
 from .common import (AggregateProperty, AnnotationProperty, MappingProperty, RangeCheckProperty,
                      RelatedExistenceCheckProperty, ValueCheckProperty)
 from .mixins import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin, lookup_filter,
-                     SetterMixin, UpdateMixin)
+                     REMAINING_LOOKUPS, SetterMixin, UpdateMixin)
 
 __all__ = (
     'MISSING_OBJECT',
@@ -14,6 +14,6 @@ __all__ = (
     'CACHE_RETURN_VALUE', 'CACHE_VALUE', 'CLEAR_CACHE', 'DO_NOTHING',
     'AggregateProperty', 'AnnotationProperty', 'MappingProperty', 'RangeCheckProperty', 'RelatedExistenceCheckProperty',
     'ValueCheckProperty',
-    'AnnotationGetterMixin', 'AnnotationMixin', 'boolean_filter', 'LookupFilterMixin', 'lookup_filter', 'SetterMixin',
-    'UpdateMixin',
+    'AnnotationGetterMixin', 'AnnotationMixin', 'boolean_filter', 'LookupFilterMixin', 'lookup_filter',
+    'REMAINING_LOOKUPS', 'SetterMixin', 'UpdateMixin',
 )
