@@ -6,7 +6,7 @@ from django.db.models import Q
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin,
-                                             lookup_filter, QueryableProperty)
+                                             lookup_filter, QueryableProperty, REMAINING_LOOKUPS)
 
 from ..app_management.models import ApplicationWithClassBasedProperties
 
@@ -36,6 +36,22 @@ class DerivedLookupFilterProperty(BaseLookupFilterProperty):
     def filter_in(self, cls, lookup, value):
         value = list(value) + ['test']
         return Q(dummy__in=value)
+
+
+class ParentRemainingLookupFilterProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
+
+    remaining_lookups_via_parent = True
+
+    @lookup_filter('exact')
+    def filter_equality(self, cls, lookup, value):
+        return Q(exact=value)
+
+
+class MethodRemainingLookupFilterProperty(ParentRemainingLookupFilterProperty):
+
+    @lookup_filter(REMAINING_LOOKUPS)
+    def filter_remaining(self, cls, lookup, value):
+        return Q(remaining=value)
 
 
 class TestLookupFilterMixin(object):
@@ -80,6 +96,22 @@ class TestLookupFilterMixin(object):
         assert len(q.children) == 1
         assert q.children[0] == expected_q_value
         assert q.negated is expected_q_negation
+
+    @pytest.mark.parametrize('cls, lookup, value, expected_q_value', [
+        (ParentRemainingLookupFilterProperty, 'exact', 1337, ('exact', 1337)),
+        (ParentRemainingLookupFilterProperty, 'gt', 42, ('dummy__gt', 42)),
+        (ParentRemainingLookupFilterProperty, 'lte', 69, ('dummy__lte', 69)),
+        (MethodRemainingLookupFilterProperty, 'exact', 1337, ('exact', 1337)),
+        (MethodRemainingLookupFilterProperty, 'gt', 42, ('remaining', 42)),
+        (MethodRemainingLookupFilterProperty, 'lte', 69, ('remaining', 69)),
+    ])
+    def test_remaining_lookups(self, cls, lookup, value, expected_q_value):
+        prop = cls()
+        prop.model = ApplicationWithClassBasedProperties
+        prop.name = 'dummy'
+        q = prop.get_filter(None, lookup, value)
+        assert len(q.children) == 1
+        assert q.children[0] == expected_q_value
 
     @pytest.mark.parametrize('cls, lookup, value', [
         (BaseLookupFilterProperty, 'month', 5),
