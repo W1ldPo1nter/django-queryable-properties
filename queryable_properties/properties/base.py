@@ -297,7 +297,7 @@ class queryable_property(QueryableProperty):
         return self._clone(**attrs)
 
     @parametrizable_decorator_method
-    def filter(self, method, requires_annotation=None, lookups=None, boolean=False):
+    def filter(self, method, requires_annotation=None, lookups=None, boolean=False, remaining_lookups_via_parent=None):
         """
         Decorator for a function or method that is used to generate a filter
         for querysets to emulate filtering by this queryable property. May be
@@ -326,6 +326,13 @@ class queryable_property(QueryableProperty):
                         negate the condition if the filter was called with a
                         `False` value.
         :type boolean: bool
+        :param remaining_lookups_via_parent: True if lookup-based filters
+                                             should fall back to the base class
+                                             implementation for lookups without
+                                             a registered filter function;
+                                             otherwise False. None if this
+                                             information should not be changed.
+        :type remaining_lookups_via_parent: bool
         :return: A cloned queryable property.
         :rtype: queryable_property
         """
@@ -340,9 +347,14 @@ class queryable_property(QueryableProperty):
             lookups = method._lookups
             method = partial(method, None)
 
+        if remaining_lookups_via_parent is not None and not hasattr(self, 'lookup_mappings') and lookups is None:
+            raise QueryablePropertyError('remaining_lookups_via_parent can only be used with lookup-based filters.')
+
         attrs = {}
         if requires_annotation is not None:
             attrs['filter_requires_annotation'] = requires_annotation
+        if remaining_lookups_via_parent is not None:
+            attrs['remaining_lookups_via_parent'] = remaining_lookups_via_parent
         if lookups is not None:  # Register only for the given lookups.
             attrs['lookup_mappings'] = dict(getattr(self, 'lookup_mappings', {}),
                                             **{lookup: method for lookup in lookups})
