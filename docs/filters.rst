@@ -177,6 +177,22 @@ implementation (see above) and return ``Q`` objects.
 To support complex lookups (i.e. combinations of transforms and lookups), the full combined lookup string for each
 supported option must be specified in the decorators (e.g. ``'year__gt'``)
 
+It's also possible to define filter functions/methods that handle all remaining lookups for which no explicit function/
+method was defined.
+There are two ways to achieve this:
+
+- Using the :const:`queryable_properties.properties.REMAINING_LOOKUPS` constant instead of a lookup name in the
+  ``.filter`` or ``lookup_filter`` decorators above (i.e. ``@my_property.filter(lookups=(REMAINING_LOOKUPS,))`` or
+  ``@lookup_filter(REMAINING_LOOKUPS)``) to explicitly register a function/method for all remaining lookups.
+- Setting the class (or instance) attribute ``remaining_lookups_via_parent`` to ``True`` for the class-based approach
+  or passing ``remaining_lookups_via_parent=True`` in the ``.filter`` decorator for the decorator-based approach.
+  This will result in using the ``get_filter`` implementation of the parent class for all remaining lookups by
+  essentially performing a ``super`` call and is therefore useful in inheritance scenarios.
+  This can, for example, be used in conjunction with the ``AnnotationMixin`` to allow to override the filter
+  implementation for certain lookups while relying on the implementation of the ``AnnotationMixin`` for all remaining
+  lookups.
+  Refer to :ref:`annotations:The \`\`AnnotationMixin\`\` and custom filter implementations` for further information.
+
 .. caution::
    Since the ``LookupFilterMixin`` simply implements the ``get_filter`` method to perform the lookup dispatching, care
    must be taken when using other mixins (most notably the ``AnnotationMixin`` - see

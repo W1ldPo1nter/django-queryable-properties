@@ -170,6 +170,72 @@ For the class-based approach, the class (or instance) attribute ``filter_require
    name of the property itself can be referenced in the returned ``Q`` objects. It will then refer to the annotation
    for that property instead of leading to an infinite recursion while trying to resolve the property filter.
 
+Using the ``LookupFilterMixin`` described in :ref:`filters:Lookup-based filter functions/methods`, it is also possible
+to only customize the filter logic for certain lookups while retaining the default filter of the ``AnnotationMixin``
+for all remaining lookups.
+This is based on the ``remaining_lookups_via_parent`` feature of the ``LookupFilterMixin`` and requires the
+``LookupFilterMixin`` to be higher up in the MRO than the ``AnnotationMixin``.
+As an example, the ``lt(e)`` lookups could be implemented in a custom fashion for the ``version_str`` property.
+
+For the decorator-based approach, this could look like the following example:
+
+.. code-block:: python
+
+    from django.db.models import Model, Q, Value
+    from django.db.models.functions import Concat
+    from queryable_properties.properties import queryable_property
+
+
+    class ApplicationVersion(Model):
+        ...
+
+        @queryable_property
+        def version_str(self):
+            """Return the combined version info as a string."""
+            return '{major}.{minor}'.format(major=self.major, minor=self.minor)
+
+        @version_str.annotater
+        @classmethod
+        def version_str(cls):
+            return Concat('major', Value('.'), 'minor')
+
+        @version_str.filter(lookups=('lt', 'lte'), remaining_lookups_via_parent=True)
+        @classmethod
+        def version_str(cls, lookup, value):  # Only ever called with the 'lt' or 'lte' lookup.
+            # Don't implement any validation to keep the example simple.
+            major, minor = value.split('.')
+            return Q(major__lt=major) | Q(**{'major': major, 'minor__{}'.format(lookup): minor})
+
+For the class-based approach, this could be achieved the following way:
+
+.. code-block:: python
+
+    from django.db.models import Q, Value
+    from django.db.models.functions import Concat
+    from queryable_properties.properties import AnnotationMixin, LookupFilterMixin, QueryableProperty
+
+
+    class VersionStringProperty(LookupFilterMixin, AnnotationMixin, QueryableProperty):
+
+        remaining_lookups_via_parent = True
+
+        def get_value(self, obj):
+            """Return the combined version info as a string."""
+            return '{major}.{minor}'.format(major=obj.major, minor=obj.minor)
+
+        @lookup_filter('lt', 'lte')  # Alternatively: @LookupFilterMixin.lookup_filter(...)
+        def filter_lower(self, cls, lookup, value):  # Only ever called with the 'lt' or 'lte' lookup.
+            # Don't implement any validation to keep the example simple.
+            major, minor = value.split('.')
+            return Q(major__lt=major) | Q(**{'major': major, 'minor__{}'.format(lookup): minor})
+
+        def get_annotation(self, cls):
+            return Concat('major', Value('.'), 'minor')
+
+In both cases, filtering with the ``lt(e)`` lookups will call the custom implementation while filtering with any other
+lookup will fall back to the annotation-based filter implementation of the ``AnnotationMixin`` due to the
+``LookupFilterMixin`` being higher up in the MRO and the ``AnnotationMixin`` therefore being considered its base class.
+
 Automatic (non-selecting) annotation usage
 ------------------------------------------
 
@@ -355,6 +421,8 @@ For the ``version_str`` property from the examples above, this could be achieved
 
 Notes:
 
+- Due to the explicit selections, the selected properties always behave like cached properties as is the case for
+  ``select_properties``.
 - Unlike the ``select_properties`` queryset method described above, the query paths supplied to
   ``prefetch_queryable_properties`` may contain the lookup separator (``__``) to reference queryable properties on
   related objects (even via many-to-many relations) and populate the queryable property cache on these objects.

@@ -9,7 +9,7 @@ from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import InjectableMixin, QueryPath
 
 
-REMAINING_LOOKUPS = '*'
+REMAINING_LOOKUPS = '*'  #: A Constant that can be used instead of lookup names to match all remaining lookups.
 
 
 class LookupFilterMeta(type):
