@@ -11,7 +11,8 @@ from queryable_properties.properties import (
     AnnotationGetterMixin, AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING, LookupFilterMixin,
     QueryableProperty, queryable_property
 )
-from queryable_properties.utils import reset_queryable_property
+from queryable_properties.properties.base import QueryablePropertyDescriptor
+from queryable_properties.utils import get_queryable_property, reset_queryable_property
 
 from ..app_management.models import (ApplicationWithClassBasedProperties, Category, DummyProperty,
                                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
@@ -22,19 +23,113 @@ def function_with_docstring():
     pass
 
 
-class TestBasics(object):
+@pytest.fixture
+def dummy_property():
+    prop = get_queryable_property(ApplicationWithClassBasedProperties, 'dummy')
+    prop.counter = 0
+    return prop
 
-    @pytest.fixture
-    def property_instance(self):
+
+@pytest.fixture
+def model_instance():
+    return ApplicationWithClassBasedProperties(name='Test')
+
+
+class TestQueryablePropertyDescriptor(object):
+
+    def test_initializer(self):
         prop = QueryableProperty()
-        prop.name = 'test_prop'
-        return prop
+        prop.__doc__ = 'Test property'
+        descriptor = QueryablePropertyDescriptor(prop)
+        assert descriptor.prop is prop
+        assert descriptor.__doc__ == prop.__doc__
 
-    @pytest.fixture
-    def model_instance(self):
-        instance = ApplicationWithClassBasedProperties(name='Test')
-        instance.__class__.dummy.counter = 0
-        return instance
+    def test_get_class_attribute(self, dummy_property):
+        descriptor = getattr(dummy_property.model, dummy_property.name)
+        assert isinstance(descriptor, QueryablePropertyDescriptor)
+        assert descriptor.prop is dummy_property
+
+    @pytest.mark.parametrize('cached, clear_cache, expected_values', [
+        (False, False, [1, 2, 3, 4, 5]),  # The implementation of the dummy property returns increasing values ...
+        (False, True, [1, 2, 3, 4, 5]),  # ... and cache clears shoudn't matter if caching was disabled all along
+        (True, False, [1, 1, 1, 1, 1]),  # Caching is enabled (and never cleared); first value should always be returned
+        (True, True, [1, 2, 3, 4, 5]),  # Cache is cleared every time; expect the same result like without caching
+    ])
+    def test_get(self, monkeypatch, dummy_property, model_instance, cached, clear_cache, expected_values):
+        monkeypatch.setattr(dummy_property, 'cached', cached)
+        for expected_value in expected_values:
+            assert getattr(model_instance, dummy_property.name) == expected_value
+            if clear_cache:
+                model_instance.reset_property(dummy_property.name)
+
+    def test_get_exception(self, monkeypatch, dummy_property, model_instance):
+        monkeypatch.setattr(dummy_property, 'get_value', None)
+        with pytest.raises(AttributeError):
+            getattr(model_instance, dummy_property.name)
+
+    @pytest.mark.parametrize('cached, setter_cache_behavior, values, expected_values', [
+        # The setter cache behavior should not make a difference if a property
+        # is not cached
+        (False, CLEAR_CACHE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+        (False, CACHE_VALUE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+        (False, CACHE_RETURN_VALUE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+        (False, DO_NOTHING, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
+        (True, CLEAR_CACHE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),  # Getter always gets called again due to cache clear
+        (True, CACHE_VALUE, [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]),  # The raw value gets should get cached
+        (True, CACHE_RETURN_VALUE, [0, 0, 0, 0, 0], [-1, -1, -1, -1, -1]),  # The return value should get cached
+        (True, DO_NOTHING, [0, 0, 0, 0, 0], [1, 1, 1, 1, 1]),  # The first getter value should get and stay cached
+    ])
+    def test_set(self, monkeypatch, dummy_property, model_instance,
+                 cached, setter_cache_behavior, values, expected_values):
+        monkeypatch.setattr(dummy_property, 'cached', cached)
+        monkeypatch.setattr(dummy_property, 'setter_cache_behavior', setter_cache_behavior)
+        for value, expected_value in zip(values, expected_values):
+            setattr(model_instance, dummy_property.name, value)
+            assert getattr(model_instance, dummy_property.name) == expected_value
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_set_via_init_kwargs(self, model):
+        """Test that properties with a setter can be set via the corresponding model's init kwargs."""
+        instance = model(version='11.22.33', changes='Various Bugfixes')
+        assert instance.major == '11'
+        assert instance.minor == '22'
+        assert instance.patch == '33'
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_set_exception(self, model):
+        instance = model()
+        with pytest.raises(AttributeError):
+            instance.major_minor = '1.3'
+
+    @pytest.mark.parametrize('value', [5, 'test', 1.337, None])
+    def test_cache_methods(self, dummy_property, model_instance, value):
+        descriptor = getattr(model_instance.__class__, dummy_property.name)
+        # Nothing should be cached initially
+        assert not descriptor.has_cached_value(model_instance)
+        with pytest.raises(KeyError):
+            descriptor.get_cached_value(model_instance)
+        # Clear calls should still work even if nothing is cached
+        descriptor.clear_cached_value(model_instance)
+
+        # Cache value, then try to use the other methods again
+        descriptor.set_cached_value(model_instance, value)
+        assert model_instance.__dict__[dummy_property.name] == value
+        assert descriptor.has_cached_value(model_instance)
+        assert descriptor.get_cached_value(model_instance) == value
+
+        # Test if clearing the cached value works correctly
+        descriptor.clear_cached_value(model_instance)
+        assert not descriptor.has_cached_value(model_instance)
+        with pytest.raises(KeyError):
+            descriptor.get_cached_value(model_instance)
+
+    def test_representations(self, dummy_property):
+        descriptor = getattr(dummy_property.model, dummy_property.name)
+        assert six.text_type(descriptor) == six.text_type(dummy_property)
+        assert repr(descriptor) == '<QueryablePropertyDescriptor: {}>'.format(six.text_type(descriptor))
+
+
+class TestQueryableProperty(object):
 
     @pytest.mark.parametrize('kwargs', [
         {},
@@ -51,92 +146,28 @@ class TestBasics(object):
         prop = QueryableProperty(verbose_name='Test Property')
         assert prop.short_description == 'Test Property'
 
-    def test_contribute_to_class(self, model_instance):
-        prop = model_instance.__class__.dummy
-        assert isinstance(prop, QueryableProperty)
-        assert prop.name == 'dummy'
-        assert prop.verbose_name == 'Dummy'
-        assert prop.model is model_instance.__class__
+    def test_contribute_to_class(self, dummy_property, model_instance):
+        descriptor = getattr(model_instance.__class__, dummy_property.name)
+        assert isinstance(descriptor, QueryablePropertyDescriptor)
+        assert descriptor.prop is dummy_property
+        assert isinstance(dummy_property, QueryableProperty)
+        assert dummy_property.name == 'dummy'
+        assert dummy_property.verbose_name == 'Dummy'
+        assert dummy_property.model is model_instance.__class__
         assert six.get_method_function(model_instance.reset_property) is reset_queryable_property
         # TODO: test that an existing method with the name reset_property will not be overridden
 
-    def test_descriptor_get_class_attribute(self, model_instance):
-        assert isinstance(model_instance.__class__.dummy, QueryableProperty)
-
-    @pytest.mark.parametrize('cached, clear_cache, expected_values', [
-        (False, False, [1, 2, 3, 4, 5]),  # The implementation of the dummy property returns increasing values ...
-        (False, True, [1, 2, 3, 4, 5]),  # ... and cache clears shoudn't matter if caching was disabled all along
-        (True, False, [1, 1, 1, 1, 1]),  # Caching is enabled (and never cleared); first value should always be returned
-        (True, True, [1, 2, 3, 4, 5]),  # Cache is cleared every time; expect the same result like without caching
-    ])
-    def test_descriptor_get(self, monkeypatch, model_instance, cached, clear_cache, expected_values):
-        monkeypatch.setattr(model_instance.__class__.dummy, 'cached', cached)
-        for expected_value in expected_values:
-            assert model_instance.dummy == expected_value
-            if clear_cache:
-                model_instance.reset_property('dummy')
-
-    def test_descriptor_get_exception(self, monkeypatch, model_instance):
-        monkeypatch.setattr(model_instance.__class__.dummy, 'get_value', None)
-        with pytest.raises(AttributeError):
-            model_instance.dummy
-
-    @pytest.mark.parametrize('cached, setter_cache_behavior, values, expected_values', [
-        # The setter cache behavior should not make a difference if a property
-        # is not cached
-        (False, CLEAR_CACHE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
-        (False, CACHE_VALUE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
-        (False, CACHE_RETURN_VALUE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
-        (False, DO_NOTHING, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),
-        (True, CLEAR_CACHE, [0, 0, 0, 0, 0], [1, 2, 3, 4, 5]),  # Getter always gets called again due to cache clear
-        (True, CACHE_VALUE, [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]),  # The raw value gets should get cached
-        (True, CACHE_RETURN_VALUE, [0, 0, 0, 0, 0], [-1, -1, -1, -1, -1]),  # The return value should get cached
-        (True, DO_NOTHING, [0, 0, 0, 0, 0], [1, 1, 1, 1, 1]),  # The first getter value should get and stay cached
-    ])
-    def test_descriptor_set(self, monkeypatch, model_instance, cached, setter_cache_behavior, values, expected_values):
-        monkeypatch.setattr(model_instance.__class__.dummy, 'cached', cached)
-        monkeypatch.setattr(model_instance.__class__.dummy, 'setter_cache_behavior', setter_cache_behavior)
-        for value, expected_value in zip(values, expected_values):
-            model_instance.dummy = value
-            assert model_instance.dummy == expected_value
-
-    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
-    def test_descriptor_set_exception(self, model):
-        instance = model()
-        with pytest.raises(AttributeError):
-            instance.major_minor = '1.3'
-
-    @pytest.mark.parametrize('value', [5, 'test', 1.337, None])
-    def test_cache_methods(self, property_instance, model_instance, value):
-        # Nothing should be cached initially
-        assert not property_instance._has_cached_value(model_instance)
-        with pytest.raises(KeyError):
-            property_instance._get_cached_value(model_instance)
-        # Clear calls should still work even if nothing is cached
-        property_instance._clear_cached_value(model_instance)
-
-        # Cache value, then try to use the other methods again
-        property_instance._set_cached_value(model_instance, value)
-        assert model_instance.__dict__['test_prop'] == value
-        assert property_instance._has_cached_value(model_instance)
-        assert property_instance._get_cached_value(model_instance) == value
-
-        # Test if clearing the cached value works correctly
-        property_instance._clear_cached_value(model_instance)
-        assert not property_instance._has_cached_value(model_instance)
-        with pytest.raises(KeyError):
-            property_instance._get_cached_value(model_instance)
-
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_pickle_unpickle(self, model):
-        serialized_prop = six.moves.cPickle.dumps(model.version)
+        prop = get_queryable_property(model, 'version')
+        serialized_prop = six.moves.cPickle.dumps(prop)
         deserialized_prop = six.moves.cPickle.loads(serialized_prop)
-        assert deserialized_prop is model.version
+        assert deserialized_prop is prop
 
     @pytest.mark.parametrize('prop, expected_str, expected_class_name', [
-        (ApplicationWithClassBasedProperties.dummy,
+        (get_queryable_property(ApplicationWithClassBasedProperties, 'dummy'),
          'tests.app_management.models.ApplicationWithClassBasedProperties.dummy', 'DummyProperty'),
-        (VersionWithClassBasedProperties.is_beta,
+        (get_queryable_property(VersionWithClassBasedProperties, 'is_beta'),
          'tests.dummy_lib.models.ReleaseTypeModel.is_beta', 'ValueCheckProperty'),
     ])
     def test_representations(self, prop, expected_str, expected_class_name):
