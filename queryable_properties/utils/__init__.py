@@ -4,8 +4,7 @@ from collections import defaultdict
 
 import six
 
-from ..exceptions import QueryablePropertyDoesNotExist
-from .internal import MISSING_OBJECT, ModelAttributeGetter, QueryPath
+from .internal import get_queryable_property_descriptor, MISSING_OBJECT, ModelAttributeGetter, QueryPath
 
 __all__ = ('MISSING_OBJECT', 'get_queryable_property', 'prefetch_queryable_properties', 'reset_queryable_property')
 
@@ -21,13 +20,7 @@ def get_queryable_property(model, name):
     :return: The queryable property.
     :rtype: queryable_properties.properties.QueryableProperty
     """
-    from ..properties import QueryableProperty
-
-    prop = getattr(model, name, None)
-    if not isinstance(prop, QueryableProperty):
-        raise QueryablePropertyDoesNotExist("{model} has no queryable property named '{name}'".format(
-            model=model.__name__, name=name))
-    return prop
+    return get_queryable_property_descriptor(model, name).prop
 
 
 get_queryable_property.__safe_for_unpickling__ = True
@@ -43,8 +36,8 @@ def reset_queryable_property(obj, name):
                                        value on.
     :param str name: The name of the queryable property.
     """
-    prop = get_queryable_property(obj.__class__, name)
-    prop._clear_cached_value(obj)
+    descriptor = get_queryable_property_descriptor(obj.__class__, name)
+    descriptor.clear_cached_value(obj)
 
 
 def prefetch_queryable_properties(model_instances, *property_paths):
@@ -89,10 +82,10 @@ def prefetch_queryable_properties(model_instances, *property_paths):
         for result in queryset.values('pk', *property_mappings):
             pk = result.pop('pk')
             for property_name, value in six.iteritems(result):
-                prop = get_queryable_property(model, property_name)
+                descriptor = get_queryable_property_descriptor(model, property_name)
                 for instance in property_mappings[property_name]:
                     # Only populate the cache for the concrete objects the
                     # property values were requested for (different relations
                     # may lead to the same model).
                     if instance.pk == pk:
-                        prop._set_cached_value(instance, value)
+                        descriptor.set_cached_value(instance, value)
