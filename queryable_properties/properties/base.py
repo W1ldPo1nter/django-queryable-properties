@@ -18,6 +18,103 @@ RESET_METHOD_NAME = 'reset_property'
 
 
 @six.python_2_unicode_compatible
+class QueryablePropertyDescriptor(property):
+    """
+    Descriptor class for queryable properties that allows the actual attribute
+    access on model instances and handles caching.
+
+    This class deliberately inherits from property to be treated like regular
+    properties by Django, e.g. to allow queryable properties with a setter to
+    be used in the initializer kwargs of models.
+    """
+
+    def __new__(cls, prop):
+        """
+        Construct a new QueryablePropertyDescriptor for the given queryable
+        property.
+
+        :param prop: The queryable property to allow attribute access for.
+        :type prop: QueryableProperty
+        """
+        descriptor = super(QueryablePropertyDescriptor, cls).__new__(cls, doc=prop.__doc__)
+        descriptor.prop = prop
+        return descriptor
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+
+        # Always check for cached values first regardless of the self.cached
+        # since values will also be cached through annotations.
+        if self.has_cached_value(obj):
+            return self.get_cached_value(obj)
+        if not self.prop.get_value:
+            raise AttributeError('Unreadable queryable property.')
+        value = self.prop.get_value(obj)
+        if self.prop.cached:
+            self.set_cached_value(obj, value)
+        return value
+
+    def __set__(self, obj, value):
+        if not self.prop.set_value:
+            raise AttributeError("Can't set queryable property.")
+        return_value = self.prop.set_value(obj, value)
+        # If a value is set and the property is set up to cache values or has
+        # a current cached value, invoke the configured setter cache behavior.
+        if self.prop.cached or self.has_cached_value(obj):
+            self.prop.setter_cache_behavior(self, obj, value, return_value)
+
+    def __str__(self):
+        return six.text_type(self.prop)
+
+    def __repr__(self):
+        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
+
+    def get_cached_value(self, obj):
+        """
+        Get the cached value for this property from the given object. Requires
+        a cached value to be present.
+
+        :param django.db.models.Model obj: The object to get the cached value
+                                           from.
+        :return: The cached value.
+        """
+        return obj.__dict__[self.prop.name]
+
+    def set_cached_value(self, obj, value):
+        """
+        Set the cached value for this property on the given object.
+
+        :param django.db.models.Model obj: The object to set the cached value
+                                           for.
+        :param value: The value to cache.
+        """
+        obj.__dict__[self.prop.name] = value
+
+    def has_cached_value(self, obj):
+        """
+        Check if a value for this property is cached on the given object.
+
+        :param django.db.models.Model obj: The object to check for a cached
+                                           value.
+        :return: True if a value is cached; otherwise False.
+        :rtype: bool
+        """
+        return self.prop.name in obj.__dict__
+
+    def clear_cached_value(self, obj):
+        """
+        Clear the cached value for this property on the given object. Does not
+        require a cached value to be present and will do nothing if no value is
+        cached.
+
+        :param django.db.models.Model obj: The object to clear the cached value
+                                           on.
+        """
+        obj.__dict__.pop(self.prop.name, None)
+
+
+@six.python_2_unicode_compatible
 class QueryableProperty(object):
     """
     Base class for all queryable properties, which are basically simple
@@ -46,30 +143,6 @@ class QueryableProperty(object):
         self.name = None
         self.setter_cache_behavior = six.get_method_function(self.setter_cache_behavior)
         self.verbose_name = verbose_name
-
-    def __get__(self, obj, objtype=None):
-        if obj is None:
-            return self
-
-        # Always check for cached values first regardless of the self.cached
-        # since values will also be cached through annotations.
-        if self._has_cached_value(obj):
-            return self._get_cached_value(obj)
-        if not self.get_value:
-            raise AttributeError('Unreadable queryable property.')
-        value = self.get_value(obj)
-        if self.cached:
-            self._set_cached_value(obj, value)
-        return value
-
-    def __set__(self, obj, value):
-        if not self.set_value:
-            raise AttributeError("Can't set queryable property.")
-        return_value = self.set_value(obj, value)
-        # If a value is set and the property is set up to cache values or has
-        # a current cached value, invoke the configured setter cache behavior.
-        if self.cached or self._has_cached_value(obj):
-            self.setter_cache_behavior(self, obj, value, return_value)
 
     def __reduce__(self):
         # Since queryable property instances only make sense in the context of
@@ -130,54 +203,11 @@ class QueryableProperty(object):
         self.name = self.name or name
         if self.verbose_name is None:
             self.verbose_name = pretty_name(self.name)
-        setattr(cls, name, self)  # Re-append the property to the model class
+        setattr(cls, name, QueryablePropertyDescriptor(self))  # Add a descriptor for this property to the model class
         # If not already set, also add a method to the model class that allows
         # to reset the cached values of queryable properties.
         if not getattr(cls, RESET_METHOD_NAME, None):
             setattr(cls, RESET_METHOD_NAME, reset_queryable_property)
-
-    def _get_cached_value(self, obj):
-        """
-        Get the cached value for this property from the given object. Requires
-        a cached value to be present.
-
-        :param django.db.models.Model obj: The object to get the cached value
-                                           from.
-        :return: The cached value.
-        """
-        return obj.__dict__[self.name]
-
-    def _set_cached_value(self, obj, value):
-        """
-        Set the cached value for this property on the given object.
-
-        :param django.db.models.Model obj: The object to set the cached value
-                                           for.
-        :param value: The value to cache.
-        """
-        obj.__dict__[self.name] = value
-
-    def _has_cached_value(self, obj):
-        """
-        Check if a value for this property is cached on the given object.
-
-        :param django.db.models.Model obj: The object to check for a cached
-                                           value.
-        :return: True if a value is cached; otherwise False.
-        :rtype: bool
-        """
-        return self.name in obj.__dict__
-
-    def _clear_cached_value(self, obj):
-        """
-        Clear the cached value for this property on the given object. Does not
-        require a cached value to be present and will do nothing if no value is
-        cached.
-
-        :param django.db.models.Model obj: The object to clear the cached value
-                                           on.
-        """
-        obj.__dict__.pop(self.name, None)
 
 
 class queryable_property(QueryableProperty):
