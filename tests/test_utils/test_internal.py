@@ -7,9 +7,12 @@ from django import VERSION as DJANGO_VERSION
 from django.db.models import CharField, IntegerField, Q, Sum
 from six.moves import cPickle
 
+from queryable_properties.exceptions import QueryablePropertyDoesNotExist
+from queryable_properties.properties.base import QueryablePropertyDescriptor
+from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import (
-    get_output_field, InjectableMixin, MISSING_OBJECT, ModelAttributeGetter, parametrizable_decorator,
-    QueryablePropertyReference, QueryPath, resolve_queryable_property, TreeNodeProcessor
+    get_output_field, get_queryable_property_descriptor, InjectableMixin, MISSING_OBJECT, ModelAttributeGetter,
+    parametrizable_decorator, QueryablePropertyReference, QueryPath, resolve_queryable_property, TreeNodeProcessor
 )
 
 from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
@@ -318,62 +321,86 @@ def test_parametrizable_decorator():
     assert func3.kwargs == dict(kwarg='test')
 
 
+class TestGetQueryablePropertyDescriptor(object):
+
+    @pytest.mark.parametrize('model, property_name', [
+        (VersionWithClassBasedProperties, 'major_minor'),
+        (VersionWithDecoratorBasedProperties, 'major_minor'),
+        (VersionWithClassBasedProperties, 'version'),
+        (VersionWithDecoratorBasedProperties, 'version'),
+    ])
+    def test_property_found(self, model, property_name):
+        descriptor = get_queryable_property_descriptor(model, property_name)
+        assert isinstance(descriptor, QueryablePropertyDescriptor)
+
+    @pytest.mark.parametrize('model, property_name', [
+        (VersionWithClassBasedProperties, 'non_existent'),
+        (VersionWithDecoratorBasedProperties, 'non_existent'),
+        (VersionWithClassBasedProperties, 'major'),  # Existing model field
+        (VersionWithDecoratorBasedProperties, 'major'),  # Existing model field
+    ])
+    def test_exception(self, model, property_name):
+        with pytest.raises(QueryablePropertyDoesNotExist):
+            get_queryable_property_descriptor(model, property_name)
+
+
 class TestResolveQueryableProperty(object):
 
     @pytest.mark.parametrize('model, query_path, expected_property, expected_lookups', [
         # No relation involved
-        (VersionWithClassBasedProperties, QueryPath('version'), VersionWithClassBasedProperties.version, QueryPath()),
+        (VersionWithClassBasedProperties, QueryPath('version'),
+         get_queryable_property(VersionWithClassBasedProperties, 'version'), QueryPath()),
         (VersionWithDecoratorBasedProperties, QueryPath('version'),
-         VersionWithDecoratorBasedProperties.version, QueryPath()),
+         get_queryable_property(VersionWithDecoratorBasedProperties, 'version'), QueryPath()),
         (VersionWithClassBasedProperties, QueryPath('version__lower__exact'),
-         VersionWithClassBasedProperties.version, QueryPath('lower__exact')),
+         get_queryable_property(VersionWithClassBasedProperties, 'version'), QueryPath('lower__exact')),
         (VersionWithDecoratorBasedProperties, QueryPath('version__lower__exact'),
-         VersionWithDecoratorBasedProperties.version, QueryPath('lower__exact')),
+         get_queryable_property(VersionWithDecoratorBasedProperties, 'version'), QueryPath('lower__exact')),
         # FK forward relation
         (VersionWithClassBasedProperties, QueryPath('application__version_count'),
-         ApplicationWithClassBasedProperties.version_count, QueryPath()),
+         get_queryable_property(ApplicationWithClassBasedProperties, 'version_count'), QueryPath()),
         (VersionWithDecoratorBasedProperties, QueryPath('application__version_count'),
-         ApplicationWithDecoratorBasedProperties.version_count, QueryPath()),
+         get_queryable_property(ApplicationWithDecoratorBasedProperties, 'version_count'), QueryPath()),
         (VersionWithClassBasedProperties, QueryPath('application__major_sum__gt'),
-         ApplicationWithClassBasedProperties.major_sum, QueryPath('gt')),
+         get_queryable_property(ApplicationWithClassBasedProperties, 'major_sum'), QueryPath('gt')),
         (VersionWithDecoratorBasedProperties, QueryPath('application__major_sum__gt'),
-         ApplicationWithDecoratorBasedProperties.major_sum, QueryPath('gt')),
+         get_queryable_property(ApplicationWithDecoratorBasedProperties, 'major_sum'), QueryPath('gt')),
         # FK reverse relation
         (ApplicationWithClassBasedProperties, QueryPath('versions__major_minor'),
-         VersionWithClassBasedProperties.major_minor, QueryPath()),
+         get_queryable_property(VersionWithClassBasedProperties, 'major_minor'), QueryPath()),
         (ApplicationWithDecoratorBasedProperties, QueryPath('versions__major_minor'),
-         VersionWithDecoratorBasedProperties.major_minor, QueryPath()),
+         get_queryable_property(VersionWithDecoratorBasedProperties, 'major_minor'), QueryPath()),
         (ApplicationWithClassBasedProperties, QueryPath('versions__version__lower__contains'),
-         VersionWithClassBasedProperties.version, QueryPath('lower__contains')),
+         get_queryable_property(VersionWithClassBasedProperties, 'version'), QueryPath('lower__contains')),
         (ApplicationWithDecoratorBasedProperties, QueryPath('versions__version__lower__contains'),
-         VersionWithDecoratorBasedProperties.version, QueryPath('lower__contains')),
+         get_queryable_property(VersionWithDecoratorBasedProperties, 'version'), QueryPath('lower__contains')),
         # M2M forward relation
         (ApplicationWithClassBasedProperties, QueryPath('categories__circular'),
-         CategoryWithClassBasedProperties.circular, QueryPath()),
+         get_queryable_property(CategoryWithClassBasedProperties, 'circular'), QueryPath()),
         (ApplicationWithDecoratorBasedProperties, QueryPath('categories__circular'),
-         CategoryWithDecoratorBasedProperties.circular, QueryPath()),
+         get_queryable_property(CategoryWithDecoratorBasedProperties, 'circular'), QueryPath()),
         (ApplicationWithClassBasedProperties, QueryPath('categories__circular__exact'),
-         CategoryWithClassBasedProperties.circular, QueryPath('exact')),
+         get_queryable_property(CategoryWithClassBasedProperties, 'circular'), QueryPath('exact')),
         (ApplicationWithDecoratorBasedProperties, QueryPath('categories__circular__exact'),
-         CategoryWithDecoratorBasedProperties.circular, QueryPath('exact')),
+         get_queryable_property(CategoryWithDecoratorBasedProperties, 'circular'), QueryPath('exact')),
         # M2M reverse relation
         (CategoryWithClassBasedProperties, QueryPath('applications__major_sum'),
-         ApplicationWithClassBasedProperties.major_sum, QueryPath()),
+         get_queryable_property(ApplicationWithClassBasedProperties, 'major_sum'), QueryPath()),
         (CategoryWithDecoratorBasedProperties, QueryPath('applications__major_sum'),
-         ApplicationWithDecoratorBasedProperties.major_sum, QueryPath()),
+         get_queryable_property(ApplicationWithDecoratorBasedProperties, 'major_sum'), QueryPath()),
         (CategoryWithClassBasedProperties, QueryPath('applications__version_count__lt'),
-         ApplicationWithClassBasedProperties.version_count, QueryPath('lt')),
+         get_queryable_property(ApplicationWithClassBasedProperties, 'version_count'), QueryPath('lt')),
         (CategoryWithDecoratorBasedProperties, QueryPath('applications__version_count__lt'),
-         ApplicationWithDecoratorBasedProperties.version_count, QueryPath('lt')),
+         get_queryable_property(ApplicationWithDecoratorBasedProperties, 'version_count'), QueryPath('lt')),
         # Multiple relations
         (CategoryWithClassBasedProperties, QueryPath('applications__versions__application__categories__circular'),
-         CategoryWithClassBasedProperties.circular, QueryPath()),
+         get_queryable_property(CategoryWithClassBasedProperties, 'circular'), QueryPath()),
         (CategoryWithDecoratorBasedProperties, QueryPath('applications__versions__application__categories__circular'),
-         CategoryWithDecoratorBasedProperties.circular, QueryPath()),
+         get_queryable_property(CategoryWithDecoratorBasedProperties, 'circular'), QueryPath()),
         (VersionWithClassBasedProperties, QueryPath('application__categories__circular__in'),
-         CategoryWithClassBasedProperties.circular, QueryPath('in')),
+         get_queryable_property(CategoryWithClassBasedProperties, 'circular'), QueryPath('in')),
         (VersionWithDecoratorBasedProperties, QueryPath('application__categories__circular__in'),
-         CategoryWithDecoratorBasedProperties.circular, QueryPath('in')),
+         get_queryable_property(CategoryWithDecoratorBasedProperties, 'circular'), QueryPath('in')),
     ])
     def test_successful(self, model, query_path, expected_property, expected_lookups):
         expected_ref = QueryablePropertyReference(expected_property, expected_property.model,

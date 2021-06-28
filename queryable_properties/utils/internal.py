@@ -451,6 +451,26 @@ def parametrizable_decorator(function):
 parametrizable_decorator_method = method_decorator(parametrizable_decorator)
 
 
+def get_queryable_property_descriptor(model, name):
+    """
+    Retrieve the descriptor object for the property with the given attribute
+    name from the given model class or raise an error if no queryable property
+    with that name exists on the model class.
+
+    :param type model: The model class to retrieve the descriptor object from.
+    :param str name: The name of the property to retrieve the descriptor for.
+    :return: The descriptor object.
+    :rtype: queryable_properties.properties.base.QueryablePropertyDescriptor
+    """
+    from ..properties.base import QueryablePropertyDescriptor
+
+    descriptor = getattr(model, name, None)
+    if not isinstance(descriptor, QueryablePropertyDescriptor):
+        raise QueryablePropertyDoesNotExist("{model} has no queryable property named '{name}'".format(
+            model=model.__name__, name=name))
+    return descriptor
+
+
 def resolve_queryable_property(model, query_path):
     """
     Resolve the given path into a queryable property on the given model.
