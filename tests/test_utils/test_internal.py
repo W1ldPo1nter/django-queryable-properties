@@ -4,7 +4,7 @@ from collections import Counter
 import pytest
 import six
 from django import VERSION as DJANGO_VERSION
-from django.db.models import CharField, IntegerField, Q, Sum
+from django.db.models import CharField, Count, IntegerField, Q, Sum
 from six.moves import cPickle
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
@@ -381,7 +381,7 @@ class TestQueryablePropertyReference(object):
     def test_get_annotation(self):
         prop = get_queryable_property(ApplicationWithClassBasedProperties, 'version_count')
         ref = QueryablePropertyReference(prop, prop.model, QueryPath())
-        assert ref.get_annotation() == prop.get_annotation(ApplicationWithClassBasedProperties)
+        assert isinstance(ref.get_annotation(), Count)
 
     def test_get_annotation_exception(self):
         prop = get_queryable_property(ApplicationWithClassBasedProperties, 'dummy')
