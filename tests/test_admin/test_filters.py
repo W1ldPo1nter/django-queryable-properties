@@ -10,6 +10,7 @@ from django.db.models import DateField
 
 from queryable_properties.admin.filters import QueryablePropertyField, QueryablePropertyListFilter
 from queryable_properties.exceptions import QueryablePropertyError
+from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import get_output_field, QueryPath
 from ..app_management.admin import ApplicationAdmin, VersionAdmin
 from ..app_management.models import (ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties,
@@ -54,8 +55,9 @@ class TestQueryablePropertyField(object):
         return ChangeList(request, **defaults)
 
     @pytest.mark.parametrize('query_path, expected_property', [
-        (QueryPath('version_count'), ApplicationWithClassBasedProperties.version_count),
-        (QueryPath('categories__version_count'), CategoryWithClassBasedProperties.version_count),
+        (QueryPath('version_count'), get_queryable_property(ApplicationWithClassBasedProperties, 'version_count')),
+        (QueryPath('categories__version_count'),
+         get_queryable_property(CategoryWithClassBasedProperties, 'version_count')),
     ])
     def test_initializer(self, admin_instance, query_path, expected_property):
         field = QueryablePropertyField(admin_instance, query_path)
@@ -231,10 +233,14 @@ class TestQueryablePropertyListFilter(object):
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
     @pytest.mark.parametrize('prop, admin_class, expected_filter_class', [
-        (ApplicationWithClassBasedProperties.has_version_with_changelog, ApplicationAdmin, BooleanFieldListFilter),
-        (VersionWithClassBasedProperties.release_type_verbose_name, VersionAdmin, ChoicesFieldListFilter),
-        (ApplicationWithClassBasedProperties.support_start_date, VersionAdmin, DateFieldListFilter),
-        (VersionWithClassBasedProperties.version, VersionAdmin, ChoicesFieldListFilter),
+        (get_queryable_property(ApplicationWithClassBasedProperties, 'has_version_with_changelog'),
+         ApplicationAdmin, BooleanFieldListFilter),
+        (get_queryable_property(VersionWithClassBasedProperties, 'release_type_verbose_name'),
+         VersionAdmin, ChoicesFieldListFilter),
+        (get_queryable_property(ApplicationWithClassBasedProperties, 'support_start_date'),
+         VersionAdmin, DateFieldListFilter),
+        (get_queryable_property(VersionWithClassBasedProperties, 'version'),
+         VersionAdmin, ChoicesFieldListFilter),
     ])
     def test_get_class(self, prop, admin_class, expected_filter_class):
         field = QueryablePropertyField(admin_class(prop.model, site), QueryPath(prop.name))

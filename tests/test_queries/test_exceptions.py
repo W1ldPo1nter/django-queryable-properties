@@ -6,6 +6,7 @@ from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from queryable_properties.exceptions import FieldError, QueryablePropertyError
+from queryable_properties.utils import get_queryable_property
 
 from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                                      CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
@@ -18,7 +19,8 @@ class TestFilter(object):
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_filter(self, monkeypatch, model):
-        monkeypatch.setattr(model.version, 'get_filter', None)
+        prop = get_queryable_property(model, 'version')
+        monkeypatch.setattr(prop, 'get_filter', None)
         with pytest.raises(QueryablePropertyError):
             model.objects.filter(version='1.2.3')
 

@@ -12,6 +12,7 @@ from django.utils.translation import trans_real
 
 from queryable_properties.compat import nullcontext
 from queryable_properties.properties import AggregateProperty, AnnotationProperty, RelatedExistenceCheckProperty
+from queryable_properties.utils import get_queryable_property
 from ..app_management.models import (ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties,
                                      VersionWithClassBasedProperties)
 
@@ -83,9 +84,10 @@ class TestValueCheckProperty(object):
 class TestRangeCheckProperty(object):
 
     def test_final_value(self, monkeypatch):
-        assert VersionWithClassBasedProperties.is_supported.final_value == date(2019, 1, 1)
-        monkeypatch.setattr(VersionWithClassBasedProperties.is_supported, 'value', lambda: 5)
-        assert VersionWithClassBasedProperties.is_supported.final_value == 5
+        prop = get_queryable_property(VersionWithClassBasedProperties, 'is_supported')
+        assert prop.final_value == date(2019, 1, 1)
+        monkeypatch.setattr(prop, 'value', lambda: 5)
+        assert prop.final_value == 5
 
     @pytest.mark.parametrize(
         'index, prop_name, value, include_boundaries, include_missing, in_range, expected_result',
@@ -110,7 +112,7 @@ class TestRangeCheckProperty(object):
     def test_getter(self, monkeypatch, versions, index, prop_name, value, include_boundaries, include_missing,
                     in_range, expected_result):
         version = versions[index]
-        prop = getattr(VersionWithClassBasedProperties, prop_name)
+        prop = get_queryable_property(VersionWithClassBasedProperties, prop_name)
         monkeypatch.setattr(prop, 'value', value)
         monkeypatch.setattr(prop, 'include_boundaries', include_boundaries)
         monkeypatch.setattr(prop, 'include_missing', include_missing)
@@ -137,7 +139,7 @@ class TestRangeCheckProperty(object):
     ])
     def test_filter(self, monkeypatch, value, include_boundaries, include_missing, in_range, condition,
                     expected_versions):
-        prop = VersionWithClassBasedProperties.is_supported
+        prop = get_queryable_property(VersionWithClassBasedProperties, 'is_supported')
         monkeypatch.setattr(prop, 'value', value)
         monkeypatch.setattr(prop, 'include_boundaries', include_boundaries)
         monkeypatch.setattr(prop, 'include_missing', include_missing)
@@ -158,7 +160,7 @@ class TestRangeCheckProperty(object):
     ])
     def test_filter_based_on_transform(self, monkeypatch, include_boundaries, include_missing, in_range, condition,
                                        expected_versions):
-        prop = VersionWithClassBasedProperties.supported_in_2018
+        prop = get_queryable_property(VersionWithClassBasedProperties, 'supported_in_2018')
         monkeypatch.setattr(prop, 'include_boundaries', include_boundaries)
         monkeypatch.setattr(prop, 'include_missing', include_missing)
         monkeypatch.setattr(prop, 'in_range', in_range)

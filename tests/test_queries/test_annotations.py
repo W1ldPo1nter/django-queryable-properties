@@ -5,6 +5,7 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db import models
 
+from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 from ..conftest import Concat, Value
@@ -26,8 +27,8 @@ class TestAggregateAnnotations(object):
         queryset = model.objects.filter(**filters).select_properties('version_count', 'major_sum').filter(**filters)
         assert 'version_count' in queryset.query.annotations
         assert 'major_sum' in queryset.query.annotations
-        assert all(model.version_count._has_cached_value(obj) for obj in queryset)
-        assert all(model.major_sum._has_cached_value(obj) for obj in queryset)
+        assert all(model.version_count.has_cached_value(obj) for obj in queryset)
+        assert all(model.major_sum.has_cached_value(obj) for obj in queryset)
 
     @pytest.mark.parametrize('model, limit, expected_total', [
         (ApplicationWithClassBasedProperties, None, 8),
@@ -63,7 +64,7 @@ class TestAggregateAnnotations(object):
     def test_iterator(self, model):
         queryset = model.objects.filter(version_count=4).select_properties('version_count')
         for application in queryset.iterator():
-            assert model.version_count._has_cached_value(application)
+            assert model.version_count.has_cached_value(application)
             assert application.version_count == 4
         assert queryset._result_cache is None
 
@@ -81,7 +82,7 @@ class TestAggregateAnnotations(object):
         results = list(queryset.filter(alias=5))
         assert len(results) == 2
         for application in results:
-            assert model.version_count._has_cached_value(application) is with_selection
+            assert model.version_count.has_cached_value(application) is with_selection
             assert application.version_count == 4
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
@@ -93,7 +94,7 @@ class TestAggregateAnnotations(object):
         queryset = model.objects.select_properties('version_count')
         del queryset.query.annotations['version_count']
         assert bool(queryset)
-        assert all(not model.version_count._has_cached_value(obj) for obj in queryset)
+        assert all(not model.version_count.has_cached_value(obj) for obj in queryset)
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
@@ -110,7 +111,7 @@ class TestExpressionAnnotations(object):
         # the annotation gets selected correctly regardless
         queryset = model.objects.filter(**filters).select_properties('version').filter(**filters)
         assert 'version' in queryset.query.annotations
-        assert all(model.version._has_cached_value(obj) for obj in queryset)
+        assert all(model.version.has_cached_value(obj) for obj in queryset)
 
     @pytest.mark.parametrize('model, property_name, annotation, expected_count, record_checker', [
         (VersionWithClassBasedProperties, 'version', models.F('version'), 8,
@@ -139,8 +140,8 @@ class TestExpressionAnnotations(object):
             # Check that a property annotation used implicitly by another
             # annotation does not lead to a selection of the property
             # annotation
-            prop = getattr(model, property_name)
-            assert all(not prop._has_cached_value(obj) for obj in queryset)
+            descriptor = get_queryable_property_descriptor(model, property_name)
+            assert all(not descriptor.has_cached_value(obj) for obj in queryset)
 
     @pytest.mark.skipif(DJANGO_VERSION < (3, 2), reason="The alias() method didn't exist before Django 3.2")
     @pytest.mark.parametrize('model, with_selection', [
@@ -156,13 +157,13 @@ class TestExpressionAnnotations(object):
         results = list(queryset.filter(alias='V2.0.0'))
         assert len(results) == 2
         for version in results:
-            assert model.version._has_cached_value(version) is with_selection
+            assert model.version.has_cached_value(version) is with_selection
             assert version.version == '2.0.0'
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_iterator(self, model):
         queryset = model.objects.filter(major_minor='2.0').select_properties('version')
         for version in queryset.iterator():
-            assert model.version._has_cached_value(version)
+            assert model.version.has_cached_value(version)
             assert version.version == '2.0.0'
         assert queryset._result_cache is None

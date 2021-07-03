@@ -6,6 +6,8 @@ import six
 from django import VERSION as DJANGO_VERSION
 from django.db import models
 
+from queryable_properties.utils import get_queryable_property
+from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                                      CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
                                      VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
@@ -172,8 +174,8 @@ class TestFilterWithAggregateAnnotation(object):
         if '__' not in property_name:
             # Check that a property annotation used implicitly by a filter does
             # not lead to a selection of the property annotation.
-            prop = getattr(model, property_name)
-            assert all(not prop._has_cached_value(app) for app in queryset)
+            descriptor = get_queryable_property_descriptor(model, property_name)
+            assert all(not descriptor.has_cached_value(app) for app in queryset)
 
     @pytest.mark.parametrize('model, filters, expected_remaining_count', [
         (ApplicationWithClassBasedProperties, models.Q(version_count=4, name__contains='cool'), 1),
@@ -190,7 +192,8 @@ class TestFilterWithAggregateAnnotation(object):
     def test_filter_implementation_used_despite_present_annotation(self, monkeypatch, model):
         # Patch the property to have a filter that is always True, then use a
         # condition that would be False without the patch.
-        monkeypatch.setattr(model.version_count, 'get_filter', lambda cls, lookup, value: models.Q(pk__gt=0))
+        prop = get_queryable_property(model, 'version_count')
+        monkeypatch.setattr(prop, 'get_filter', lambda cls, lookup, value: models.Q(pk__gt=0))
         queryset = model.objects.select_properties('version_count').filter(version_count__gt=5)
         assert '"id" > 0' in six.text_type(queryset.query)
         assert queryset.count() == len(queryset) == 2
@@ -239,8 +242,8 @@ class TestFilterWithExpressionAnnotation(object):
         if '__' not in property_name:
             # Check that a property annotation used implicitly by a filter does
             # not lead to a selection of the property annotation.
-            prop = getattr(model, property_name)
-            assert all(not prop._has_cached_value(version) for version in queryset)
+            descriptor = get_queryable_property_descriptor(model, property_name)
+            assert all(not descriptor.has_cached_value(version) for version in queryset)
 
     @pytest.mark.parametrize('model, filters, expected_remaining_count', [
         (VersionWithClassBasedProperties, models.Q(changes_or_default='(No data)', major=1), 2),
@@ -300,8 +303,8 @@ class TestFilterWithSubqueryAnnotation(object):
         if '__' not in property_name:
             # Check that a property annotation used implicitly by a filter does
             # not lead to a selection of the property annotation.
-            prop = getattr(model, property_name)
-            assert all(not prop._has_cached_value(version) for version in queryset)
+            descriptor = get_queryable_property_descriptor(model, property_name)
+            assert all(not descriptor.has_cached_value(version) for version in queryset)
 
     @pytest.mark.parametrize('model, filters, expected_remaining_count', [
         (ApplicationWithClassBasedProperties, models.Q(highest_version='2.0.0', name__contains='cool'), 1),

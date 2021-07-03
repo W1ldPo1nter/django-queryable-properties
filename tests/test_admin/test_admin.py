@@ -9,6 +9,7 @@ from mock import patch
 
 from queryable_properties.compat import ADMIN_QUERYSET_METHOD_NAME, nullcontext
 from queryable_properties.managers import QueryablePropertiesQuerySetMixin
+from queryable_properties.utils import get_queryable_property
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
 from .test_checks import DummyListFilter
@@ -29,9 +30,9 @@ class TestQueryablePropertiesAdminMixin(object):
         (VersionAdmin, VersionWithClassBasedProperties, False, ()),
         (VersionAdmin, VersionWithClassBasedProperties, True, ()),
         (ApplicationAdmin, ApplicationWithClassBasedProperties, False,
-         (ApplicationWithClassBasedProperties.version_count,)),
+         (get_queryable_property(ApplicationWithClassBasedProperties, 'version_count'),)),
         (ApplicationAdmin, ApplicationWithClassBasedProperties, True,
-         (ApplicationWithClassBasedProperties.version_count,)),
+         (get_queryable_property(ApplicationWithClassBasedProperties, 'version_count'),)),
     ])
     def test_get_queryset(self, rf, admin_class, model, apply_patch, expected_selected_properties):
         admin = admin_class(model, site)

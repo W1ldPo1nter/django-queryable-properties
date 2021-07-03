@@ -22,4 +22,4 @@ def test_pickle_unpickle(model):
     for queryset in (queryset1, queryset2, queryset3):
         versions = list(queryset)
         assert versions == expected_applications
-        assert all(model.version_count._has_cached_value(obj) for obj in queryset)
+        assert all(model.version_count.has_cached_value(obj) for obj in queryset)

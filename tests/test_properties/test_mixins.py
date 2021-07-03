@@ -7,6 +7,7 @@ from django.db.models import Q
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin,
                                              lookup_filter, QueryableProperty, REMAINING_LOOKUPS)
+from queryable_properties.utils import get_queryable_property
 
 from ..app_management.models import ApplicationWithClassBasedProperties
 
@@ -157,13 +158,15 @@ class TestAnnotationGetterMixin(object):
 
     @pytest.fixture
     def prop(self):
-        assert isinstance(ApplicationWithClassBasedProperties.version_count, AnnotationGetterMixin)
-        return ApplicationWithClassBasedProperties.version_count
+        prop = get_queryable_property(ApplicationWithClassBasedProperties, 'version_count')
+        assert isinstance(prop, AnnotationGetterMixin)
+        return prop
 
     @pytest.fixture
     def nested_prop(self):
-        assert isinstance(ApplicationWithClassBasedProperties.major_avg, AnnotationGetterMixin)
-        return ApplicationWithClassBasedProperties.major_avg
+        prop = get_queryable_property(ApplicationWithClassBasedProperties, 'major_avg')
+        assert isinstance(prop, AnnotationGetterMixin)
+        return prop
 
     @pytest.mark.parametrize('kwargs, expected_cached', [
         ({}, QueryableProperty.cached),

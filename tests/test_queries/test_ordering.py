@@ -38,7 +38,7 @@ class TestAggregateAnnotations(object):
         assert results == sorted(results, key=lambda application: application.version_count, reverse=reverse)
         # Check that ordering by a property annotation does not lead to a
         # selection of the property annotation.
-        assert all(model.version_count._has_cached_value(application) is with_selection for application in results)
+        assert all(model.version_count.has_cached_value(application) is with_selection for application in results)
 
     @pytest.mark.parametrize('model, order_by, reverse', [
         # All parametrizations are expected to yield results ordered by the
@@ -97,7 +97,7 @@ class TestExpressionAnnotations(object):
         assert results == sorted(results, key=lambda version: version.version, reverse=reverse)
         # Check that ordering by a property annotation does not lead to a
         # selection of the property annotation
-        assert all(model.version._has_cached_value(version) is with_selection for version in results)
+        assert all(model.version.has_cached_value(version) is with_selection for version in results)
 
     @pytest.mark.parametrize('model, order_by, expected_names', [
         (ApplicationWithClassBasedProperties, ('versions__version',),
@@ -184,7 +184,7 @@ class TestSubqueryAnnotations(object):
         assert results == sorted(results, key=lambda app: app.highest_version, reverse=reverse)
         # Check that ordering by a property annotation does not lead to a
         # selection of the property annotation
-        assert all(model.highest_version._has_cached_value(app) is with_selection for app in results)
+        assert all(model.highest_version.has_cached_value(app) is with_selection for app in results)
 
     @pytest.mark.parametrize('model, order_by, reverse', [
         # All parametrizations are expected to yield results ordered by the
