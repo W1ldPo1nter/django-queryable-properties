@@ -93,6 +93,17 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         """
         return self.relation_path + self.property.name
 
+    @property
+    def descriptor(self):
+        """
+        Return the descriptor object associated with the queryable property
+        this reference points to.
+
+        :return: The queryable property descriptor for the referenced property.
+        :rtype: queryable_properties.properties.base.QueryablePropertyDescriptor
+        """
+        return get_queryable_property_descriptor(self.model, self.property.name)
+
     def get_filter(self, lookups, value):
         """
         A wrapper for the get_filter method of the property this reference

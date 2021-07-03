@@ -72,7 +72,7 @@ class QueryablePropertiesIterable(InjectableMixin):
                         value = getattr(obj, changed_name)
                         delattr(obj, changed_name)
                         if property_ref:
-                            property_ref.property._set_cached_value(obj, value)
+                            property_ref.descriptor.set_cached_value(obj, value)
                 yield obj
         finally:
             self.queryset.query = original_query
