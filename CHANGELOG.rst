@@ -8,6 +8,8 @@ master (unreleased)
   model instances that were already loaded from the database beforehand
 - Extended the ``LookupFilterMixin`` to allow to define a filter function/method that handles all lookups that don't
   use an explicitly registered function/method
+- Values for queryable properties with setters can now also be set using initializer keyword arguments of their
+  respective models
 
 1.6.1 (2021-04-19)
 ------------------
