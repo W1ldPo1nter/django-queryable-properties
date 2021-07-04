@@ -155,6 +155,14 @@ implemented correctly.
             # Don't implement any validation to keep the example simple.
             obj.major, obj.minor = value.split('.')
 
+Just like regular properties, queryable properties with setters can also be used via the initializer arguments of their
+respective model.
+With both approaches shown above, an ``ApplicationVersion`` object could therefore be created like this:
+
+.. code-block:: python
+
+    version = ApplicationVersion(version_str='1.2')
+
 Setter cache behavior
 ^^^^^^^^^^^^^^^^^^^^^
 
