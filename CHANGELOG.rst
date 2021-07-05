@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.7.0 (2021-07-05)
+------------------
+
 - Added the ``prefetch_queryable_properties`` utility function which allows to efficiently query property values for
   model instances that were already loaded from the database beforehand
 - Extended the ``LookupFilterMixin`` to allow to define a filter function/method that handles all lookups that don't
