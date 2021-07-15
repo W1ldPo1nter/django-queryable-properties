@@ -26,7 +26,7 @@ the annotation.
 Implementation
 --------------
 
-To provide a realisticc example, let's implement a property that provides the number of versions that is defined for
+To provide a realistic example, let's implement a property that provides the number of versions that is defined for
 an application, similar to the example in :ref:`annotations:Regarding aggregate annotations across relations`.
 
 The decorator-based approach for an annotation-based property looks slightly different since the `queryable_property`
