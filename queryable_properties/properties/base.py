@@ -44,8 +44,9 @@ class QueryablePropertyDescriptor(property):
         if obj is None:
             return self
 
-        # Always check for cached values first regardless of the self.cached
-        # since values will also be cached through annotations.
+        # Always check for cached values first regardless of the associated
+        # property being configured as cached since values will also be cached
+        # through annotation selections.
         if self.has_cached_value(obj):
             return self.get_cached_value(obj)
         if not self.prop.get_value:
@@ -72,8 +73,8 @@ class QueryablePropertyDescriptor(property):
 
     def get_cached_value(self, obj):
         """
-        Get the cached value for this property from the given object. Requires
-        a cached value to be present.
+        Get the cached value for the associated queryable property from the
+        given object. Requires a cached value to be present.
 
         :param django.db.models.Model obj: The object to get the cached value
                                            from.
@@ -83,7 +84,8 @@ class QueryablePropertyDescriptor(property):
 
     def set_cached_value(self, obj, value):
         """
-        Set the cached value for this property on the given object.
+        Set the cached value for the associated queryable property on the given
+        object.
 
         :param django.db.models.Model obj: The object to set the cached value
                                            for.
@@ -93,7 +95,8 @@ class QueryablePropertyDescriptor(property):
 
     def has_cached_value(self, obj):
         """
-        Check if a value for this property is cached on the given object.
+        Check if a value for the associated queryable property is cached on the
+        given object.
 
         :param django.db.models.Model obj: The object to check for a cached
                                            value.
@@ -104,9 +107,9 @@ class QueryablePropertyDescriptor(property):
 
     def clear_cached_value(self, obj):
         """
-        Clear the cached value for this property on the given object. Does not
-        require a cached value to be present and will do nothing if no value is
-        cached.
+        Clear the cached value for the associated queryable property on the
+        given object. Does not require a cached value to be present and will
+        do nothing if no value is cached.
 
         :param django.db.models.Model obj: The object to clear the cached value
                                            on.
