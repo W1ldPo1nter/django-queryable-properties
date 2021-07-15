@@ -120,8 +120,8 @@ class QueryablePropertyDescriptor(property):
 @six.python_2_unicode_compatible
 class QueryableProperty(object):
     """
-    Base class for all queryable properties, which are basically simple
-    descriptors with some added methods for queryset interaction.
+    Base class for all queryable property definitions, which provide methods
+    for single object as well as queryset interaction.
     """
 
     cached = False  #: Determines if the result of the getter is cached, like Django's cached_property.
