@@ -124,7 +124,7 @@ class QueryableProperty(object):
     for single object as well as queryset interaction.
     """
 
-    cached = False  #: Determines if the result of the getter is cached, like Django's cached_property.
+    cached = False  #: Determines if the result of the getter is cached, like Python's/Django's ``cached_property``.
     setter_cache_behavior = CLEAR_CACHE  #: Determines what happens if the setter of a cached property is used.
     filter_requires_annotation = False  #: Determines if using the property to filter requires annotating first.
 
@@ -297,8 +297,8 @@ class queryable_property(QueryableProperty):
         (``@getter(cached=True)``).
 
         :param function method: The method to decorate.
-        :param cached: If True, values returned by the decorated getter method
-                       will be cached. A value of None means no change.
+        :param cached: If ``True``, values returned by the decorated getter
+                       method will be cached. A value of None means no change.
         :type cached: bool | None
         :return: A cloned queryable property.
         :rtype: queryable_property
@@ -337,13 +337,13 @@ class queryable_property(QueryableProperty):
         used as a parameter-less decorator (``@filter``) or as a decorator with
         keyword arguments (``@filter(requires_annotation=False)``). May be used
         to define a one-for-all filter function or a filter function that will
-        be called for certain lookups only using the `lookups` argument.
+        be called for certain lookups only using the ``lookups`` argument.
 
         :param method: The method to decorate.
         :type method: function | classmethod | staticmethod
-        :param requires_annotation: True if filtering using this queryable
+        :param requires_annotation: ``True`` if filtering using this queryable
                                     property requires its annotation to be
-                                    applied first; otherwise False. None if
+                                    applied first; otherwise ``False``. None if
                                     this information should not be changed.
         :type requires_annotation: bool | None
         :param lookups: If given, the decorated function or method will be used
@@ -351,19 +351,19 @@ class queryable_property(QueryableProperty):
                         the :class:`LookupFilterMixin` to this property if this
                         is used.
         :type lookups: collections.Iterable[str] | None
-        :param boolean: If True, the decorated function or method is expected
-                        to be a simple boolean filter, which doesn't take the
-                        `lookup` and `value` parameters and should always
-                        return a `Q` object representing the positive (i.e.
-                        `True`) filter case. The decorator will automatically
-                        negate the condition if the filter was called with a
-                        `False` value.
+        :param boolean: If ``True``, the decorated function or method is
+                        expected to be a simple boolean filter, which doesn't
+                        take the ``lookup`` and ``value`` parameters and should
+                        always return a ``Q`` object representing the positive
+                        (i.e. ``True``) filter case. The decorator will
+                        automatically negate the condition if the filter was
+                        called with a ``False`` value.
         :type boolean: bool
-        :param remaining_lookups_via_parent: True if lookup-based filters
+        :param remaining_lookups_via_parent: ``True`` if lookup-based filters
                                              should fall back to the base class
                                              implementation for lookups without
                                              a registered filter function;
-                                             otherwise False. None if this
+                                             otherwise ``False``. None if this
                                              information should not be changed.
         :type remaining_lookups_via_parent: bool
         :return: A cloned queryable property.

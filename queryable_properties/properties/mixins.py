@@ -75,12 +75,13 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
         """
         Decorator for individual filter methods of classes that use the
         :class:`LookupFilterMixin` to register the methods that are simple
-        boolean filters (i.e. the filter can only be called with a `True` or
-        `False` value). This automatically restricts the usable lookups to
-        `exact`. Decorated methods should not expect the `lookup` and `value`
-        parameters and should always return a `Q` object representing the
-        positive (i.e. `True`) filter case. The decorator will automatically
-        negate the condition if the filter was called with a `False` value.
+        boolean filters (i.e. the filter can only be called with a ``True`` or
+        ``False`` value). This automatically restricts the usable lookups to
+        ``exact``. Decorated methods should not expect the ``lookup`` and
+        ``value`` parameters and should always return a ``Q`` object
+        representing the positive (i.e. ``True``) filter case. The decorator
+        will automatically negate the condition if the filter was called with a
+        ``False`` value.
 
         :param function method: The method to decorate.
         :return: The decorated method.

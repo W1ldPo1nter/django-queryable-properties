@@ -89,7 +89,7 @@ class QueryablePropertiesAdminMixin(object):
 
     def get_list_select_properties(self, request):
         """
-        Wrapper around the `list_select_properties` attribute that allows to
+        Wrapper around the ``list_select_properties`` attribute that allows to
         dynamically create the list of queryable property names to select based
         on the given request.
 
@@ -133,7 +133,7 @@ class QueryablePropertiesAdmin(QueryablePropertiesAdminMixin, ModelAdmin):
     Base class for admin classes which allows to use queryable properties in
     various admin features.
 
-    Intended to be used in place of Django's regular `ModelAdmin` class.
+    Intended to be used in place of Django's regular ``ModelAdmin`` class.
     """
 
 
@@ -142,7 +142,7 @@ class QueryablePropertiesStackedInline(QueryablePropertiesAdminMixin, StackedInl
     Base class for stacked inline classes which allows to use queryable
     properties in various admin features.
 
-    Intended to be used in place of Django's regular `StackedInline` class.
+    Intended to be used in place of Django's regular ``StackedInline`` class.
     """
 
 
@@ -151,7 +151,7 @@ class QueryablePropertiesTabularInline(QueryablePropertiesAdminMixin, TabularInl
     Base class for tabular inline classes which allows to use queryable
     properties in various admin features.
 
-    Intended to be used in place of Django's regular `TabularInline` class.
+    Intended to be used in place of Django's regular ``TabularInline`` class.
     """
 
 

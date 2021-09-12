@@ -51,7 +51,7 @@ class ValueCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
     object contains a certain value or one of multiple specified values and
     returns a corresponding boolean value.
 
-    Supports queryset filtering and CASE/WHEN-based annotating.
+    Supports queryset filtering and ``CASE``/``WHEN``-based annotating.
     """
 
     def __init__(self, attribute_path, *values, **kwargs):
@@ -85,7 +85,7 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
     A property that checks if a static or dynamic value is contained in a range
     expressed by two field values and returns a corresponding boolean value.
 
-    Supports queryset filtering and CASE/WHEN-based annotating.
+    Supports queryset filtering and ``CASE``/``WHEN``-based annotating.
     """
 
     def __init__(self, min_attribute_path, max_attribute_path, value, include_boundaries=True, in_range=True,
@@ -103,7 +103,7 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
                                        it will be treated as a missing value
                                        instead of raising an exception. The
                                        behavior is the same if an intermediate
-                                       value raises an ObjectDoesNotExist
+                                       value raises an ``ObjectDoesNotExist``
                                        error.
         :param str max_attribute_path: The name of the attribute to get the
                                        upper boundary from. The same behavior
@@ -115,14 +115,14 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
                                         a part of the range if it is exactly
                                         equal to one of the boundaries.
         :param bool in_range: Configures whether the property should return
-                              `True` if the value is in range (`in_range=True`)
-                              or if it is out of the range (`in_range=False`).
-                              This also affects the impact of the
-                              `include_boundaries` and `include_missing`
-                              parameters.
+                              ``True`` if the value is in range
+                              (``in_range=True``) or if it is out of the range
+                              (``in_range=False``). This also affects the
+                              impact of the ``include_boundaries`` and
+                              ``include_missing`` parameters.
         :param bool include_missing: Whether or not a missing value is
                                      considered a part of the range (see the
-                                     description of `min_attribute_path`).
+                                     description of ``min_attribute_path``).
                                      Useful e.g. for nullable fields.
         """
         self.min_attribute_getter = ModelAttributeGetter(min_attribute_path)
@@ -167,7 +167,7 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
     A property that checks whether related objects to the one that uses the
     property exist in the database and returns a corresponding boolean value.
 
-    Supports queryset filtering and CASE/WHEN-based annotating.
+    Supports queryset filtering and ``CASE``/``WHEN``-based annotating.
     """
 
     def __init__(self, relation_path, **kwargs):
@@ -214,7 +214,7 @@ class MappingProperty(AnnotationMixin, QueryableProperty):
                                    will be treated as "no match" instead of
                                    raising an exception. The behavior is the
                                    same if an intermediate value raises an
-                                   ObjectDoesNotExist error.
+                                   ``ObjectDoesNotExist`` error.
         :param django.db.models.Field output_field: The field to represent the
                                                     mapped values in querysets.
         :param mappings: An iterable containing 2-tuples that represent the
