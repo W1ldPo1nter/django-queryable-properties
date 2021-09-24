@@ -51,6 +51,8 @@ class TestQueryablePropertyField(object):
         )
         if hasattr(ModelAdmin, 'get_sortable_by'):
             defaults['sortable_by'] = model_admin.get_sortable_by(request)
+        if hasattr(ModelAdmin, 'search_help_text'):
+            defaults['search_help_text'] = model_admin.search_help_text
         defaults.update(kwargs)
         return ChangeList(request, **defaults)
 
