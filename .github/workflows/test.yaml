@@ -7,8 +7,9 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        python-version: [2.7, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9]
-
+        python-version: ['2.7', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9']
+    env:
+      PYTHON: ${{ matrix.python-version }}
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
@@ -16,7 +17,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install test utilities
-      run: pip install tox tox-factor codecov "coverage<5" "importlib-metadata<3"
+      run: pip install tox tox-factor "coverage<5" "importlib-metadata<3"
     - name: Lint with flake8
       run: tox -e flake8
       if: matrix.python-version == '3.9'
@@ -24,6 +25,14 @@ jobs:
       run: |
         export TOXFACTOR=$(echo "py${{ matrix.python-version }}" | sed 's/\.//g')
         tox -- -p no:warnings
+    - name: Generate coverage report
+      run: coverage xml
+      if: ${{ success() }}
     - name: Upload coverage report
-      run: codecov
+      uses: codecov/codecov-action@v2
+      with:
+        env_vars: PYTHON
+        files: coverage.xml
+        flags: unittests
+        verbose: true
       if: ${{ success() }}
