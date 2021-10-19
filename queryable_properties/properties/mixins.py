@@ -3,6 +3,7 @@
 from functools import wraps
 
 import six
+from django.db.models import BooleanField
 
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
@@ -242,3 +243,38 @@ class UpdateMixin(object):
         :rtype: dict
         """
         raise NotImplementedError()
+
+
+class BooleanMixin(LookupFilterMixin):
+    """
+    Internal mixin class for common properties that return boolean values,
+    which is intended to be used in conjunction with one of the annotation
+    mixins.
+    """
+
+    filter_requires_annotation = False
+
+    def _get_condition(self, cls):  # pragma: no cover
+        """
+        Build the query filter condition for this boolean property, which is
+        used for both the filter and the annotation implementation.
+
+        :param type cls: The model class of which a queryset should be filtered
+                         or annotated.
+        :return: The filter condition for this property.
+        :rtype: django.db.models.Q
+        """
+        raise NotImplementedError()
+
+    @boolean_filter
+    def get_exact_filter(self, cls):
+        return self._get_condition(cls)
+
+    def get_annotation(self, cls):
+        from django.db.models import Case, When
+
+        return Case(
+            When(self._get_condition(cls), then=True),
+            default=False,
+            output_field=BooleanField()
+        )

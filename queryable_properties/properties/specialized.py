@@ -3,46 +3,11 @@
 import operator
 
 import six
-from django.db.models import BooleanField, Field, Q
+from django.db.models import Field
 
-from ..utils.internal import MISSING_OBJECT, ModelAttributeGetter, QueryPath
+from ..utils.internal import MISSING_OBJECT, ModelAttributeGetter
 from .base import QueryableProperty
-from .mixins import AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin
-
-
-class BooleanMixin(LookupFilterMixin):
-    """
-    Internal mixin class for common properties that return boolean values,
-    which is intended to be used in conjunction with one of the annotation
-    mixins.
-    """
-
-    filter_requires_annotation = False
-
-    def _get_condition(self, cls):  # pragma: no cover
-        """
-        Build the query filter condition for this boolean property, which is
-        used for both the filter and the annotation implementation.
-
-        :param type cls: The model class of which a queryset should be filtered
-                         or annotated.
-        :return: The filter condition for this property.
-        :rtype: django.db.models.Q
-        """
-        raise NotImplementedError()
-
-    @boolean_filter
-    def get_exact_filter(self, cls):
-        return self._get_condition(cls)
-
-    def get_annotation(self, cls):
-        from django.db.models import Case, When
-
-        return Case(
-            When(self._get_condition(cls), then=True),
-            default=False,
-            output_field=BooleanField()
-        )
+from .mixins import AnnotationMixin, BooleanMixin
 
 
 class ValueCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
@@ -162,36 +127,6 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
         return lower_condition & upper_condition
 
 
-class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, QueryableProperty):
-    """
-    A property that checks whether related objects to the one that uses the
-    property exist in the database and returns a corresponding boolean value.
-
-    Supports queryset filtering and ``CASE``/``WHEN``-based annotating.
-    """
-
-    def __init__(self, relation_path, **kwargs):
-        """
-        Initialize a new property that checks for the existence of related
-        objects.
-
-        :param str relation_path: The path to the object/field whose existence
-                                  is to be checked. May contain the lookup
-                                  separator (``__``) to check for more remote
-                                  relations.
-        """
-        super(RelatedExistenceCheckProperty, self).__init__(**kwargs)
-        self.filter = (QueryPath(relation_path) + 'isnull').build_filter(False)
-
-    def get_value(self, obj):
-        return self.get_queryset_for_object(obj).filter(self.filter).exists()
-
-    def _get_condition(self, cls):
-        # Perform the filtering via a subquery to avoid any side-effects that may be introduced by JOINs.
-        subquery = self.get_queryset(cls).filter(self.filter)
-        return Q(pk__in=subquery)
-
-
 class MappingProperty(AnnotationMixin, QueryableProperty):
     """
     A property that translates values of an attribute into other values using
@@ -244,45 +179,3 @@ class MappingProperty(AnnotationMixin, QueryableProperty):
         cases = (When(self.attribute_getter.build_filter('exact', from_value), then=Value(self._force_value(to_value)))
                  for from_value, to_value in self.mappings)
         return Case(*cases, default=Value(self._force_value(self.default)), output_field=self.output_field)
-
-
-class AnnotationProperty(AnnotationGetterMixin, QueryableProperty):
-    """
-    A property that is based on a static annotation that is even used to
-    provide getter values.
-    """
-
-    def __init__(self, annotation, **kwargs):
-        """
-        Initialize a new property that gets its value by retrieving an
-        annotated value from the database.
-
-        :param annotation: The static annotation to use to determine the value
-                           of this property.
-        """
-        super(AnnotationProperty, self).__init__(**kwargs)
-        self.annotation = annotation
-
-    def get_annotation(self, cls):
-        return self.annotation
-
-
-class AggregateProperty(AnnotationProperty):
-    """
-    A property that is based on an aggregate that is used to provide both
-    queryset annotations as well as getter values.
-    """
-
-    def __init__(self, aggregate, **kwargs):
-        """
-        Initialize a new property that gets its value by retrieving an
-        aggregated value from the database.
-
-        :param django.db.models.Aggregate aggregate: The aggregate to use to
-                                                     determine the value of
-                                                     this property.
-        """
-        super(AggregateProperty, self).__init__(aggregate, **kwargs)
-
-    def get_value(self, obj):
-        return self.get_queryset_for_object(obj).aggregate(**{self.name: self.annotation})[self.name]
