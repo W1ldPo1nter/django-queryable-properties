@@ -7,6 +7,7 @@ from .cache_behavior import CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOT
 from .mixins import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin, lookup_filter,
                      REMAINING_LOOKUPS, SetterMixin, UpdateMixin)
 from .specialized import MappingProperty, RangeCheckProperty, ValueCheckProperty
+from .subquery import SubqueryExistenceCheckProperty, SubqueryFieldProperty
 
 __all__ = (
     'MISSING_OBJECT',
@@ -16,4 +17,5 @@ __all__ = (
     'AnnotationGetterMixin', 'AnnotationMixin', 'boolean_filter', 'LookupFilterMixin', 'lookup_filter',
     'REMAINING_LOOKUPS', 'SetterMixin', 'UpdateMixin',
     'MappingProperty', 'RangeCheckProperty', 'ValueCheckProperty',
+    'SubqueryExistenceCheckProperty', 'SubqueryFieldProperty',
 )

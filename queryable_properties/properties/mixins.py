@@ -278,3 +278,45 @@ class BooleanMixin(LookupFilterMixin):
             default=False,
             output_field=BooleanField()
         )
+
+
+class SubqueryMixin(AnnotationGetterMixin):
+    """
+    Internal mixin class for common properties that are based on custom
+    subqueries.
+    """
+
+    def __init__(self, queryset, output_field=None, **kwargs):
+        """
+        Initialize a new subquery-based queryable property.
+
+        :param queryset: The internal queryset to use as the subquery or a
+                         callable without arguments that generates the internal
+                         queryset.
+        :type queryset: django.db.models.QuerySet | function
+        :param output_field: The output field to use for the subquery
+                             expression. Only required in cases where Django
+                             cannot determine the field type on its own.
+        :type output_field: django.db.models.Field | None
+        """
+        self.queryset = queryset
+        self.output_field = output_field
+        super(SubqueryMixin, self).__init__(**kwargs)
+
+    def _build_subquery(self, queryset):  # pragma: no cover
+        """
+        Build the subquery annotation that should be used to represent this
+        queryable property in querysets.
+
+        :param django.db.models.QuerySet queryset: The internal queryset to
+                                                   base the annotation on.
+        :return: The subquery annotation.
+        :rtype: django.db.models.expressions.Subquery
+        """
+        raise NotImplementedError()
+
+    def get_annotation(self, cls):
+        queryset = self.queryset
+        if callable(queryset):
+            queryset = queryset()
+        return self._build_subquery(queryset)
