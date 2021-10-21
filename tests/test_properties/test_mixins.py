@@ -1,12 +1,14 @@
 # encoding: utf-8
 import pytest
+from mock import patch
 
 from django import VERSION as DJANGO_VERSION
-from django.db.models import Q
+from django.db.models import IntegerField, Q
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin,
                                              lookup_filter, QueryableProperty, REMAINING_LOOKUPS)
+from queryable_properties.properties.mixins import SubqueryMixin
 from queryable_properties.utils import get_queryable_property
 
 from ..app_management.models import ApplicationWithClassBasedProperties
@@ -206,3 +208,26 @@ class TestAnnotationGetterMixin(object):
         application = ApplicationWithClassBasedProperties()
         with pytest.raises(ApplicationWithClassBasedProperties.DoesNotExist):
             prop.get_value(application)
+
+
+class TestSubqueryMixin(object):
+
+    @pytest.mark.parametrize('kwargs', [
+        {'queryset': ApplicationWithClassBasedProperties.objects.filter(name='test')},
+        {'queryset': ApplicationWithClassBasedProperties.objects.all(), 'output_field': IntegerField(), 'cached': True}
+    ])
+    def test_initializer(self, kwargs):
+        cls = SubqueryMixin.mix_with_class(QueryableProperty)
+        prop = cls(**kwargs)
+        assert prop.queryset is kwargs['queryset']
+        assert prop.output_field is kwargs.get('output_field')
+        assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
+
+    @pytest.mark.parametrize('use_function', [False, True])
+    def test_get_annotation(self, use_function):
+        cls = SubqueryMixin.mix_with_class(QueryableProperty)
+        queryset = ApplicationWithClassBasedProperties.objects.all()
+        prop = cls((lambda: queryset) if use_function else queryset)
+        with patch.object(prop, '_build_subquery') as mock_build_queryset:
+            assert prop.get_annotation(ApplicationWithClassBasedProperties) == mock_build_queryset.return_value
+            mock_build_queryset.assert_called_once_with(queryset)
