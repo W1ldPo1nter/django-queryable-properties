@@ -8,7 +8,8 @@ from django.db import models
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
     AggregateProperty, AnnotationGetterMixin, AnnotationMixin, AnnotationProperty, LookupFilterMixin, QueryableProperty,
-    queryable_property, RangeCheckProperty, RelatedExistenceCheckProperty, SetterMixin, UpdateMixin, ValueCheckProperty
+    queryable_property, RangeCheckProperty, RelatedExistenceCheckProperty, SetterMixin, SubqueryFieldProperty,
+    UpdateMixin, ValueCheckProperty
 )
 from ..dummy_lib.models import ReleaseTypeModel
 
@@ -27,20 +28,6 @@ class DummyProperty(SetterMixin, QueryableProperty):
 
     def set_value(self, obj, value):
         return -1  # A value < 0 to test the CACHE_RETURN_VALUE setter behavior
-
-
-class HighestVersionProperty(AnnotationMixin, QueryableProperty):
-
-    def get_value(self, obj):
-        try:
-            return obj.versions.order_by('-major', '-minor', '-patch')[0].version
-        except IndexError:
-            return None
-
-    def get_annotation(self, cls):
-        queryset = VersionWithClassBasedProperties.objects.select_properties('version')
-        queryset = queryset.filter(application=models.OuterRef('pk')).order_by('-major', '-minor', '-patch')
-        return models.Subquery(queryset.values('version')[:1], output_field=models.CharField())
 
 
 class VersionCountProperty(AnnotationGetterMixin, QueryableProperty):
@@ -178,7 +165,13 @@ class ApplicationWithClassBasedProperties(Application):
 
     objects = QueryablePropertiesManager()
 
-    highest_version = HighestVersionProperty()
+    highest_version = SubqueryFieldProperty(
+        lambda: (VersionWithClassBasedProperties.objects.select_properties('version')
+                                                        .filter(application=models.OuterRef('pk'))
+                                                        .order_by('-major', '-minor', '-patch')),
+        field_name='version',
+        output_field=models.CharField()
+    )
     version_count = VersionCountProperty()
     major_sum = AggregateProperty(models.Sum('versions__major'))
     major_avg = MajorAverageProperty()
