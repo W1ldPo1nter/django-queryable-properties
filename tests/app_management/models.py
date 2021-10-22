@@ -8,8 +8,8 @@ from django.db import models
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
     AggregateProperty, AnnotationGetterMixin, AnnotationMixin, AnnotationProperty, LookupFilterMixin, QueryableProperty,
-    queryable_property, RangeCheckProperty, RelatedExistenceCheckProperty, SetterMixin, SubqueryFieldProperty,
-    UpdateMixin, ValueCheckProperty
+    queryable_property, RangeCheckProperty, RelatedExistenceCheckProperty, SetterMixin, SubqueryExistenceCheckProperty,
+    SubqueryFieldProperty, UpdateMixin, ValueCheckProperty
 )
 from ..dummy_lib.models import ReleaseTypeModel
 
@@ -130,6 +130,9 @@ class CategoryWithClassBasedProperties(Category):
 
     has_versions = RelatedExistenceCheckProperty('applications__versions')
     version_count = AnnotationProperty(models.Count('applications__versions'))
+    has_v2 = SubqueryExistenceCheckProperty(
+        lambda: VersionWithClassBasedProperties.objects.filter(application__categories=models.OuterRef('pk'), major=2)
+    )
     circular = CircularProperty()
 
     class Meta:

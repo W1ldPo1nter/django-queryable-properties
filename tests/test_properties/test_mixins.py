@@ -210,6 +210,7 @@ class TestAnnotationGetterMixin(object):
             prop.get_value(application)
 
 
+@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
 class TestSubqueryMixin(object):
 
     @pytest.mark.parametrize('kwargs', [
