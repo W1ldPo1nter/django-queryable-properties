@@ -3,7 +3,7 @@ import pytest
 from mock import patch
 
 from django import VERSION as DJANGO_VERSION
-from django.db.models import IntegerField, Q
+from django.db.models import Q
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin,
