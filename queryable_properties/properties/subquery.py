@@ -27,7 +27,8 @@ class SubqueryFieldProperty(SubqueryMixin, QueryableProperty):
         :type output_field: django.db.models.Field | None
         """
         self.field_name = field_name
-        super(SubqueryFieldProperty, self).__init__(queryset, output_field, **kwargs)
+        self.output_field = output_field
+        super(SubqueryFieldProperty, self).__init__(queryset, **kwargs)
 
     def _build_subquery(self, queryset):
         from django.db.models import Subquery
@@ -41,7 +42,7 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
     using a custom subquery.
     """
 
-    def __init__(self, queryset, negated=False, output_field=None, **kwargs):
+    def __init__(self, queryset, negated=False, **kwargs):
         """
         Initialize a new property that checks for the existence of database
         records using a custom subquery.
@@ -53,13 +54,9 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
         :param bool negated: Whether or not to negate the ``EXISTS`` subquery
                              (i.e. the property will return ``True`` if no
                              objects exist when using ``negated=True``).
-        :param output_field: The output field to use for the subquery
-                             expression. Only required in cases where Django
-                             cannot determine the field type on its own.
-        :type output_field: django.db.models.Field | None
         """
         self.negated = negated
-        super(SubqueryExistenceCheckProperty, self).__init__(queryset, output_field, **kwargs)
+        super(SubqueryExistenceCheckProperty, self).__init__(queryset, **kwargs)
 
     def _build_subquery(self, queryset):
         from django.db.models import Exists

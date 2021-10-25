@@ -215,13 +215,12 @@ class TestSubqueryMixin(object):
 
     @pytest.mark.parametrize('kwargs', [
         {'queryset': ApplicationWithClassBasedProperties.objects.filter(name='test')},
-        {'queryset': ApplicationWithClassBasedProperties.objects.all(), 'output_field': IntegerField(), 'cached': True}
+        {'queryset': ApplicationWithClassBasedProperties.objects.all(), 'cached': True}
     ])
     def test_initializer(self, kwargs):
         cls = SubqueryMixin.mix_with_class(QueryableProperty)
         prop = cls(**kwargs)
         assert prop.queryset is kwargs['queryset']
-        assert prop.output_field is kwargs.get('output_field')
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
 
     @pytest.mark.parametrize('use_function', [False, True])

@@ -286,7 +286,7 @@ class SubqueryMixin(AnnotationGetterMixin):
     subqueries.
     """
 
-    def __init__(self, queryset, output_field=None, **kwargs):
+    def __init__(self, queryset, **kwargs):
         """
         Initialize a new subquery-based queryable property.
 
@@ -294,13 +294,8 @@ class SubqueryMixin(AnnotationGetterMixin):
                          callable without arguments that generates the internal
                          queryset.
         :type queryset: django.db.models.QuerySet | function
-        :param output_field: The output field to use for the subquery
-                             expression. Only required in cases where Django
-                             cannot determine the field type on its own.
-        :type output_field: django.db.models.Field | None
         """
         self.queryset = queryset
-        self.output_field = output_field
         super(SubqueryMixin, self).__init__(**kwargs)
 
     def _build_subquery(self, queryset):  # pragma: no cover

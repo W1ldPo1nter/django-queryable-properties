@@ -56,7 +56,6 @@ class TestSubqueryExistenceCheckProperty(object):
         {
             'queryset': ApplicationWithClassBasedProperties.objects.all(),
             'negated': True,
-            'output_field': models.IntegerField(),
             'cached': True,
         }
     ])
@@ -64,7 +63,6 @@ class TestSubqueryExistenceCheckProperty(object):
         prop = SubqueryExistenceCheckProperty(**kwargs)
         assert prop.queryset is kwargs['queryset']
         assert prop.negated == kwargs.get('negated', False)
-        assert prop.output_field is kwargs.get('output_field')
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
 
     @pytest.mark.django_db
