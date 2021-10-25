@@ -28,8 +28,9 @@ class QueryPath(tuple):
     LOOKUP_SEP as their separator.
 
     Objects can be used to build the string representation of a query path and
-    to combine paths using the `+` operator.
+    to combine paths using the ``+`` operator.
     """
+    __slots__ = ()
 
     def __new__(cls, path=()):
         """
@@ -197,13 +198,14 @@ class InjectableMixin(object):
         class_name = str(class_name or base_class.__name__)
         cache_key = (base_class, cls, class_name)
         created_class = cls._created_classes.get(cache_key)
-        metaclass = type
-        if not issubclass(cls.__class__, base_class.__class__) and not issubclass(base_class.__class__, cls.__class__):
-            # If the metaclasses of both classes are unrelated, try to build
-            # a new metaclass based on both dynamically.
-            metaclass = type(base_class.__class__.__name__, (cls.__class__, base_class.__class__), {})
         if created_class is None:
             attrs = {}
+            metaclass = type
+            if (not issubclass(cls.__class__, base_class.__class__) and
+                    not issubclass(base_class.__class__, cls.__class__)):
+                # If the metaclasses of both classes are unrelated, try to build
+                # a new metaclass based on both dynamically.
+                metaclass = type(base_class.__class__.__name__, (cls.__class__, base_class.__class__), {})
             if cls._dynamic_pickling:
                 # Make sure objects of a dynamically created class can be pickled.
                 def __reduce__(self):
@@ -493,7 +495,7 @@ def resolve_queryable_property(model, query_path):
              path that represent lookups (or transforms). The first item will
              be None and the query path will be empty if no queryable property
              could be resolved.
-    :rtype: (QueryablePropertyReference, QueryPath)
+    :rtype: (QueryablePropertyReference | None, QueryPath)
     """
     from . import get_queryable_property
 
