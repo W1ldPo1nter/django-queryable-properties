@@ -4,6 +4,8 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 4.0
+
 1.7.0 (2021-07-05)
 ------------------
 
