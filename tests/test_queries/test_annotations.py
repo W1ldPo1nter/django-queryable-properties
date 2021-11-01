@@ -28,7 +28,9 @@ class TestAggregateAnnotations(object):
         assert 'version_count' in queryset.query.annotations
         assert 'major_sum' in queryset.query.annotations
         assert all(model.version_count.has_cached_value(obj) for obj in queryset)
+        assert all(obj.version_count == 4 for obj in queryset)
         assert all(model.major_sum.has_cached_value(obj) for obj in queryset)
+        assert all(obj.major_sum == 5 for obj in queryset)
 
     @pytest.mark.parametrize('model, limit, expected_total', [
         (ApplicationWithClassBasedProperties, None, 8),
