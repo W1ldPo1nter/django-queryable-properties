@@ -429,7 +429,7 @@ Annotation-based properties
 ---------------------------
 
 The properties in this category are all :ref:`annotation_based:Annotation-based properties`, which means their getter
-implementation will also perform a databse query.
+implementation will also perform a database query.
 All of the listed properties therefore also take an additional ``cached`` argument in their initializer that allows
 to mark individual properties as having a :ref:`standard_features:Cached getter`.
 This can improve performance since the query will only be executed on the first getter access at the cost of
@@ -630,3 +630,63 @@ For a quick overview, the ``RelatedExistenceCheckProperty`` offers the following
 +------------+----------------------------+
 | Updating   | No                         |
 +------------+----------------------------+
+
+Subquery-based properties (Django 1.11 or higher)
+-------------------------------------------------
+
+The properties in this category are all based on custom subqueries, i.e. they utilize Django's ``Subquery`` objects.
+They are therefore :ref:`annotation_based:Annotation-based properties`, which means their getter implementation will
+also perform a database query.
+Due to the utilization of ``Subquery`` objects, these properties can only be used in conjunction with a Django version
+that supports custom subqueries, i.e. Django 1.11 or higher.
+
+All subquery-based properties take a queryset that will be used to generate the custom subquery as their first
+argument.
+This queryset is always expected to be a regular queryset, i.e. **not** a ``Subquery`` object - the properties will
+build these objects on their own using the given queryset.
+The specified queryset can (and in most cases should) contain ``OuterRef`` objects to filter the subquery's rows based
+on the outer query.
+These ``OuterRef`` objects will always be based on the model the property is defined on - all fields of that model or
+related fields starting from that model can therefore be referenced.
+
+Instead of specifying a queryset directly, the subquery-based properties can also take a callable without any arguments
+as their first parameter, which in turn must return the queryset.
+This is useful in cases where the model class for the subquery's queryset cannot be imported on the module level or is
+defined later in the same module.
+
+``SubqueryFieldProperty``: Getting a field value from a subquery
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The property class :class:`queryable_properties.properties.SubqueryFieldProperty` allows to retrieve the value of any
+field from the specified subquery.
+The field does not have to be a static model field, but may also be an annotated field (which can even be used to work
+around the problem described in :ref:`annotations:Regarding aggregate annotations across relations`) or even a
+queryable property as long as it was selected as described in :ref:`annotations:Selecting annotations`.
+
+Based on the ``version_str`` property for the ``ApplicationVersion`` shown in the :ref:`annotations:Implementation`
+documentation for annotatable properties, an example property could be implemented for the ``Application`` model that
+determines the highest version for each application via a subquery:
+
+.. code-block:: python
+
+    from django.db import models
+    from queryable_properties.properties import SubqueryFieldProperty
+
+
+    class Application(models.Model):
+        ...  # other fields/properties
+
+        highest_version = SubqueryFieldProperty(
+            (ApplicationVersion.objects.select_properties('version_str')
+                                       .filter(application=models.OuterRef('pk'))
+                                       .order_by('-major', '-minor')),
+            field_name='version_str',  # The field to extract the property value from
+            output_field=models.CharField()  # Only required in cases where Django can't determine the type on its own
+        )
+
+.. note::
+   Since the property can only return a single value per object, the subquery is limited to the first row (the
+   specified queryset and field name is essentially transformed into
+   ``Subquery(queryset.values(self.field_name)[:1])``).
+   If a subquery returns multiple rows, it should therefore be ordered in a way that puts the desired value into the
+   first row.
