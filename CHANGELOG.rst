@@ -4,9 +4,12 @@ Changelog
 master (unreleased)
 -------------------
 
+1.7.1 (2021-11-01)
+------------------
+
 - Added support for Python 3.10
-- Fixed duplicate selections of GROUP BY columns when multiple aggregate properties are selected, which also led to
-  wrong property values in Django versions below 1.8
+- Fixed duplicate selections of ``GROUP BY`` columns when multiple aggregate properties are selected, which also led to
+  wrong property values, in Django versions below 1.8
 
 1.7.0 (2021-07-05)
 ------------------
