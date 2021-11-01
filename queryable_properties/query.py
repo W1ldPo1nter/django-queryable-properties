@@ -84,7 +84,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 # simply setting group_by to True.
                 self.group_by = True
             else:
-                if full_group_by:  # pragma: no cover
+                if full_group_by and self.group_by is None:  # pragma: no cover
                     # In old versions, the fields must be added to the selected
                     # fields manually and set_group_by must be called after.
                     opts = self.model._meta
