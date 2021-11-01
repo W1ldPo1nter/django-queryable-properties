@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        python-version: ['2.7', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9']
+        python-version: ['2.7', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10']
     env:
       PYTHON: ${{ matrix.python-version }}
     steps:
@@ -20,7 +20,7 @@ jobs:
       run: pip install tox tox-factor "coverage<5" "importlib-metadata<3"
     - name: Lint with flake8
       run: tox -e flake8
-      if: matrix.python-version == '3.9'
+      if: matrix.python-version == '3.10'
     - name: Test via tox
       run: |
         export TOXFACTOR=$(echo "py${{ matrix.python-version }}" | sed 's/\.//g')
