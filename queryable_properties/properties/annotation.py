@@ -57,7 +57,7 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
     Supports queryset filtering and ``CASE``/``WHEN``-based annotating.
     """
 
-    def __init__(self, relation_path, **kwargs):
+    def __init__(self, relation_path, negated=False, **kwargs):
         """
         Initialize a new property that checks for the existence of related
         objects.
@@ -68,12 +68,29 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
                                   relations.
         """
         super(RelatedExistenceCheckProperty, self).__init__(**kwargs)
-        self.filter = (QueryPath(relation_path) + 'isnull').build_filter(False)
+        self.query_path = QueryPath(relation_path) + 'isnull'
+        self.negated = negated
+
+    @property
+    def _base_condition(self):
+        """
+        Return the base condition for the existence check that can be applied to a queryset of the model this property
+        is defined on for the positive (existence check rather than non-existence check) case.
+
+        :return: The base condition for this property.
+        :rtype: django.db.models.Q
+        """
+        return self.query_path.build_filter(False)
 
     def get_value(self, obj):
-        return self.get_queryset_for_object(obj).filter(self.filter).exists()
+        condition = self._base_condition
+        if self.negated:
+            condition.negate()
+        return self.get_queryset_for_object(obj).filter(condition).exists()
 
     def _get_condition(self, cls):
         # Perform the filtering via a subquery to avoid any side-effects that may be introduced by JOINs.
-        subquery = self.get_queryset(cls).filter(self.filter)
-        return Q(pk__in=subquery)
+        condition = Q(pk__in=self.get_queryset(cls).filter(self._base_condition))
+        if self.negated:
+            condition.negate()
+        return condition

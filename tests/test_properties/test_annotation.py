@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import pytest
 
+import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Avg, Q
 
 from queryable_properties.properties import AggregateProperty, AnnotationProperty, RelatedExistenceCheckProperty
+from queryable_properties.utils import get_queryable_property
+from queryable_properties.utils.internal import QueryPath
 from ..app_management.models import ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
@@ -54,52 +57,72 @@ class TestAggregateProperty(object):
 
 class TestRelatedExistenceCheckProperty(object):
 
-    @pytest.mark.parametrize('path, cached, expected_filter, expected_cached', [
-        ('my_field', False, 'my_field__isnull', False),
-        ('my_relation__my_field', None, 'my_relation__my_field__isnull', False),
-        ('my_field', True, 'my_field__isnull', True),
+    @pytest.mark.parametrize('path, kwargs, expected_query_path', [
+        ('my_field', {}, QueryPath('my_field__isnull')),
+        ('my_relation__my_field', {'negated': True}, QueryPath('my_relation__my_field__isnull')),
+        ('my_field', {'cached': True}, QueryPath('my_field__isnull')),
     ])
-    def test_initializer(self, path, cached, expected_filter, expected_cached):
-        prop = RelatedExistenceCheckProperty(path, cached=cached)
-        assert isinstance(prop.filter, Q)
-        assert len(prop.filter.children) == 1
-        assert prop.filter.children[0] == (expected_filter, False)
-        assert prop.cached is expected_cached
+    def test_initializer(self, path, kwargs, expected_query_path):
+        prop = RelatedExistenceCheckProperty(path, **kwargs)
+        assert prop.query_path == expected_query_path
+        assert prop.negated is kwargs.get('negated', False)
+        assert prop.cached is kwargs.get('cached', RelatedExistenceCheckProperty.cached)
 
-    def test_getter(self, categories, applications):
-        assert categories[0].has_versions is True
-        assert categories[1].has_versions is True
+    @pytest.mark.parametrize('path', ['my_field', 'my_relation__my_field'])
+    def test_base_condition(self, path):
+        prop = RelatedExistenceCheckProperty(path)
+        condition = prop._base_condition
+        assert isinstance(condition, Q)
+        assert len(condition.children) == 1
+        assert condition.children[0] == (six.text_type(QueryPath(path) + 'isnull'), False)
+
+    @pytest.mark.parametrize('negated', [False, True])
+    def test_getter(self, monkeypatch, categories, applications, negated):
+        monkeypatch.setattr(get_queryable_property(CategoryWithClassBasedProperties, 'has_versions'),
+                            'negated', negated)
+        assert categories[0].has_versions is not negated
+        assert categories[1].has_versions is not negated
         applications[1].versions.all().delete()
-        assert categories[0].has_versions is True
-        assert categories[1].has_versions is False
+        assert categories[0].has_versions is not negated
+        assert categories[1].has_versions is negated
 
-    def test_getter_based_on_non_relation_field(self, applications):
-        assert applications[0].has_version_with_changelog is True
-        assert applications[1].has_version_with_changelog is True
+    @pytest.mark.parametrize('negated', [False, True])
+    def test_getter_based_on_non_relation_field(self, monkeypatch, applications, negated):
+        monkeypatch.setattr(get_queryable_property(ApplicationWithClassBasedProperties, 'has_version_with_changelog'),
+                            'negated', negated)
+        assert applications[0].has_version_with_changelog is not negated
+        assert applications[1].has_version_with_changelog is not negated
         applications[0].versions.filter(major=2).delete()
-        assert applications[0].has_version_with_changelog is False
-        assert applications[1].has_version_with_changelog is True
+        assert applications[0].has_version_with_changelog is negated
+        assert applications[1].has_version_with_changelog is not negated
 
-    def test_filter(self, categories, applications):
+    @pytest.mark.parametrize('negated', [False, True])
+    def test_filter(self, monkeypatch, categories, applications, negated):
+        monkeypatch.setattr(get_queryable_property(CategoryWithClassBasedProperties, 'has_versions'),
+                            'negated', negated)
         queryset = CategoryWithClassBasedProperties.objects.all()
-        assert set(queryset.filter(has_versions=True)) == set(categories[:2])
-        assert not queryset.filter(has_versions=False).exists()
+        assert set(queryset.filter(has_versions=not negated)) == set(categories[:2])
+        assert not queryset.filter(has_versions=negated).exists()
         applications[1].versions.all().delete()
-        assert queryset.get(has_versions=True) == categories[0]
-        assert queryset.get(has_versions=False) == categories[1]
+        assert queryset.get(has_versions=not negated) == categories[0]
+        assert queryset.get(has_versions=negated) == categories[1]
 
-    def test_filter_based_on_non_relation_field(self, categories, applications):
+    @pytest.mark.parametrize('negated', [False, True])
+    def test_filter_based_on_non_relation_field(self, monkeypatch, categories, applications, negated):
+        monkeypatch.setattr(get_queryable_property(ApplicationWithClassBasedProperties, 'has_version_with_changelog'),
+                            'negated', negated)
         app_queryset = ApplicationWithClassBasedProperties.objects.all()
         category_queryset = CategoryWithClassBasedProperties.objects.all()
-        assert set(app_queryset.filter(has_version_with_changelog=True)) == set(applications[:2])
-        assert not app_queryset.filter(has_version_with_changelog=False).exists()
-        assert set(category_queryset.filter(applications__has_version_with_changelog=True)) == set(categories[:2])
-        assert not category_queryset.filter(applications__has_version_with_changelog=False).exists()
+        assert set(app_queryset.filter(has_version_with_changelog=not negated)) == set(applications[:2])
+        assert not app_queryset.filter(has_version_with_changelog=negated).exists()
+        assert (set(category_queryset.filter(applications__has_version_with_changelog=not negated)) ==
+                set(categories[:2]))
+        assert not category_queryset.filter(applications__has_version_with_changelog=negated).exists()
         applications[1].versions.filter(major=2).delete()
-        assert app_queryset.get(has_version_with_changelog=True) == applications[0]
-        assert app_queryset.get(has_version_with_changelog=False) == applications[1]
-        assert category_queryset.get(applications__has_version_with_changelog=True) == categories[0]
-        assert category_queryset.get(applications__has_version_with_changelog=False) == categories[1]
+        assert app_queryset.get(has_version_with_changelog=not negated) == applications[0]
+        assert app_queryset.get(has_version_with_changelog=negated) == applications[1]
+        assert category_queryset.get(applications__has_version_with_changelog=not negated) == categories[0]
+        assert category_queryset.get(applications__has_version_with_changelog=negated) == categories[1]
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     def test_annotation(self, categories, applications):
