@@ -604,7 +604,7 @@ whenever ...-to-many relations are involved.
 .. _in-subquery: https://docs.djangoproject.com/en/stable/ref/models/querysets/#in
 
 .. note::
-   The query paths passed to ``RelatedExistenceCheckProperty`` may also refer to another queryable propertie as long as
+   The query paths passed to ``RelatedExistenceCheckProperty`` may also refer to another queryable property as long as
    this property allows filtering with the ``isnull`` lookup.
 
 .. note::
@@ -686,7 +686,65 @@ determines the highest version for each application via a subquery:
 
 .. note::
    Since the property can only return a single value per object, the subquery is limited to the first row (the
-   specified queryset and field name is essentially transformed into
-   ``Subquery(queryset.values(self.field_name)[:1])``).
+   specified queryset and field name is essentially transformed into ``Subquery(queryset.values(field_name)[:1])``).
    If a subquery returns multiple rows, it should therefore be ordered in a way that puts the desired value into the
    first row.
+
+For a quick overview, the ``SubqueryFieldProperty`` offers the following queryable property features:
+
++------------+-----------+
+| Feature    | Supported |
++============+===========+
+| Getter     | Yes       |
++------------+-----------+
+| Setter     | No        |
++------------+-----------+
+| Filtering  | Yes       |
++------------+-----------+
+| Annotation | Yes       |
++------------+-----------+
+| Updating   | No        |
++------------+-----------+
+
+``SubqueryExistenceCheckProperty``: Checking whether or not certain objects exist via a subquery
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The property class :class:`queryable_properties.properties.SubqueryExistenceCheckProperty` is similar to the
+:class:`queryable_properties.properties.RelatedExistenceCheckProperty` mentioned above, but can be used to perform
+any kind of existence check via a subquery.
+The object(s) whose existence is to be determined does therefore not have to be related to the class the property is
+defined on via a ``ForeignKey`` or another relation field.
+
+To perform this check, the given queryset is wrapped into an ``Exists`` object, which may also be negated using the
+property's ``negated`` argument.
+
+For an example use case, certain applications may be so popular that they receive their own category with the same
+name as the application.
+To determine whether or not an application has its own category, a ``SubqueryExistenceCheckProperty`` could be used:
+
+.. code-block:: python
+
+    from django.db import models
+    from queryable_properties.properties import SubqueryExistenceCheckProperty
+
+
+    class Application(models.Model):
+        ...  # other fields/properties
+
+        has_own_category = SubqueryExistenceCheckProperty(Category.objects.filter(name=models.OuterRef('name')))
+
+For a quick overview, the ``SubqueryExistenceCheckProperty`` offers the following queryable property features:
+
++------------+-----------+
+| Feature    | Supported |
++============+===========+
+| Getter     | Yes       |
++------------+-----------+
+| Setter     | No        |
++------------+-----------+
+| Filtering  | Yes       |
++------------+-----------+
+| Annotation | Yes       |
++------------+-----------+
+| Updating   | No        |
++------------+-----------+
