@@ -4,6 +4,11 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added new ready-to-use queryable property implementations for properties based on subqueries
+  (``SubqueryFieldProperty``, ``SubqueryExistenceCheckProperty``)
+- ``RelatedExistenceCheckProperty`` objects can now be configured as negated to be able to check for the non-existence
+  of related objects
+
 1.7.1 (2021-11-01)
 ------------------
 
