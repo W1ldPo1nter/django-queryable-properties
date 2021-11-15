@@ -714,7 +714,7 @@ For a quick overview, the ``SubqueryFieldProperty`` offers the following queryab
 The property class :class:`queryable_properties.properties.SubqueryExistenceCheckProperty` is similar to the
 :class:`queryable_properties.properties.RelatedExistenceCheckProperty` mentioned above, but can be used to perform
 any kind of existence check via a subquery.
-The object(s) whose existence is to be determined does therefore not have to be related to the class the property is
+The objects whose existence is to be determined does therefore not have to be related to the class the property is
 defined on via a ``ForeignKey`` or another relation field.
 
 To perform this check, the given queryset is wrapped into an ``Exists`` object, which may also be negated using the
