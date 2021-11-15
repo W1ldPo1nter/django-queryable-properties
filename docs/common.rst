@@ -578,8 +578,10 @@ Instead of defining the properties like this, the property class
 
 Instances of this property class take the query path to the related objects, which may also span multiple relations
 using the ``__`` separator, as their first parameter.
-In queries, this query path is extended with the ``__isnull`` lookup, which is tested against the value ``False``, to
-determine whether or not related objects exist.
+Additionally, the optional ``negated`` parameter can be used to set up the property to check for the *non-existence*
+of related objects instead.
+In queries, the given query path is extended with the ``__isnull`` lookup,  to determine whether or not related objects
+exist.
 The path may also lead to a nullable field, which would allow to check for the existence of related objects that
 have a value for a certain field.
 
