@@ -4,6 +4,7 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 4.0
 - Added new ready-to-use queryable property implementations for properties based on subqueries
   (``SubqueryFieldProperty``, ``SubqueryExistenceCheckProperty``)
 - ``RelatedExistenceCheckProperty`` objects can now be configured as negated to be able to check for the non-existence
