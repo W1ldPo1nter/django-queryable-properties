@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.8.0 (2021-12-07)
+------------------
+
 - Added support for Django 4.0
 - Added new ready-to-use queryable property implementations for properties based on subqueries
   (``SubqueryFieldProperty``, ``SubqueryExistenceCheckProperty``)
