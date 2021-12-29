@@ -76,12 +76,102 @@ class QueryPath(tuple):
         return Q(**{six.text_type(self): value})
 
 
+class NodeProcessor(object):
+    """
+    Base class for utilities that work with Django's tree nodes.
+    """
+
+    def __init__(self, func):
+        """
+        Initialize a new node processor.
+
+        :param function func: The function that is applied to nodes and/or
+                              their children. The function must take the node
+                              item as its first argument as well as potentially
+                              more context arguments based on the concrete
+                              implementation, which also defines the expected
+                              return value.
+        """
+        self.func = func
+
+    def iter_leaves(self, node):
+        """
+        Iterate over all leaves of the given node, regardless of the depth of
+        potential sub-nodes.
+
+        :param Node node: The node to get the leaves from.
+        :return: A generator yielding 3-tuples for each leaf consisting of the
+                 (sub-)node the leaf belongs to, the index of the item inside
+                 of that leaf and the leaf item itself.
+        :rtype: collections.Iterable[Node, int, object]
+        """
+        for index, child in enumerate(node.children):
+            if isinstance(child, Node):
+                for result in self.iter_leaves(child):
+                    yield result
+            else:
+                yield node, index, child
+
+
+class NodeChecker(NodeProcessor):
+    """
+    A utility to test tree nodes against a condition specified by the
+    configured function, which therefore must return a boolean value indicating
+    whether or not the condition was met.
+    """
+
+    def check_leaves(self, node, **context):
+        """
+        Check the leaves of the given node object against the configured
+        function.
+
+        :param Node node: The node whose leaves should be checked.
+        :param context: Additional context parameters that will be passed
+                        through to the configured function.
+        :return: True if the condition matches at least one leaf; otherwise
+                 False.
+        :rtype: bool
+        """
+        for branch_node, index, leaf in self.iter_leaves(node):
+            if self.func(leaf, **context):
+                return True
+        return False
+
+
+class NodeModifier(NodeProcessor):
+    """
+    A utility to modify the tree nodes using the configured function, which
+    therefore must return the replacement value for a given item.
+    """
+
+    def modify_leaves(self, node, copy=True, **context):
+        """
+        Modify the leaves of the given node object using the configured
+        function.
+
+        :param Node node: The node whose leaves should be modified.
+        :param bool copy: If True, a copy of the given node will be created and
+                          modified, leaving the original node untouched. If
+                          False, the original node will be modified in place.
+        :param context: Additional context parameters that will be passed
+                        through to the configured function.
+        :return: The modified node.
+        :rtype: Node
+        """
+        if copy:
+            node = deepcopy(node)
+        for branch_node, index, leaf in self.iter_leaves(node):
+            branch_node.children[index] = self.func(leaf, **context)
+        return node
+
+
 class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):
     """
     A reference to a queryable property that also holds the path to reach the
     property across relations.
     """
     __slots__ = ()
+    node_modifier = NodeModifier(lambda item, ref: (six.text_type(ref.relation_path + item[0]), item[1]))
 
     @property
     def full_path(self):
@@ -128,9 +218,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
             # If the resolved property belongs to a related model, all actual
             # conditions in the returned Q object must be modified to use the
             # current relation path as prefix.
-            def prefix_condition(item):
-                return six.text_type(self.relation_path + item[0]), item[1]
-            q_obj = TreeNodeProcessor(q_obj).modify_leaves(prefix_condition)
+            q_obj = self.node_modifier.modify_leaves(q_obj, ref=self)
         return q_obj
 
     def get_annotation(self):

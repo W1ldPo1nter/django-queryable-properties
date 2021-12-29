@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 from contextlib import contextmanager
-from functools import partial
 
 import six
 from django.utils.tree import Node
@@ -11,7 +10,45 @@ from .compat import (
     convert_build_filter_to_add_q_kwargs, NEED_HAVING_METHOD_NAME, nullcontext, QUERY_CHAIN_METHOD_NAME, ValuesQuerySet
 )
 from .exceptions import QueryablePropertyError
-from .utils.internal import InjectableMixin, QueryPath, resolve_queryable_property, TreeNodeProcessor
+from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
+
+
+class AggregatePropertyChecker(NodeChecker):
+    """
+    A specialized node checker that checks whether or not a node contains a
+    reference to an aggregate property for the purposes of determining whether
+    or not a HAVING clause is required.
+    """
+
+    def __init__(self):
+        super(AggregatePropertyChecker, self).__init__(self.is_aggregate_property)
+
+    def is_aggregate_property(self, item, model, ignored_refs=frozenset()):
+        """
+        Check if the given node item or its subnodes contain a reference to an
+        aggregate property.
+
+        :param (str, object) item: The node item consisting of path and value.
+        :param model: The model class the corresponding query is performed for.
+        :param ignored_refs: Queryable property references that should not be
+                             checked.
+        :type ignored_refs: frozenset[queryable_properties.utils.internal.QueryablePropertyReference]
+        :return:
+        """
+        property_ref, lookups = resolve_queryable_property(model, QueryPath(item[0]))
+        if not property_ref or property_ref in ignored_refs:
+            return False
+        if property_ref.property.filter_requires_annotation:
+            if contains_aggregate(property_ref.get_annotation()):
+                return True
+            ignored_refs = ignored_refs.union((property_ref,))
+        # Also check the Q object returned by the property's get_filter method
+        # as it may contain references to other properties that may add
+        # aggregation-based annotations.
+        return self.check_leaves(property_ref.get_filter(lookups, item[1]), model=model, ignored_refs=ignored_refs)
+
+
+aggregate_property_checker = AggregatePropertyChecker()
 
 
 class QueryablePropertiesQueryMixin(InjectableMixin):
@@ -246,23 +283,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # the query. Since a queryable property might add an aggregate-based
         # annotation during the actual filter application, this method must
         # return True if a filter condition contains such a property.
-        def is_aggregate_property(item, ignored_refs=set()):
-            property_ref, lookups = resolve_queryable_property(self.model, QueryPath(item[0]))
-            if not property_ref or property_ref in ignored_refs:
-                return False
-            if property_ref.property.filter_requires_annotation:
-                if contains_aggregate(property_ref.get_annotation()):
-                    return True
-                ignored_refs = ignored_refs.union((property_ref,))
-            # Also check the Q object returned by the property's get_filter
-            # method as it may contain references to other properties that may
-            # add aggregation-based annotations.
-            predicate = partial(is_aggregate_property, ignored_refs=ignored_refs)
-            return TreeNodeProcessor(property_ref.get_filter(lookups, item[1])).check_leaves(predicate)
-
-        if isinstance(obj, Node) and TreeNodeProcessor(obj).check_leaves(is_aggregate_property):
-            return True
-        elif not isinstance(obj, Node) and is_aggregate_property(obj):
+        node = obj if isinstance(obj, Node) else Node([obj])
+        if aggregate_property_checker.check_leaves(node, model=self.model):
             return True
         # The base method has different names in different Django versions (see
         # comment on the constant definition).
