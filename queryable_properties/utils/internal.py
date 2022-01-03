@@ -353,62 +353,6 @@ def _unpickle_injected_object(base_class, mixin_class, class_name=None):
 _unpickle_injected_object.__safe_for_unpickling__ = True
 
 
-class TreeNodeProcessor(object):
-    """
-    A utility class to simplify working with Django's Node objects.
-    """
-
-    def __init__(self, node):
-        """
-        Initialize a new node processor for the given node.
-
-        :param Node node: The node to process.
-        """
-        self.node = node
-
-    def check_leaves(self, predicate):
-        """
-        Check if any leaf of this processor's node matches the given predicate.
-
-        :param function predicate: A function that the leaves of the node will
-                                   be tested against. Must take a single
-                                   parameter that represents the leaf value.
-        :return: True if any leaf matched the predicate; otherwise False.
-        :rtype: bool
-        """
-        for child in self.node.children:
-            if isinstance(child, Node) and TreeNodeProcessor(child).check_leaves(predicate):
-                return True
-            elif not isinstance(child, Node) and predicate(child):
-                return True
-        return False
-
-    def modify_leaves(self, modifier, copy=True):
-        """
-        Modify all leaves of this processor's node modifier callable.
-
-        :param function modifier: A callable that will be called for every
-                                  encountered actual node value (not subnodes)
-                                  with that value as its only parameter. It
-                                  must returned the replacement value for the
-                                  given value.
-        :param bool copy: Whether to create a copy of the original node and
-                          modify this copy instead of modifying the original
-                          node in place.
-        :return: The modified node or node copy.
-        :rtype: Node
-        """
-        if copy:
-            return TreeNodeProcessor(deepcopy(self.node)).modify_leaves(modifier, copy=False)
-
-        for index, child in enumerate(self.node.children):
-            if isinstance(child, Node):
-                TreeNodeProcessor(child).modify_leaves(modifier, copy=False)
-            else:
-                self.node.children[index] = modifier(child)
-        return self.node
-
-
 class ModelAttributeGetter(object):
     """
     An attribute getter akin to :func:`operator.attrgetter` specifically

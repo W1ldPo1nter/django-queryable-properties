@@ -12,7 +12,8 @@ from queryable_properties.properties.base import QueryablePropertyDescriptor
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import (
     get_output_field, get_queryable_property_descriptor, InjectableMixin, MISSING_OBJECT, ModelAttributeGetter,
-    parametrizable_decorator, QueryablePropertyReference, QueryPath, resolve_queryable_property, TreeNodeProcessor
+    NodeChecker, NodeModifier, NodeProcessor, parametrizable_decorator, QueryablePropertyReference, QueryPath,
+    resolve_queryable_property
 )
 
 from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
@@ -188,29 +189,58 @@ class TestInjectableMixin(object):
             cPickle.dumps(base_obj)
 
 
-class TestTreeNodeProcessor(object):
+class TestNodeProcessor(object):
 
-    @pytest.mark.parametrize('node, expected_result', [
-        (Q(a=1), True),
-        (Q(b=2), False),
-        (Q(Q(a=1) | Q(b=2), c=3), True),
-        (Q(Q(d=1) | Q(b=2), c=3), False),
+    def test_initializer(self):
+        def func(item):
+            return item
+
+        processor = NodeProcessor(func)
+        assert processor.func is func
+
+    def test_iter_leaves(self):
+        processor = NodeProcessor(lambda item: item)
+        inner_q = Q(a=1) | Q(b=2)
+        outer_q = Q(inner_q, c=3)
+        assert list(processor.iter_leaves(outer_q)) == [
+            (inner_q, 0, ('a', 1)),
+            (inner_q, 1, ('b', 2)),
+            (outer_q, 1, ('c', 3)),
+        ]
+
+
+class TestNodeChecker(object):
+
+    @pytest.mark.parametrize('node, path, expected_result', [
+        (Q(a=1), 'a', True),
+        (Q(b=2), 'a', False),
+        (Q(a=1), 'b', False),
+        (Q(b=2), 'b', True),
+        (Q(Q(a=1) | Q(b=2), c=3), 'a', True),
+        (Q(Q(a=1) | Q(b=2), c=3), 'c', True),
+        (Q(Q(a=1) | Q(b=2), c=3), 'd', False),
     ])
-    def test_check_leaves(self, node, expected_result):
-        # The predicate checks if a leaf for field 'a' exists
-        assert TreeNodeProcessor(node).check_leaves(lambda item: item[0] == 'a') is expected_result
+    def test_check_leaves(self, node, path, expected_result):
+        # The predicate checks if a leaf for a given path exists
+        checker = NodeChecker(lambda item, required_path: item[0] == path)
+        assert checker.check_leaves(node, required_path=path) is expected_result
+
+
+class TestNodeModifier(object):
 
     @pytest.mark.parametrize('copy', [True, False])
-    def test_modify_tree_node(self, copy):
+    @pytest.mark.parametrize('increment, expected_a, expected_b, expected_c', [
+        (1, 2, 3, 4),
+        (10, 11, 12, 13),
+    ])
+    def test_modify_leaves(self, copy, increment, expected_a, expected_b, expected_c):
+        modifier = NodeModifier(lambda item, inc: ('new_{}'.format(item[0]), item[1] + inc))
         q = Q(Q(a=1) | Q(b=2), c=3)
-        result = TreeNodeProcessor(q).modify_leaves(
-            lambda item: ('prefix_{}_suffix'.format(item[0]), item[1] + 1), copy=copy)
+        result = modifier.modify_leaves(q, copy, inc=increment)
         assert (result is q) is not copy
-        children = list(result.children)
-        assert ('prefix_c_suffix', 4) in children
-        children.remove(('prefix_c_suffix', 4))
-        assert ('prefix_a_suffix', 2) in children[0].children
-        assert ('prefix_b_suffix', 3) in children[0].children
+        assert len(result.children) == 2
+        assert result.children[0].children == [('new_a', expected_a), ('new_b', expected_b)]
+        assert result.children[1] == ('new_c', expected_c)
 
 
 class TestModelAttributeGetter(object):
