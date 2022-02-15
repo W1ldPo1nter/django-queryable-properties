@@ -7,7 +7,7 @@ from django.db.models import Manager
 from django.db.models.query import QuerySet
 
 from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, chain_query, chain_queryset,
-                     ModelIterable, ValuesQuerySet)
+                     ModelIterable, QUERYSET_QUERY_ATTRIBUTE_NAME, ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
@@ -42,6 +42,7 @@ class QueryablePropertiesIterable(InjectableMixin):
         :keyword collections.Iterable iterable: The optional iterable to use
                                                 for standalone usage.
         """
+        queryset = chain_queryset(queryset)
         self.queryset = queryset
         # Only perform the super call if the class is used as a mixin
         if self.__class__.__bases__ != (InjectableMixin,):
@@ -57,25 +58,19 @@ class QueryablePropertiesIterable(InjectableMixin):
 
         :return: A generator that yields the model objects.
         """
-        original_query = self.queryset.query
-        try:
-            self.queryset.query = chain_query(original_query)
-            final_aliases = self._setup_queryable_properties()
-
-            for obj in self.iterable:
-                if self.yields_model_instances:
-                    # Retrieve the annotation values from each renamed
-                    # attribute and use it to populate the cache for the
-                    # corresponding queryable property on each object while
-                    # removing the weird, renamed attributes.
-                    for changed_name, property_ref in six.iteritems(final_aliases):
-                        value = getattr(obj, changed_name)
-                        delattr(obj, changed_name)
-                        if property_ref:
-                            property_ref.descriptor.set_cached_value(obj, value)
-                yield obj
-        finally:
-            self.queryset.query = original_query
+        final_aliases = self._setup_queryable_properties()
+        for obj in self.iterable:
+            if self.yields_model_instances:
+                # Retrieve the annotation values from each renamed
+                # attribute and use it to populate the cache for the
+                # corresponding queryable property on each object while
+                # removing the weird, renamed attributes.
+                for changed_name, property_ref in six.iteritems(final_aliases):
+                    value = getattr(obj, changed_name)
+                    delattr(obj, changed_name)
+                    if property_ref:
+                        property_ref.descriptor.set_cached_value(obj, value)
+            yield obj
 
     def _setup_queryable_properties(self):
         """
@@ -153,8 +148,10 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # required. If the current query is not using the mixin already, it
         # will be dynamically injected into the query. That way, other Django
         # extensions using custom query objects are also supported.
-        class_name = 'QueryableProperties' + self.query.__class__.__name__
-        self.query = QueryablePropertiesQueryMixin.inject_into_object(chain_query(self.query), class_name)
+        query = chain_query(getattr(self, QUERYSET_QUERY_ATTRIBUTE_NAME))
+        class_name = 'QueryableProperties' + query.__class__.__name__
+        setattr(self, QUERYSET_QUERY_ATTRIBUTE_NAME,
+                QueryablePropertiesQueryMixin.inject_into_object(query, class_name))
 
     @property
     def _iterable_class(self):

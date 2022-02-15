@@ -95,6 +95,8 @@ if not hasattr(Query, 'annotation_select'):  # pragma: no cover
 # while older versions only have the clone method.
 QUERYSET_CHAIN_METHOD_NAME = '_chain' if hasattr(QuerySet, '_chain') else '_clone'
 QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
+# Recent Django versions (>=3.1) have a property guarding the query attribute.
+QUERYSET_QUERY_ATTRIBUTE_NAME = '_query' if hasattr(QuerySet, 'query') else 'query'
 
 # The `get_queryset` method of ModelAdmins was called `queryset` in very old
 # Django versions.
