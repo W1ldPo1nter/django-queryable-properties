@@ -151,15 +151,17 @@ class TestInjectableMixin(object):
         assert isinstance(cls, base_class.__class__)
         assert isinstance(cls, mixin_class.__class__)
 
-    def test_inject_into_object(self):
+    @pytest.mark.parametrize('init', [True, False])
+    def test_inject_into_object(self, init):
         obj = DummyClass(5, 'abc')
-        assert DummyMixin.inject_into_object(obj) is obj
+        obj.mixin_attr1 = obj.mixin_attr2 = None
+        assert DummyMixin.inject_into_object(obj, init=init) is obj
         assert isinstance(obj, DummyClass)
         assert isinstance(obj, DummyMixin)
         assert obj.attr1 == 5
         assert obj.attr2 == 'abc'
-        assert obj.mixin_attr1 == 1.337
-        assert obj.mixin_attr2 == 'test'
+        assert obj.mixin_attr1 == (1.337 if init else None)
+        assert obj.mixin_attr2 == ('test' if init else None)
         # Test that init_injected_attrs is not called when no injection takes
         # places due to the object already using the mixin.
         obj.mixin_attr1 = obj.mixin_attr2 = None

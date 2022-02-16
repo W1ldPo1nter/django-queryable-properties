@@ -305,7 +305,7 @@ class InjectableMixin(object):
         return created_class
 
     @classmethod
-    def inject_into_object(cls, obj, class_name=None):
+    def inject_into_object(cls, obj, class_name=None, init=True):
         """
         Update the given object's class by dynamically generating a new class
         based on the object's original class and this mixin class and changing
@@ -319,12 +319,16 @@ class InjectableMixin(object):
                                name of the dynamically created class will be
                                the one of the object's original class. Will
                                be applied if a new class is created.
+        :param bool init: Whether or not to perform the initialization of
+                          injected attributes if the object's class was
+                          changed.
         :return: The (potentially) modified object.
         """
         new_class = cls.mix_with_class(obj.__class__, class_name)
         if new_class is not obj.__class__:
             obj.__class__ = new_class
-            obj.init_injected_attrs()
+            if init:
+                obj.init_injected_attrs()
         return obj
 
 
@@ -347,7 +351,7 @@ def _unpickle_injected_object(base_class, mixin_class, class_name=None):
              object's state).
     """
     obj = base_class.__new__(base_class, ())
-    return mixin_class.inject_into_object(obj, class_name)
+    return mixin_class.inject_into_object(obj, class_name, init=False)
 
 
 _unpickle_injected_object.__safe_for_unpickling__ = True
