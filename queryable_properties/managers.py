@@ -39,15 +39,14 @@ class QueryablePropertiesIterable(InjectableMixin):
                      initialization when used as a mixin.
         :param kwargs: Keyword arguments to pass through to the base class
                        initialization when used as a mixin.
-        :keyword collections.Iterable iterable: The optional iterable to use
-                                                for standalone usage.
         """
-        queryset = chain_queryset(queryset)
-        self.queryset = queryset
-        # Only perform the super call if the class is used as a mixin
+        self.queryset = chain_queryset(queryset)
+        # Only perform super calls if the class is used as a mixin.
         if self.__class__.__bases__ != (InjectableMixin,):
-            super(QueryablePropertiesIterable, self).__init__(queryset, *args, **kwargs)
-        self.iterable = kwargs.get('iterable') or super(QueryablePropertiesIterable, self).__iter__()
+            super(QueryablePropertiesIterable, self).__init__(self.queryset, *args, **kwargs)
+            self.iterable = super(QueryablePropertiesIterable, self).__iter__()
+        else:  # pragma: no cover
+            self.iterable = super(QueryablePropertiesQuerySetMixin, self.queryset).iterator()
         self.yields_model_instances = ((ModelIterable is not None and isinstance(self, ModelIterable)) or
                                        (ValuesQuerySet is not None and not isinstance(self.queryset, ValuesQuerySet)))
 
@@ -251,10 +250,9 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # will be already mixed in. In older Django versions, use a standalone
         # QueryablePropertiesModelIterable instead to perform the queryable
         # properties processing.
-        iterable = super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
         if '_iterable_class' not in self.__dict__:  # pragma: no cover
-            return iter(QueryablePropertiesIterable(self, iterable=iterable))
-        return iterable
+            return iter(QueryablePropertiesIterable(self))
+        return super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
 
     def update(self, **kwargs):
         # Resolve any queryable properties into their actual update kwargs
