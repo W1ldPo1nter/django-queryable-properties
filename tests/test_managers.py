@@ -4,7 +4,8 @@ import pytest
 
 from six.moves import cPickle
 
-from .app_management.models import ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties
+from .app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
+                                    VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
 
 @pytest.mark.django_db
@@ -32,4 +33,9 @@ class TestQueryablePropertiesQuerySetMixin(object):
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_pickle_values_list_queryset(self, model):
         queryset = model.objects.order_by('pk').select_properties('version_count').values_list('name', 'version_count')
+        self.assert_queryset_picklable(queryset)
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_pickle_dates_queryset(self, model):
+        queryset = model.objects.filter(application__version_count=3).dates('supported_from', 'year')
         self.assert_queryset_picklable(queryset)
