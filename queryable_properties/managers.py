@@ -185,8 +185,18 @@ class LegacyIterable(LegacyOrderingMixin, LegacyBaseIterable):
     """Legacy iterable class for querysets that don't yield model instances."""
 
 
-class LegacyModelIterable(QueryablePropertiesModelIterableMixin, LegacyIterable):
-    """Legacy iterable class for querysets that yield model instances."""
+class LegacyModelIterable(QueryablePropertiesModelIterableMixin, LegacyBaseIterable):
+    """
+    Legacy iterable class for querysets that yield model instances in Django
+    versions that don't require additional ordering setup.
+    """
+
+
+class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyIterable):
+    """
+    Legacy iterable class for querysets that yield model instances in Django
+    versions that require additional ordering setup.
+    """
 
     @cached_property
     def _discarded_attr_names(self):
@@ -204,7 +214,7 @@ class LegacyModelIterable(QueryablePropertiesModelIterableMixin, LegacyIterable)
         return {self._queryable_property_aliases.pop(ref) for ref in self._order_by_select}
 
     def _setup_queryable_properties(self):
-        super(LegacyModelIterable, self)._setup_queryable_properties()
+        super(LegacyOrderingModelIterable, self)._setup_queryable_properties()
         query = self.queryset.query
 
         # Properties used for ordering may have a changed alias due to the
@@ -219,7 +229,7 @@ class LegacyModelIterable(QueryablePropertiesModelIterableMixin, LegacyIterable)
     def _postprocess_queryable_properties(self, obj):
         for attr_name in self._discarded_attr_names:
             delattr(obj, attr_name)
-        return super(LegacyModelIterable, self)._postprocess_queryable_properties(obj)
+        return super(LegacyOrderingModelIterable, self)._postprocess_queryable_properties(obj)
 
 
 class QueryablePropertiesQuerySetMixin(InjectableMixin):
@@ -342,6 +352,8 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
             iterable_class = LegacyModelIterable
             if isinstance(self, ValuesQuerySet):
                 iterable_class = LegacyIterable if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP else LegacyBaseIterable
+            elif ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
+                iterable_class = LegacyOrderingModelIterable
             return iter(iterable_class(self))
         return super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
 
