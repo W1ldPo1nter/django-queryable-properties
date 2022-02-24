@@ -7,8 +7,8 @@ from django.db.models import Manager
 from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
 
-from .compat import (ANNOTATION_SELECT_CACHE_NAME, chain_query, chain_queryset, ModelIterable,
-                     QUERYSET_QUERY_ATTRIBUTE_NAME, ValuesQuerySet)
+from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, chain_query, chain_queryset,
+                     ModelIterable, QUERYSET_QUERY_ATTRIBUTE_NAME, ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
@@ -339,7 +339,9 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # QueryablePropertiesModelIterable instead to perform the queryable
         # properties processing.
         if '_iterable_class' not in self.__dict__:  # pragma: no cover
-            iterable_class = LegacyIterable if isinstance(self, ValuesQuerySet) else LegacyModelIterable
+            iterable_class = LegacyModelIterable
+            if isinstance(self, ValuesQuerySet):
+                iterable_class = LegacyIterable if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP else LegacyBaseIterable
             return iter(iterable_class(self))
         return super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
 
