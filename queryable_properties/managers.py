@@ -39,7 +39,7 @@ class QueryablePropertiesIterableMixin(object):
     Base class for iterable mixins that handle queryable properties logic.
 
     Can be applied to both Django's iterable classes as well as the legacy
-    terable classes.
+    iterable classes.
     """
 
     def __init__(self, queryset, *args, **kwargs):
