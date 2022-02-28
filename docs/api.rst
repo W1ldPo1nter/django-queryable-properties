@@ -19,9 +19,7 @@ Module ``queryable_properties.managers``
 ----------------------------------------
 
 .. automodule:: queryable_properties.managers
-   :members:
-   :exclude-members: LegacyBaseIterable, QueryablePropertiesIterableMixin, LegacyOrderingMixin,
-                     QueryablePropertiesModelIterableMixin, LegacyIterable, LegacyModelIterable
+   :members: QueryablePropertiesQuerySet, QueryablePropertiesQuerySetMixin
 
 .. autoattribute:: queryable_properties.managers.QueryablePropertiesManager
 
