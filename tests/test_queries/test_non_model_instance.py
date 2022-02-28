@@ -51,23 +51,26 @@ class TestAggregateAnnotations(object):
         queryset = model.objects.values(*values).filter(**{property_name: filter_value})
         assert len(queryset) == expected_count
         assert len(set(tuple(obj_dict.items()) for obj_dict in queryset)) == expected_count
-        assert all(property_name not in obj_dict for obj_dict in queryset)
+        assert all(set(obj_dict) == set(values) for obj_dict in queryset)
 
-    @pytest.mark.parametrize('model, values, property_name, expected_count', [
-        (ApplicationWithClassBasedProperties, ('common_data',), 'version_count', 1),
-        (ApplicationWithDecoratorBasedProperties, ('common_data',), 'version_count', 1),
-        (CategoryWithClassBasedProperties, ('pk', 'applications__pk'), 'applications__version_count', 3),
-        (CategoryWithDecoratorBasedProperties, ('pk', 'applications__pk'), 'applications__version_count', 3),
+    @pytest.mark.parametrize('model, values, property_name, select, expected_count', [
+        (ApplicationWithClassBasedProperties, ('common_data',), 'version_count', False, 1),
+        (ApplicationWithDecoratorBasedProperties, ('common_data',), 'version_count', False, 1),
+        (ApplicationWithClassBasedProperties, ('common_data', 'version_count'), 'version_count', True, 2),
+        (ApplicationWithDecoratorBasedProperties, ('common_data', 'version_count'), 'version_count', True, 2),
+        (CategoryWithClassBasedProperties, ('pk', 'applications__pk'), 'applications__version_count', False, 3),
+        (CategoryWithDecoratorBasedProperties, ('pk', 'applications__pk'), 'applications__version_count', False, 3),
     ])
-    def test_values_with_order_by_property(self, model, values, property_name, expected_count):
+    def test_values_with_order_by_property(self, model, values, property_name, select, expected_count):
         # In Django versions below 1.8, annotations used for ordering MUST be
         # selected, which expectedly tinkers with the GROUPING.
-        expected_property_selection = DJANGO_VERSION < (1, 8)
-        expected_queryset_len = expected_count + int(expected_property_selection and property_name == 'version_count')
-        queryset = model.objects.order_by(property_name).values(*values)
-        assert len(queryset) == expected_queryset_len
-        assert len(set(tuple(obj_dict.items()) for obj_dict in queryset)) == expected_count
-        assert all((property_name in obj_dict) is expected_property_selection for obj_dict in queryset)
+        expected_count += int(DJANGO_VERSION < (1, 8) and not select and property_name == 'version_count')
+        queryset = model.objects.order_by(property_name)
+        if select:
+            queryset = queryset.select_properties(property_name)
+        queryset = queryset.values(*values)
+        assert len(queryset) == expected_count
+        assert all(set(obj_dict) == set(values) for obj_dict in queryset)
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_distinct_property_values(self, model):
@@ -91,6 +94,40 @@ class TestAggregateAnnotations(object):
         queryset = model.objects.filter(**filters).select_properties('version_count').values_list('version_count',
                                                                                                   flat=True)
         assert set(queryset) == expected_version_counts
+
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('select, order_by, values_list, expected_count', [
+        ((), ('version_count',), (), 2),
+        ((), ('-version_count',), ('common_data',), 1),
+        (('version_count',), ('version_count',), (), 2),
+        (('version_count',), ('-version_count',), ('common_data',), 2),
+        (('version_count',), ('version_count',), ('common_data', 'version_count'), 2),
+        (('major_sum',), ('-version_count',), ('common_data', 'name', 'major_sum'), 2),
+    ])
+    def test_values_list_with_order_by_property(self, model, select, order_by, values_list, expected_count):
+        # In Django versions below 1.8, annotations used for ordering MUST be
+        # selected, which expectedly tinkers with the GROUPING.
+        expected_count += int(DJANGO_VERSION < (1, 8) and values_list and not select)
+        expected_tuple_len = len(values_list) if values_list else (3 + len(select))
+        queryset = model.objects.order_by(*order_by)
+        if select:
+            queryset = queryset.select_properties(*select)
+        queryset = queryset.values_list(*values_list)
+        assert len(queryset) == expected_count
+        assert all(len(obj_tuple) == expected_tuple_len for obj_tuple in queryset)
+
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('select, order_by, name, expected_results', [
+        ((), ('version_count',), 'common_data', [0, 0]),
+        (('version_count',), ('-version_count',), 'common_data', [0, 0]),
+        (('version_count',), ('version_count',), 'version_count', [4, 4]),
+        (('major_sum',), ('-version_count',), 'major_sum', [5, 5]),
+    ])
+    def test_flat_list_with_order_by_property(self, model, select, order_by, name, expected_results):
+        queryset = model.objects.order_by('pk', *order_by)
+        if select:
+            queryset = queryset.select_properties(*select)
+        assert list(queryset.values_list(name, flat=True)) == expected_results
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="dates() couldn't be used with annotations before Django 1.8")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
