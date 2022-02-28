@@ -7,7 +7,7 @@ from six.moves import cPickle
 
 from queryable_properties.compat import LOOKUP_SEP, ModelIterable
 from queryable_properties.managers import (LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable,
-                                           QueryablePropertiesIterableMixin)
+                                           LegacyValuesIterable, QueryablePropertiesIterableMixin)
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath, QueryablePropertyReference
 from .app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
@@ -207,3 +207,18 @@ class TestLegacyOrderingModelIterable(object):
         obj = iterable._postprocess_queryable_properties(obj)
         for name in discarded_names:
             assert not hasattr(obj, name)
+
+
+class TestLegacyValuesIterable(object):
+
+    @pytest.mark.parametrize('prop_names', [
+        (),
+        ('version_count',),
+        ('version_count', 'major_sum'),
+    ])
+    def test_postprocess_queryable_properties(self, refs, prop_names):
+        iterable = LegacyValuesIterable(ApplicationWithClassBasedProperties.objects.all())
+        iterable.__dict__['_order_by_select'] = {refs[prop_name] for prop_name in prop_names}
+        obj = {'name': 'My cool App', 'version_count': 4, 'major_sum': 5}
+        result = iterable._postprocess_queryable_properties(dict(obj))
+        assert result == {name: value for name, value in obj.items() if name not in prop_names}
