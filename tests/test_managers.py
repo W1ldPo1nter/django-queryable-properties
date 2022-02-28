@@ -5,7 +5,9 @@ from mock import Mock, patch
 from six.moves import cPickle
 
 from queryable_properties.compat import ModelIterable
-from queryable_properties.managers import LegacyBaseIterable, QueryablePropertiesIterableMixin
+from queryable_properties.managers import LegacyBaseIterable, LegacyIterable, QueryablePropertiesIterableMixin
+from queryable_properties.utils import get_queryable_property
+from queryable_properties.utils.internal import QueryPath, QueryablePropertyReference
 from .app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
 
@@ -91,3 +93,54 @@ class TestQueryablePropertiesIterableMixin(object):
         assert mock_postprocess.call_count == len(applications)
         for application in applications:
             mock_postprocess.assert_any_call(application)
+
+
+class TestLegacyOrderingMixin(object):
+
+    @pytest.mark.parametrize('order_by, expected_indexes', [
+        ((), {}),
+        (('name', '-pk'), {}),
+        (('version_count', '-pk'), {'version_count': [0]}),
+        (('name', '-major_sum'), {'major_sum': [1]}),
+        (('major_sum', '-version_count', 'name', '-major_sum'), {'major_sum': [0, 3], 'version_count': [1]}),
+    ])
+    def test_order_by_occurrences(self, order_by, expected_indexes):
+        queryset = ApplicationWithClassBasedProperties.objects.order_by(*order_by)
+        iterable = LegacyIterable(queryset)
+        assert len(iterable._order_by_occurrences) == len(expected_indexes)
+        for ref, indexes in iterable._order_by_occurrences.items():
+            assert expected_indexes[ref.property.name] == indexes
+
+    @pytest.mark.parametrize('order_by, select, expected_result', [
+        ((), (), set()),
+        (('name', '-pk'), (), set()),
+        (('version_count', '-pk'), (), {'version_count'}),
+        (('name', '-major_sum'), ('major_sum',), set()),
+        (('major_sum', '-version_count', 'name', '-major_sum'), (), {'major_sum', 'version_count'}),
+        (('major_sum', '-version_count', 'name', '-major_sum'), ('version_count',), {'major_sum'}),
+        (('major_sum', '-version_count', 'name', '-major_sum'), ('version_count', 'major_sum'), set()),
+    ])
+    def test_order_by_select(self, order_by, select, expected_result):
+        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select).order_by(*order_by)
+        iterable = LegacyIterable(queryset)
+        assert {ref.property.name for ref in iterable._order_by_select} == expected_result
+
+    @pytest.mark.parametrize('order_by_select', [
+        set(),
+        {'version_count'},
+        {'major_sum', 'version_count'},
+    ])
+    def test_setup_queryable_properties(self, order_by_select):
+        queryset = ApplicationWithClassBasedProperties.objects.order_by('-major_sum', 'version_count')
+        iterable = LegacyIterable(queryset)
+        iterable.__dict__['_order_by_select'] = {
+            QueryablePropertyReference(get_queryable_property(queryset.model, prop_name), queryset.model, QueryPath())
+            for prop_name in order_by_select
+        }
+        iterable._setup_queryable_properties()
+        query = iterable.queryset.query
+        for prop_name in ('major_sum', 'version_count'):
+            if prop_name in order_by_select:
+                assert query.annotation_select[prop_name] == query.annotations[prop_name]
+            else:
+                assert prop_name not in query.annotation_select
