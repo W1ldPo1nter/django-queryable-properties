@@ -16,11 +16,11 @@ from .app_management.models import (ApplicationWithClassBasedProperties, Applica
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class DummyIterable(QueryablePropertiesIterableMixin, ModelIterable or LegacyBaseIterable):
+class DummyIterable(QueryablePropertiesIterableMixin, ModelIterable or LegacyIterable):
     pass
 
 
-class DummyOrderingIterable(LegacyOrderingMixin, LegacyBaseIterable):
+class DummyOrderingIterable(LegacyOrderingMixin, LegacyIterable):
     pass
 
 
