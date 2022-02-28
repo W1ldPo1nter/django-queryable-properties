@@ -8,14 +8,15 @@ from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
 
 from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, chain_query, chain_queryset,
-                     ModelIterable, QUERYSET_QUERY_ATTRIBUTE_NAME, ValuesQuerySet)
+                     DateQuerySet, DateTimeQuerySet, ModelIterable, QUERYSET_QUERY_ATTRIBUTE_NAME, ValuesListQuerySet,
+                     ValuesQuerySet)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
 from .utils.internal import InjectableMixin, QueryPath, QueryablePropertyReference
 
 
-class LegacyBaseIterable(object):
+class LegacyIterable(object):
     """
     Base class for queryset iterables for old Django versions to mimic the
     iterable classes of new Django versions.
@@ -181,18 +182,14 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
         return obj
 
 
-class LegacyIterable(LegacyOrderingMixin, LegacyBaseIterable):
-    """Legacy iterable class for querysets that don't yield model instances."""
-
-
-class LegacyModelIterable(QueryablePropertiesModelIterableMixin, LegacyBaseIterable):
+class LegacyModelIterable(QueryablePropertiesModelIterableMixin, LegacyIterable):
     """
     Legacy iterable class for querysets that yield model instances in Django
     versions that don't require additional ordering setup.
     """
 
 
-class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyIterable):
+class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyOrderingMixin, LegacyIterable):
     """
     Legacy iterable class for querysets that yield model instances in Django
     versions that require additional ordering setup.
@@ -232,6 +229,55 @@ class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyI
         return super(LegacyOrderingModelIterable, self)._postprocess_queryable_properties(obj)
 
 
+class LegacyValuesIterable(LegacyOrderingMixin, LegacyIterable):
+    """
+    Legacy iterable class for querysets that yield value dictionaries.
+    """
+
+    def _postprocess_queryable_properties(self, obj):
+        obj = super(LegacyValuesIterable, self)._postprocess_queryable_properties(obj)
+        for ref in self._order_by_select:
+            obj.pop(six.text_type(ref.full_path), None)
+        return obj
+
+
+class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):
+    """
+    Legacy iterable class for querysets that yield value tuples.
+    """
+
+    def __init__(self, queryset, *args, **kwargs):
+        super(LegacyValuesListIterable, self).__init__(queryset, *args, **kwargs)
+        self.flat = queryset.flat
+        self.queryset.flat = False
+
+    @cached_property
+    def _discarded_indexes(self):
+        """
+        Cache and return the field indexes of queryable properties that were
+        only selected for ordering and must thus be discarded.
+
+        All contained indexes will be negative, i.e. are to be interpreted as
+        indexes from end of the returned rows.
+
+        :return: A set containing the field indexes to discard.
+        :rtype: set[int]
+        """
+        aggregate_names = list(self.queryset.query.aggregate_select)
+        if self.queryset._fields:
+            aggregate_names = [name for name in aggregate_names if name not in self.queryset._fields]
+        aggregate_names.reverse()
+        forced_names = set(six.text_type(ref.full_path) for ref in self._order_by_select)
+        return {-i for i, name in enumerate(aggregate_names, start=1) if name in forced_names}
+
+    def _postprocess_queryable_properties(self, obj):
+        obj = super(LegacyValuesListIterable, self)._postprocess_queryable_properties(obj)
+        obj = tuple(value for i, value in enumerate(obj, start=-len(obj)) if i not in self._discarded_indexes)
+        if self.flat and len(self.queryset._fields) == 1:
+            return obj[0]
+        return obj
+
+
 class QueryablePropertiesQuerySetMixin(InjectableMixin):
     """
     A mixin for Django's :class:`django.db.models.QuerySet` objects that allows
@@ -252,11 +298,12 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
     def _iterable_class(self):
         # Override the regular _iterable_class attribute of recent Django
         # versions with a property that also stores the value in the instance
-        # dict, but automatically mixes the QueryablePropertiesModelIterable
-        # into the base class on getter access if the base class yields model
-        # instances. That way, the queryable properties extensions stays
-        # compatible to custom iterable classes while querysets can still be
-        # pickled due to the base class being in the instance dict.
+        # dict, but automatically mixes the
+        # QueryablePropertiesModelIterableMixin into the base class on getter
+        # access if the base class yields model instances. That way, the
+        # queryable properties extensions stays compatible to custom iterable
+        # classes while querysets can still be pickled due to the base class
+        # being in the instance dict.
         cls = self.__dict__['_iterable_class']
         if issubclass(cls, ModelIterable):
             cls = QueryablePropertiesModelIterableMixin.mix_with_class(cls, 'QueryableProperties' + cls.__name__)
@@ -343,17 +390,24 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         return queryset
 
     def iterator(self, *args, **kwargs):
-        # Recent Django versions use the associated iterable class for the
-        # iterator() implementation, where the QueryablePropertiesModelIterable
-        # will be already mixed in. In older Django versions, use a standalone
-        # QueryablePropertiesModelIterable instead to perform the queryable
-        # properties processing.
-        if '_iterable_class' not in self.__dict__:  # pragma: no cover
-            iterable_class = LegacyModelIterable
-            if isinstance(self, ValuesQuerySet):
-                iterable_class = LegacyIterable if ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP else LegacyBaseIterable
-            elif ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
-                iterable_class = LegacyOrderingModelIterable
+        # Recent Django versions use their own iterable classes, where the
+        # QueryablePropertiesModelIterableMixin will be already mixed in. In
+        # older Django versions, the standalone legacy iterables are used
+        # instead to perform the queryable properties processing. Exceptions
+        # are legacy Date(Time)QuerySets, which don't support annotations
+        # and override the ordering anyway as well as querysets that don't
+        # yield model instances in Django 1.8, which doesn't require the
+        # legacy ordering setup.
+        if ('_iterable_class' not in self.__dict__ and  # pragma: no cover
+                not (DateQuerySet and isinstance(self, (DateQuerySet, DateTimeQuerySet))) and
+                not (isinstance(self, ValuesQuerySet) and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP)):
+            iterable_class = LegacyOrderingModelIterable
+            if not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
+                iterable_class = LegacyModelIterable
+            elif isinstance(self, ValuesListQuerySet):
+                iterable_class = LegacyValuesListIterable
+            elif isinstance(self, ValuesQuerySet):
+                iterable_class = LegacyValuesIterable
             return iter(iterable_class(self))
         return super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
 

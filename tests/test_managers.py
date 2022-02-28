@@ -6,7 +6,7 @@ from mock import Mock, patch
 from six.moves import cPickle
 
 from queryable_properties.compat import LOOKUP_SEP, ModelIterable
-from queryable_properties.managers import (LegacyBaseIterable, LegacyIterable, LegacyOrderingModelIterable,
+from queryable_properties.managers import (LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable,
                                            QueryablePropertiesIterableMixin)
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath, QueryablePropertyReference
@@ -17,6 +17,10 @@ pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
 class DummyIterable(QueryablePropertiesIterableMixin, ModelIterable or LegacyBaseIterable):
+    pass
+
+
+class DummyOrderingIterable(LegacyOrderingMixin, LegacyBaseIterable):
     pass
 
 
@@ -60,11 +64,11 @@ class TestQueryablePropertiesQuerySetMixin(object):
         self.assert_queryset_picklable(queryset)
 
 
-class TestLegacyBaseIterable(object):
+class TestLegacyIterable(object):
 
     def test_initializer(self):
         queryset = ApplicationWithClassBasedProperties.objects.all()
-        iterable = LegacyBaseIterable(queryset)
+        iterable = LegacyIterable(queryset)
         assert iterable.queryset is queryset
 
     def test_iter(self):
@@ -74,7 +78,7 @@ class TestLegacyBaseIterable(object):
             ApplicationWithClassBasedProperties.objects.order_by('pk').values_list('pk', 'name'),
             VersionWithClassBasedProperties.objects.dates('supported_from', 'year'),
         ):
-            iterable = LegacyBaseIterable(queryset)
+            iterable = LegacyIterable(queryset)
             assert list(iterable) == list(queryset)
 
 
@@ -117,7 +121,7 @@ class TestLegacyOrderingMixin(object):
     ])
     def test_order_by_occurrences(self, order_by, expected_indexes):
         queryset = ApplicationWithClassBasedProperties.objects.order_by(*order_by)
-        iterable = LegacyIterable(queryset)
+        iterable = DummyOrderingIterable(queryset)
         assert len(iterable._order_by_occurrences) == len(expected_indexes)
         for ref, indexes in iterable._order_by_occurrences.items():
             assert expected_indexes[ref.property.name] == indexes
@@ -133,7 +137,7 @@ class TestLegacyOrderingMixin(object):
     ])
     def test_order_by_select(self, order_by, select, expected_result):
         queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select).order_by(*order_by)
-        iterable = LegacyIterable(queryset)
+        iterable = DummyOrderingIterable(queryset)
         assert {ref.property.name for ref in iterable._order_by_select} == expected_result
 
     @pytest.mark.parametrize('order_by_select', [
@@ -143,7 +147,7 @@ class TestLegacyOrderingMixin(object):
     ])
     def test_setup_queryable_properties(self, refs, order_by_select):
         queryset = ApplicationWithClassBasedProperties.objects.order_by('-major_sum', 'version_count')
-        iterable = LegacyIterable(queryset)
+        iterable = DummyOrderingIterable(queryset)
         iterable.__dict__['_order_by_select'] = {refs[prop_name] for prop_name in order_by_select}
         iterable._setup_queryable_properties()
         query = iterable.queryset.query
