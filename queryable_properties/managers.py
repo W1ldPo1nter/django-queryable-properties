@@ -213,7 +213,7 @@ class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyI
         # properties.
         return {self._queryable_property_aliases.pop(ref) for ref in self._order_by_select}
 
-    def _setup_queryable_properties(self):
+    def _setup_queryable_properties(self):  # pragma: no cover
         super(LegacyOrderingModelIterable, self)._setup_queryable_properties()
         query = self.queryset.query
 
