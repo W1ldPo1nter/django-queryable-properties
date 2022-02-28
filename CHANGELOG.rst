@@ -4,6 +4,11 @@ Changelog
 master (unreleased)
 -------------------
 
+- Fixed erroneous transformations of querysets with queryable properties functionality into ``.values()`` querysets
+  under rare circumstances in Django versions above 3.0
+- Fixed the ability to pickle ``.values()``/``.values_list()`` querysets with queryable properties functionality in
+  Django versions below 1.9
+
 1.8.0 (2021-12-07)
 ------------------
 
