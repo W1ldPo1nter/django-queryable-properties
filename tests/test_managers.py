@@ -228,8 +228,6 @@ class TestLegacyValuesIterable(object):
 @pytest.mark.skipif(DJANGO_VERSION >= (1, 9), reason='ValuesListQuerySets only exist in old Django versions.')
 class TestLegacyValuesListIterable(object):
 
-    order_fields = list({'major_sum', 'version_count'})
-
     @pytest.mark.parametrize('flat', [True, False])
     def test_initializer(self, flat):
         queryset = ApplicationWithClassBasedProperties.objects.values_list('name', flat=flat)
@@ -240,16 +238,18 @@ class TestLegacyValuesListIterable(object):
     @pytest.mark.parametrize('select, values, expected_indexes', [
         ((), (), {-1, -2}),
         ((), ('name', 'common_data'), {-1, -2}),
-        (('version_count',), (), {order_fields.index('major_sum') - 2}),
+        (('version_count',), (), 'major_sum'),
         (('version_count',), ('version_count', 'name'), {-1}),
         (('major_sum', 'version_count'), (), set()),
         (('major_sum', 'version_count'), ('name',), {-1, -2}),
         (('major_sum', 'version_count'), ('version_count', 'name'), {-1}),
     ])
     def test_discarded_indexes(self, select, values, expected_indexes):
-        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select).order_by(*self.order_fields)
-        iterable = LegacyValuesListIterable(queryset.values_list(*values))
+        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select)
+        iterable = LegacyValuesListIterable(queryset.order_by('major_sum', 'version_count').values_list(*values))
         iterable._setup_queryable_properties()
+        if not isinstance(expected_indexes, set):
+            expected_indexes = {list(iterable.queryset.query.aggregate_select).index(expected_indexes) - 2}
         assert iterable._discarded_indexes == expected_indexes
 
     @pytest.mark.parametrize('discarded_indexes, expected_result', [
