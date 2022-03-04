@@ -241,7 +241,7 @@ class LegacyValuesIterable(LegacyOrderingMixin, LegacyIterable):
         return obj
 
 
-class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):
+class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: no cover
     """
     Legacy iterable class for querysets that yield value tuples.
     """

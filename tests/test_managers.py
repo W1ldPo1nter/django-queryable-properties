@@ -7,7 +7,8 @@ from six.moves import cPickle
 
 from queryable_properties.compat import LOOKUP_SEP, ModelIterable
 from queryable_properties.managers import (LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable,
-                                           LegacyValuesIterable, QueryablePropertiesIterableMixin)
+                                           LegacyValuesIterable, LegacyValuesListIterable,
+                                           QueryablePropertiesIterableMixin)
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath, QueryablePropertyReference
 from .app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
@@ -222,3 +223,44 @@ class TestLegacyValuesIterable(object):
         obj = {'name': 'My cool App', 'version_count': 4, 'major_sum': 5}
         result = iterable._postprocess_queryable_properties(dict(obj))
         assert result == {name: value for name, value in obj.items() if name not in prop_names}
+
+
+@pytest.mark.skipif(DJANGO_VERSION >= (1, 9), reason='ValuesListQuerySets only exist in old Django versions.')
+class TestLegacyValuesListIterable(object):
+
+    order_fields = list({'major_sum', 'version_count'})
+
+    @pytest.mark.parametrize('flat', [True, False])
+    def test_initializer(self, flat):
+        queryset = ApplicationWithClassBasedProperties.objects.values_list('name', flat=flat)
+        iterable = LegacyValuesListIterable(queryset)
+        assert iterable.queryset.flat is False
+        assert iterable.flat is flat
+
+    @pytest.mark.parametrize('select, values, expected_indexes', [
+        ((), (), {-1, -2}),
+        ((), ('name', 'common_data'), {-1, -2}),
+        (('version_count',), (), {order_fields.index('major_sum') - 2}),
+        (('version_count',), ('version_count', 'name'), {-1}),
+        (('major_sum', 'version_count'), (), set()),
+        (('major_sum', 'version_count'), ('name',), {-1, -2}),
+        (('major_sum', 'version_count'), ('version_count', 'name'), {-1}),
+    ])
+    def test_discarded_indexes(self, select, values, expected_indexes):
+        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select).order_by(*self.order_fields)
+        iterable = LegacyValuesListIterable(queryset.values_list(*values))
+        iterable._setup_queryable_properties()
+        assert iterable._discarded_indexes == expected_indexes
+
+    @pytest.mark.parametrize('discarded_indexes, expected_result', [
+        (set(), tuple(range(10))),
+        ({-1}, tuple(range(9))),
+        ({-2}, (0, 1, 2, 3, 4, 5, 6, 7, 9)),
+        ({-1, -2, -5}, (0, 1, 2, 3, 4, 6, 7)),
+    ])
+    def test_postprocess_queryable_properties(self, discarded_indexes, expected_result):
+        queryset = ApplicationWithClassBasedProperties.objects.values_list('name')
+        iterable = LegacyValuesListIterable(queryset)
+        iterable.__dict__['_discarded_indexes'] = discarded_indexes
+        obj = tuple(range(10))
+        assert iterable._postprocess_queryable_properties(obj) == expected_result
