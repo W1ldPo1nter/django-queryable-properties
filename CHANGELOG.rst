@@ -8,6 +8,8 @@ master (unreleased)
   under rare circumstances in Django versions above 3.0
 - Fixed the ability to pickle ``.values()``/``.values_list()`` querysets with queryable properties functionality in
   Django versions below 1.9
+- Fixed the erroneous inclusion of values of queryable properties that are used for ordering without being explicitly
+  selected in ``.values()``/``.values_list()`` querysets in Django versions below 1.8
 
 1.8.0 (2021-12-07)
 ------------------
