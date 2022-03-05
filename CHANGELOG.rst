@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.8.1 (2022-03-05)
+------------------
+
 - Fixed erroneous transformations of querysets with queryable properties functionality into ``.values()`` querysets
   under rare circumstances in Django versions above 3.0
 - Fixed the ability to pickle ``.values()``/``.values_list()`` querysets with queryable properties functionality in
