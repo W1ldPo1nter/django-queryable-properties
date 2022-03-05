@@ -261,15 +261,17 @@ These queryset operations can also be used on related models and include:
    In Django versions below 1.8, it was not possible to order by annotations without selecting them at the same time.
    Queryable property annotations therefore have to be automatically added in a *selecting* manner if they appear in
    an ``.order_by()`` call in those versions.
-   
-   In querysets that return model instances, this may have performance implications due to the additional columns that
-   are queried, but the annotation values will be discarded when model instances are created.
+
+   If queryable properties are selected only to allow ordering (i.e. not also selected explicitly), their values will
+   be discarded before returning the results in regular querysets as well as ``.values()``/``.values_list()``
+   querysets.
    This is done because selected queryable properties behave differently (see below), and this behavior is meant to be
    consistent across all supported Django versions.
-   
-   The selection of the queryable property annotations in these scenarios may also affect queries with ``.distinct()``
-   calls (since the ``DISTINCT`` clause also applies to the annotation) or ``.values()``/``.values_list()`` queries,
-   which will return the annotation column in addition to the ones specified in ``.values()``/``.values_list()``.
+
+   However, keep in mind that the additional selection may have performance implications and may also affect
+   ``DISTINCT`` clauses, ``GROUP BY`` clauses, aggregates, etc. due to the additional columns that are queried.
+
+   Django versions starting from 1.8 do not have this problem as ordering by annotations is possible without selection.
 
 Caution: the order of queryset operations still matters!
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
