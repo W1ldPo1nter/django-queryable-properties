@@ -11,10 +11,11 @@ from django.db.models import DateField
 from queryable_properties.admin.filters import QueryablePropertyField, QueryablePropertyListFilter
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.utils import get_queryable_property
-from queryable_properties.utils.internal import get_output_field, QueryPath
+from queryable_properties.utils.internal import QueryPath, get_output_field
 from ..app_management.admin import ApplicationAdmin, VersionAdmin
-from ..app_management.models import (ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties,
-                                     VersionWithClassBasedProperties)
+from ..app_management.models import (
+    ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
+)
 
 
 class TestQueryablePropertyField(object):

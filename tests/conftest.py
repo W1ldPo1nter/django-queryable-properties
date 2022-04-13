@@ -14,8 +14,10 @@ try:
 except ImportError:
     Concat = Mock(return_value=Mock(output_field=None))
 
-from .app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
-                                    CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties)
+from .app_management.models import (
+    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
+    CategoryWithDecoratorBasedProperties,
+)
 from .dummy_lib.models import ReleaseTypeModel
 
 

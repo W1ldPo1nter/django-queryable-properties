@@ -5,7 +5,6 @@ from datetime import date
 from itertools import chain
 
 import pytest
-
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Q
 from django.utils.translation import trans_real

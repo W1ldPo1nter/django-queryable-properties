@@ -1,6 +1,5 @@
 # encoding: utf-8
 import pytest
-
 import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import F, Model, Q
@@ -8,14 +7,15 @@ from django.db.models import F, Model, Q
 from queryable_properties.compat import nullcontext as does_not_raise
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (
-    AnnotationGetterMixin, AnnotationMixin, CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING, LookupFilterMixin,
-    QueryableProperty, queryable_property
+    CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING, AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin,
+    QueryableProperty, queryable_property,
 )
 from queryable_properties.properties.base import QueryablePropertyDescriptor
 from queryable_properties.utils import get_queryable_property, reset_queryable_property
-
-from ..app_management.models import (ApplicationWithClassBasedProperties, Category, DummyProperty,
-                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from ..app_management.models import (
+    ApplicationWithClassBasedProperties, Category, DummyProperty, VersionWithClassBasedProperties,
+    VersionWithDecoratorBasedProperties,
+)
 
 
 def function_with_docstring():

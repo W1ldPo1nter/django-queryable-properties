@@ -1,11 +1,12 @@
 # encoding: utf-8
 
 import pytest
-
 from django import VERSION as DJANGO_VERSION
 
-from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
-                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from ..app_management.models import (
+    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
+    VersionWithDecoratorBasedProperties,
+)
 from ..conftest import Concat, Value
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]

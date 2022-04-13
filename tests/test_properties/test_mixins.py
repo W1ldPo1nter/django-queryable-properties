@@ -1,16 +1,16 @@
 # encoding: utf-8
 import pytest
-from mock import patch
-
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Q
+from mock import patch
 
 from queryable_properties.exceptions import QueryablePropertyError
-from queryable_properties.properties import (AnnotationGetterMixin, AnnotationMixin, boolean_filter, LookupFilterMixin,
-                                             lookup_filter, QueryableProperty, REMAINING_LOOKUPS)
+from queryable_properties.properties import (
+    REMAINING_LOOKUPS, AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin, QueryableProperty, boolean_filter,
+    lookup_filter,
+)
 from queryable_properties.properties.mixins import SubqueryMixin
 from queryable_properties.utils import get_queryable_property
-
 from ..app_management.models import ApplicationWithClassBasedProperties
 
 

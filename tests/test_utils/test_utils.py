@@ -8,9 +8,10 @@ from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
 from queryable_properties.utils import get_queryable_property, prefetch_queryable_properties
 from queryable_properties.utils.internal import get_queryable_property_descriptor
-
-from ..app_management.models import (ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties,
-                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from ..app_management.models import (
+    ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
+    VersionWithDecoratorBasedProperties,
+)
 
 
 class TestGetQueryableProperty(object):

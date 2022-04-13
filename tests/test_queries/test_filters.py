@@ -1,16 +1,16 @@
 # encoding: utf-8
 
 import pytest
-
 import six
 from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import get_queryable_property_descriptor
-from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
-                                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
-                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from ..app_management.models import (
+    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
+    CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
+)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 

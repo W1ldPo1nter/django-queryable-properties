@@ -9,7 +9,6 @@ from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import InjectableMixin, QueryPath
 
-
 REMAINING_LOOKUPS = '*'  #: A Constant that can be used instead of lookup names to match all remaining lookups.
 
 

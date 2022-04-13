@@ -6,13 +6,16 @@ from mock import Mock, patch
 from six.moves import cPickle
 
 from queryable_properties.compat import LOOKUP_SEP, ModelIterable
-from queryable_properties.managers import (LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable,
-                                           LegacyValuesIterable, LegacyValuesListIterable,
-                                           QueryablePropertiesIterableMixin)
+from queryable_properties.managers import (
+    LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable, LegacyValuesIterable, LegacyValuesListIterable,
+    QueryablePropertiesIterableMixin,
+)
 from queryable_properties.utils import get_queryable_property
-from queryable_properties.utils.internal import QueryPath, QueryablePropertyReference
-from .app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
-                                    VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from queryable_properties.utils.internal import QueryablePropertyReference, QueryPath
+from .app_management.models import (
+    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
+    VersionWithDecoratorBasedProperties,
+)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 

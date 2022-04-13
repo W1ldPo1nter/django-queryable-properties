@@ -3,15 +3,16 @@
 from collections import OrderedDict
 
 import six
-from django.contrib.admin.filters import (BooleanFieldListFilter, ChoicesFieldListFilter, DateFieldListFilter,
-                                          FieldListFilter)
+from django.contrib.admin.filters import (
+    BooleanFieldListFilter, ChoicesFieldListFilter, DateFieldListFilter, FieldListFilter,
+)
 from django.contrib.admin.views import main
 from django.db.models import BooleanField, DateField
 
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..properties import MappingProperty
-from ..utils.internal import get_output_field, QueryPath, resolve_queryable_property
+from ..utils.internal import QueryPath, get_output_field, resolve_queryable_property
 
 
 class QueryablePropertyField(object):

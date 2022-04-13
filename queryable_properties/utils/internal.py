@@ -14,9 +14,8 @@ from django.db.models import Manager, Q
 from django.utils.decorators import method_decorator
 from django.utils.tree import Node
 
-from ..compat import get_related_model, LOOKUP_SEP
+from ..compat import LOOKUP_SEP, get_related_model
 from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
-
 
 MISSING_OBJECT = object()  #: Arbitrary object to represent that an object in an attribute chain is missing.
 

@@ -5,7 +5,7 @@ from itertools import chain
 import six
 from django.contrib.admin.options import InlineModelAdmin
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import expressions, F
+from django.db.models import F, expressions
 
 from ..compat import checks
 from ..utils.internal import InjectableMixin, QueryPath, resolve_queryable_property

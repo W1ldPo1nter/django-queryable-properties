@@ -5,9 +5,10 @@ from datetime import date
 import pytest
 from django import VERSION as DJANGO_VERSION
 
-from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
-                                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
-                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from ..app_management.models import (
+    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
+    CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
+)
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 

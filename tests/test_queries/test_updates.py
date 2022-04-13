@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 import pytest
-
 from django import VERSION as DJANGO_VERSION
 from django.db import models
 

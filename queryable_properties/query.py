@@ -6,8 +6,8 @@ import six
 from django.utils.tree import Node
 
 from .compat import (
-    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, contains_aggregate,
-    convert_build_filter_to_add_q_kwargs, NEED_HAVING_METHOD_NAME, nullcontext, QUERY_CHAIN_METHOD_NAME, ValuesQuerySet
+    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, NEED_HAVING_METHOD_NAME,
+    QUERY_CHAIN_METHOD_NAME, ValuesQuerySet, contains_aggregate, convert_build_filter_to_add_q_kwargs, nullcontext,
 )
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property

@@ -3,6 +3,7 @@
 from __future__ import unicode_literals
 
 from django.core.exceptions import FieldError
+
 try:  # pragma: no cover
     from django.core.exceptions import FieldDoesNotExist
 except ImportError:  # pragma: no cover

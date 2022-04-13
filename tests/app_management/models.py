@@ -8,8 +8,8 @@ from django.db import models
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
     AggregateProperty, AnnotationGetterMixin, AnnotationMixin, AnnotationProperty, LookupFilterMixin, QueryableProperty,
-    queryable_property, RangeCheckProperty, RelatedExistenceCheckProperty, SetterMixin, SubqueryExistenceCheckProperty,
-    SubqueryFieldProperty, UpdateMixin, ValueCheckProperty
+    RangeCheckProperty, RelatedExistenceCheckProperty, SetterMixin, SubqueryExistenceCheckProperty,
+    SubqueryFieldProperty, UpdateMixin, ValueCheckProperty, queryable_property,
 )
 from ..dummy_lib.models import ReleaseTypeModel
 

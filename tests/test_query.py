@@ -4,8 +4,9 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 
 from queryable_properties.query import AggregatePropertyChecker
-from .app_management.models import (ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties,
-                                    VersionWithClassBasedProperties)
+from .app_management.models import (
+    ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
+)
 
 
 class TestAggregatePropertyChecker(object):

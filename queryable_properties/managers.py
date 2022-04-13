@@ -7,13 +7,14 @@ from django.db.models import Manager
 from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
 
-from .compat import (ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, chain_query, chain_queryset,
-                     DateQuerySet, DateTimeQuerySet, ModelIterable, QUERYSET_QUERY_ATTRIBUTE_NAME, ValuesListQuerySet,
-                     ValuesQuerySet)
+from .compat import (
+    ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, QUERYSET_QUERY_ATTRIBUTE_NAME, DateQuerySet,
+    DateTimeQuerySet, ModelIterable, ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset,
+)
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
-from .utils.internal import InjectableMixin, QueryPath, QueryablePropertyReference
+from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPath
 
 
 class LegacyIterable(object):

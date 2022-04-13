@@ -11,14 +11,14 @@ from queryable_properties.exceptions import QueryablePropertyDoesNotExist, Query
 from queryable_properties.properties.base import QueryablePropertyDescriptor
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import (
-    get_output_field, get_queryable_property_descriptor, InjectableMixin, MISSING_OBJECT, ModelAttributeGetter,
-    NodeChecker, NodeModifier, NodeProcessor, parametrizable_decorator, QueryablePropertyReference, QueryPath,
-    resolve_queryable_property
+    MISSING_OBJECT, InjectableMixin, ModelAttributeGetter, NodeChecker, NodeModifier, NodeProcessor,
+    QueryablePropertyReference, QueryPath, get_output_field, get_queryable_property_descriptor,
+    parametrizable_decorator, resolve_queryable_property,
 )
-
-from ..app_management.models import (ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
-                                     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
-                                     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties)
+from ..app_management.models import (
+    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
+    CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
+)
 from ..conftest import Concat, Value
 
 

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import pytest
-
 import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Avg, Q

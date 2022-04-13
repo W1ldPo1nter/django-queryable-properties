@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import six
 
-from .internal import get_queryable_property_descriptor, MISSING_OBJECT, ModelAttributeGetter, QueryPath
+from .internal import MISSING_OBJECT, ModelAttributeGetter, QueryPath, get_queryable_property_descriptor
 
 __all__ = ('MISSING_OBJECT', 'get_queryable_property', 'prefetch_queryable_properties', 'reset_queryable_property')
 
