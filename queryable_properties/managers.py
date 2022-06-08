@@ -315,18 +315,20 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         self.__dict__['_iterable_class'] = value
 
     def _clone(self, klass=None, *args, **kwargs):
-        if klass:  # pragma: no cover
+        has_iterable_class = '_iterable_class' in self.__dict__
+        if not has_iterable_class:  # pragma: no cover
             # In older Django versions, the class of the queryset may be
             # replaced with a dynamically created class based on the current
             # class and the value of klass while cloning (e.g when using
             # .values()). Therefore this needs to be re-injected to be on top
             # of the MRO again to enable queryable properties functionality.
-            klass = QueryablePropertiesQuerySetMixin.mix_with_class(klass, 'QueryableProperties' + klass.__name__)
+            if klass:
+                klass = QueryablePropertiesQuerySetMixin.mix_with_class(klass, 'QueryableProperties' + klass.__name__)
             args = (klass,) + args
         clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
         # Since the _iterable_class property may return a dynamically created
         # class, the value of a clone must be reset to the base class.
-        if '_iterable_class' in self.__dict__:
+        if has_iterable_class:
             clone._iterable_class = self.__dict__['_iterable_class']
         return clone
 
