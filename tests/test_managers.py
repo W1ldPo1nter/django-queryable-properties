@@ -5,10 +5,10 @@ from django import VERSION as DJANGO_VERSION
 from mock import Mock, patch
 from six.moves import cPickle
 
-from queryable_properties.compat import LOOKUP_SEP, ModelIterable
+from queryable_properties.compat import LOOKUP_SEP, ModelIterable, ValuesQuerySet
 from queryable_properties.managers import (
     LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable, LegacyValuesIterable, LegacyValuesListIterable,
-    QueryablePropertiesIterableMixin,
+    QueryablePropertiesIterableMixin, QueryablePropertiesQuerySetMixin,
 )
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryablePropertyReference, QueryPath
@@ -66,6 +66,22 @@ class TestQueryablePropertiesQuerySetMixin(object):
     def test_pickle_dates_queryset(self, model):
         queryset = model.objects.filter(application__version_count=3).dates('supported_from', 'year')
         self.assert_queryset_picklable(queryset)
+
+    @pytest.mark.skipif(DJANGO_VERSION >= (1, 9), reason="_clone doesn't change the class in recent Django versions.")
+    @pytest.mark.parametrize('change_class, setup, kwargs', [
+        (False, False, {}),
+        (False, True, {'dummy': None}),
+        (True, False, {}),
+        (True, True, {'test1': 'test', 'test2': 1337}),
+    ])
+    def test_clone_with_class_change(self, change_class, setup, kwargs):
+        queryset = ApplicationWithClassBasedProperties.objects.all()
+        assert isinstance(queryset, QueryablePropertiesQuerySetMixin)
+        cls = ValuesQuerySet if change_class else None
+        clone = queryset._clone(cls, setup, _fields=[], **kwargs)
+        assert isinstance(clone, ValuesQuerySet) is change_class
+        for name, value in kwargs.items():
+            assert getattr(clone, name) == value
 
 
 class TestLegacyIterable(object):

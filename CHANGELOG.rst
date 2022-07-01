@@ -4,6 +4,11 @@ Changelog
 master (unreleased)
 -------------------
 
+1.8.2 (2022-06-08)
+------------------
+
+- Fixed queryset cloning in conjunction with positional arguments in Django versions below 1.9
+
 1.8.1 (2022-03-05)
 ------------------
 
