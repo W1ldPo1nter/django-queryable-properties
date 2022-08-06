@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.8.3 (2022-08-06)
+------------------
+
 - Added support for Django 4.1
 
 1.8.2 (2022-06-08)
