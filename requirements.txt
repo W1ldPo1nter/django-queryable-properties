@@ -3,6 +3,7 @@ Django>=4.1,<4.2
 flake8==3.9.2
 isort==5.10.1
 pytest==6.2.5
+pytest-asyncio==0.19.0
 pytest-django==3.10.0
 Sphinx==4.3.0
 sphinx-rtd-theme==1.0.0
