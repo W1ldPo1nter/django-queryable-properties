@@ -3,6 +3,7 @@
 from datetime import date
 
 import pytest
+from django import VERSION as DJANGO_VERSION
 from mock import Mock
 
 try:
@@ -19,6 +20,10 @@ from .app_management.models import (
     CategoryWithDecoratorBasedProperties,
 )
 from .dummy_lib.models import ReleaseTypeModel
+
+collect_ignore_glob = []
+if DJANGO_VERSION < (4, 1):
+    collect_ignore_glob.append('*_async.py')
 
 
 @pytest.fixture
