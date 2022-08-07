@@ -21,9 +21,9 @@ from .app_management.models import (
 )
 from .dummy_lib.models import ReleaseTypeModel
 
-collect_ignore_glob = []
+collect_ignore = []
 if DJANGO_VERSION < (4, 1):
-    collect_ignore_glob.append('*_async.py')
+    collect_ignore.append('test_queries/test_async.py')
 
 
 @pytest.fixture
