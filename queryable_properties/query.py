@@ -102,7 +102,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         self._queryable_property_stack.append(property_ref)
         try:
             if property_ref not in self._queryable_property_annotations:
-                self.add_annotation(property_ref.get_annotation(), alias=annotation_name, is_summary=False)
+                self.add_annotation(property_ref.get_annotation(), alias=annotation_name)
                 if not select:
                     self.set_annotation_mask(annotation_mask)
                 self._queryable_property_annotations.add(property_ref)
