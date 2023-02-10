@@ -11,9 +11,9 @@ jobs:
     env:
       PYTHON: ${{ matrix.python-version }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install importlib-metadata for older Python versions
@@ -37,7 +37,7 @@ jobs:
       run: coverage xml
       if: ${{ success() }}
     - name: Upload coverage report
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v3
       with:
         env_vars: PYTHON
         files: coverage.xml
