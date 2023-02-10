@@ -61,4 +61,7 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
     def _build_subquery(self, queryset):
         from django.db.models import Exists
 
-        return Exists(queryset, negated=self.negated)
+        subquery = Exists(queryset)
+        if self.negated:
+            subquery = ~subquery
+        return subquery
