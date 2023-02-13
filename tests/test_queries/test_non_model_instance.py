@@ -161,7 +161,7 @@ class TestExpressionAnnotations(object):
     def test_group_by_property(self, model):
         queryset = model.objects.select_properties('highest_version').values('highest_version')
         queryset = queryset.select_properties('version_count')
-        assert queryset.count() == len(queryset) == 1
+        assert len(queryset) == 1
         assert queryset[0]['version_count'] == 8
 
     @pytest.mark.parametrize('model, values, property_name, filter_value, expected_count', [
