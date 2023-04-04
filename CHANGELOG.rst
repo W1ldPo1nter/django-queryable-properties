@@ -5,6 +5,7 @@ master (unreleased)
 -------------------
 
 - Added support for Django 4.2
+- Added support for Python 3.11
 
 1.8.3 (2022-08-06)
 ------------------
