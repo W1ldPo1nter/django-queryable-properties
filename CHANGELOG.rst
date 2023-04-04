@@ -8,7 +8,6 @@ master (unreleased)
 ------------------
 
 - Added support for Django 4.1
-- Added support for Python 3.11
 
 1.8.2 (2022-06-08)
 ------------------
