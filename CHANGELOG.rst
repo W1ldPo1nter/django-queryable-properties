@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.8.4 (2023-04-05)
+------------------
+
 - Added support for Django 4.2
 - Added support for Python 3.11
 
