@@ -4,16 +4,16 @@ on: [push]
 
 jobs:
   test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
-        python-version: ['2.7', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10']
+        python-version: ['2.7', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.11']
     env:
       PYTHON: ${{ matrix.python-version }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install importlib-metadata for older Python versions
@@ -25,10 +25,10 @@ jobs:
         matrix.python-version == '3.6' ||
         matrix.python-version == '3.7'
     - name: Install test utilities
-      run: pip install tox tox-factor "coverage<5"
+      run: pip install "tox<4" tox-factor "coverage<5"
     - name: Lint with flake8
       run: tox -e flake8
-      if: matrix.python-version == '3.10'
+      if: matrix.python-version == '3.11'
     - name: Test via tox
       run: |
         export TOXFACTOR=$(echo "py${{ matrix.python-version }}" | sed 's/\.//g')
@@ -37,7 +37,7 @@ jobs:
       run: coverage xml
       if: ${{ success() }}
     - name: Upload coverage report
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v3
       with:
         env_vars: PYTHON
         files: coverage.xml
