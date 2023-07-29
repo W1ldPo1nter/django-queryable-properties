@@ -19,13 +19,13 @@ jobs:
       if: matrix.python-version != '3.4'
     - name: Set up Python 3.4
       run: |
-        apt -y install software-properties-common libssl-dev openssl wget
+        sudo apt -y install software-properties-common libssl-dev openssl wget
         wget "https://www.python.org/ftp/python/3.4.10/Python-3.4.10.tgz"
-        tar -xvf "Python-3.4.10.tgz" -C /opt
-        ln -s "/opt/Python-3.4.10/Include" /usr/include/python3.4
+        sudo tar -xvf "Python-3.4.10.tgz" -C /opt
+        sudo ln -s "/opt/Python-3.4.10/Include" /usr/include/python3.4
         cd "/opt/Python-3.4.10"
         ./configure && make
-        make install
+        sudo make install
       if: matrix.python-version == '3.4'
     - name: Install importlib-metadata for older Python versions
       run: pip install "importlib-metadata<3"
