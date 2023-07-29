@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        python-version: ['2.7', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.11']
+        python-version: ['2.7', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.11']
     env:
       PYTHON: ${{ matrix.python-version }}
     steps:
@@ -16,6 +16,17 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+      if: matrix.python-version != '3.4'
+    - name: Set up Python 3.4
+      run: |
+        apt -y install software-properties-common libssl-dev openssl wget
+        wget "https://www.python.org/ftp/python/3.4.10/Python-3.4.10.tgz"
+        tar -xvf "Python-3.4.10.tgz" -C /opt
+        ln -s "/opt/Python-3.4.10/Include" /usr/include/python3.4
+        cd "/opt/Python-3.4.10"
+        ./configure && make
+        make install
+      if: matrix.python-version == '3.4'
     - name: Install importlib-metadata for older Python versions
       run: pip install "importlib-metadata<3"
       if: >-
