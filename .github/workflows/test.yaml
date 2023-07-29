@@ -24,7 +24,8 @@ jobs:
         sudo tar -xvf "Python-3.4.10.tgz" -C /opt
         sudo ln -s "/opt/Python-3.4.10/Include" /usr/include/python3.4
         cd "/opt/Python-3.4.10"
-        ./configure && make
+        sudo ./configure
+        sudo make
         sudo make install
       if: matrix.python-version == '3.4'
     - name: Install importlib-metadata for older Python versions
