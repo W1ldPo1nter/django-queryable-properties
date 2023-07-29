@@ -3,7 +3,7 @@ name: Tests
 on: [push]
 
 jobs:
-  test-2.7:
+  test-27:
     runs-on: ubuntu-20.04
     container: python:2.7.18-buster
     env:
@@ -27,7 +27,7 @@ jobs:
         verbose: true
       if: ${{ success() }}
 
-  test-3.4:
+  test-34:
     runs-on: ubuntu-20.04
     container: python:3.4.10-stretch
     env:
