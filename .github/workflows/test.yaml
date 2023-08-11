@@ -3,40 +3,40 @@ name: Tests
 on: [push]
 
 jobs:
-  test-27:
-    runs-on: ubuntu-20.04
-    container: python:2.7.18-buster
-    env:
-      PYTHON: '2.7'
-      TOXFACTOR: 'py27'
-    steps:
-    - uses: actions/checkout@v3
-    - name: Install test utilities
-      run: pip install "tox<4" tox-factor "coverage<5" "importlib-metadata<3"
-    - name: Test via tox
-      run: tox -- -p no:warnings
-    - name: Generate coverage report
-      run: coverage xml
-      if: ${{ success() }}
-    - name: Upload coverage report
-      uses: codecov/codecov-action@v3
-      with:
-        env_vars: PYTHON
-        files: coverage.xml
-        flags: unittests
-        verbose: true
-      if: ${{ success() }}
-
-  test-34:
-    runs-on: ubuntu-20.04
-    container: python:3.4.10-stretch
-    env:
-      PYTHON: '3.4'
-      TOXFACTOR: 'py34'
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - 'python:2.7-buster'
+          - 'python:3.4-stretch'
+          - 'python:3.5-buster'
+          - 'python:3.6-bullseye'
+          - 'python:3.7-bookworm'
+          - 'python:3.8-bookworm'
+          - 'python:3.10-bookworm'
+          - 'python:3.11-bookworm'
+    container:
+      image: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v3
+      - name: Set environment variables
+        run: |
+          echo "PYTHON=$(echo '${{ matrix.image }}' | sed -r 's/^python:([0-9]+)\.([0-9]+).*$/\1.\2/g')" >> $GITHUB_ENV
+          echo "TOXFACTOR=$(echo '${{ matrix.image }}' | sed -r 's/^python:([0-9]+)\.([0-9]+).*$/py\1\2/g')" >> $GITHUB_ENV
+      - name: Install importlib-metadata for older Python versions
+        run: pip install "importlib-metadata<3"
+        if: >-
+          matrix.image == 'python:2.7-buster' ||
+          matrix.image == 'python:3.4-stretch' ||
+          matrix.image == 'python:3.5-buster' ||
+          matrix.image == 'python:3.6-bullseye' ||
+          matrix.image == 'python:3.7-bookworm'
       - name: Install test utilities
-        run: pip install "tox<4" tox-factor "coverage<5" "importlib-metadata<3"
+        run: pip install "tox<4" tox-factor "coverage<5"
+      - name: Lint with flake8
+        run: tox -e flake8
+        if: matrix.image == 'python:3.11-bookworm'
       - name: Test via tox
         run: tox -- -p no:warnings
       - name: Generate coverage report
@@ -50,43 +50,3 @@ jobs:
           flags: unittests
           verbose: true
         if: ${{ success() }}
-
-  test:
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        python-version: ['3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.11']
-    env:
-      PYTHON: ${{ matrix.python-version }}
-    steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install importlib-metadata for older Python versions
-      run: pip install "importlib-metadata<3"
-      if: >-
-        matrix.python-version == '3.5' ||
-        matrix.python-version == '3.6' ||
-        matrix.python-version == '3.7'
-    - name: Install test utilities
-      run: pip install "tox<4" tox-factor "coverage<5"
-    - name: Lint with flake8
-      run: tox -e flake8
-      if: matrix.python-version == '3.11'
-    - name: Test via tox
-      run: |
-        export TOXFACTOR=$(echo "py${{ matrix.python-version }}" | sed 's/\.//g')
-        tox -- -p no:warnings
-    - name: Generate coverage report
-      run: coverage xml
-      if: ${{ success() }}
-    - name: Upload coverage report
-      uses: codecov/codecov-action@v3
-      with:
-        env_vars: PYTHON
-        files: coverage.xml
-        flags: unittests
-        verbose: true
-      if: ${{ success() }}
