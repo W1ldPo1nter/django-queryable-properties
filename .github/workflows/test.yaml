@@ -14,6 +14,7 @@ jobs:
           - 'python:3.6-bullseye'
           - 'python:3.7-bookworm'
           - 'python:3.8-bookworm'
+          - 'python:3.9-bookworm'
           - 'python:3.10-bookworm'
           - 'python:3.11-bookworm'
     container:
