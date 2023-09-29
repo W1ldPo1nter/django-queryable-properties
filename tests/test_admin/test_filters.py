@@ -7,6 +7,7 @@ from django.contrib.admin import ModelAdmin, site
 from django.contrib.admin.filters import BooleanFieldListFilter, ChoicesFieldListFilter, DateFieldListFilter
 from django.contrib.admin.views.main import ChangeList
 from django.db.models import DateField
+from django.http import QueryDict
 
 from queryable_properties.admin.filters import QueryablePropertyField, QueryablePropertyListFilter
 from queryable_properties.exceptions import QueryablePropertyError
@@ -129,7 +130,9 @@ class TestQueryablePropertyField(object):
         field.output_field = DateField(null=True)  # To set an output field for Django versions that don't support it
         request = rf.get('/')
         request.user = admin_user
-        list_filter = field.get_filter_creator()(request, params, admin_instance.model, admin_instance)
+        query_params = QueryDict(mutable=True)
+        query_params.update(params)
+        list_filter = field.get_filter_creator()(request, query_params, admin_instance.model, admin_instance)
         assert list_filter.queryset(request, admin_instance.get_queryset(request)).count() == expected_count
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
@@ -157,7 +160,9 @@ class TestQueryablePropertyField(object):
         field = QueryablePropertyField(admin_instance, QueryPath('has_version_with_changelog'))
         request = rf.get('/')
         request.user = admin_user
-        list_filter = field.get_filter_creator()(request, params, admin_instance.model, admin_instance)
+        query_params = QueryDict(mutable=True)
+        query_params.update(params)
+        list_filter = field.get_filter_creator()(request, query_params, admin_instance.model, admin_instance)
         assert list_filter.queryset(request, admin_instance.get_queryset(request)).count() == expected_count
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
@@ -193,7 +198,9 @@ class TestQueryablePropertyField(object):
         field = QueryablePropertyField(admin, QueryPath('release_type_verbose_name'))
         request = rf.get('/')
         request.user = admin_user
-        list_filter = field.get_filter_creator()(request, params, admin.model, admin)
+        query_params = QueryDict(mutable=True)
+        query_params.update(params)
+        list_filter = field.get_filter_creator()(request, query_params, admin.model, admin)
         assert list_filter.queryset(request, admin.get_queryset(request)).count() == expected_count
 
     @pytest.mark.django_db
@@ -228,7 +235,9 @@ class TestQueryablePropertyField(object):
         field = QueryablePropertyField(admin_instance, QueryPath('version_count'))
         request = rf.get('/')
         request.user = admin_user
-        list_filter = field.get_filter_creator()(request, params, admin_instance.model, admin_instance)
+        query_params = QueryDict(mutable=True)
+        query_params.update(params)
+        list_filter = field.get_filter_creator()(request, query_params, admin_instance.model, admin_instance)
         assert list_filter.queryset(request, admin_instance.get_queryset(request)).count() == expected_count
 
 
