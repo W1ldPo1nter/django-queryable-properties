@@ -2,6 +2,8 @@
 
 from __future__ import unicode_literals
 
+from copy import copy
+
 import six
 from django.db.models import Manager
 from django.db.models.query import QuerySet
@@ -420,24 +422,105 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         kwargs = self._resolve_update_kwargs(**kwargs)
         return super(QueryablePropertiesQuerySetMixin, self).update(**kwargs)
 
+    @classmethod
+    def apply_to(cls, queryset):
+        """
+        Copy the given queryset and apply this mixin (and thus queryable
+        properties functionality) to it, returning a new queryset that allows
+        to use queryable property interaction.
+
+        :param QuerySet queryset: The queryset to apply this mixin to.
+        :return: A copy of the given queryset with queryable properties
+                 functionality.
+        :rtype: QueryablePropertiesQuerySet
+        """
+        return cls.inject_into_object(chain_queryset(queryset))
+
 
 class QueryablePropertiesQuerySet(QueryablePropertiesQuerySetMixin, QuerySet):
     """
     A special queryset class that allows to use queryable properties in its
     filter conditions, annotations and update queries.
     """
-    pass
+
+    @classmethod
+    def get_for_model(cls, model):
+        """
+        Get a new queryset with queryable properties functionality for the
+        given model. The queryset is built using the model's default manager.
+
+        :param model: The model class for which the queryset should be built.
+        :return: A new queryset with queryable properties functionality.
+        :rtype: QueryablePropertiesQuerySet
+        """
+        return QueryablePropertiesQuerySetMixin.inject_into_object(model._default_manager.all())
 
 
-if hasattr(Manager, 'from_queryset'):
-    QueryablePropertiesManager = Manager.from_queryset(QueryablePropertiesQuerySet)
-else:  # pragma: no cover
-    class QueryablePropertiesManager(Manager):
+class QueryablePropertiesManagerMixin(InjectableMixin):
+    """
+    A mixin for Django's :class:`django.db.models.Manager` objects that allows
+    to use queryable properties methods and returns
+    :class:`QueryablePropertiesQuerySet` instances.
+    """
 
-        def get_queryset(self):
-            return QueryablePropertiesQuerySet(self.model, using=self._db)
+    def get_queryset(self):
+        queryset = super(QueryablePropertiesManagerMixin, self).get_queryset()
+        return QueryablePropertiesQuerySetMixin.inject_into_object(queryset)
 
-        get_query_set = get_queryset
+    get_query_set = get_queryset
 
-        def select_properties(self, *names):
-            return self.get_queryset().select_properties(*names)
+    def select_properties(self, *names):
+        """
+        Return a new queryset and add the annotations of the queryable
+        properties with the specified names to this query. The annotation
+        values will be cached in the properties of resulting model instances,
+        regardless of the regular caching behavior of the queried properties.
+
+        :param names: Names of queryable properties.
+        :return: A copy of this queryset with the added annotations.
+        :rtype: QuerySet
+        """
+        return self.get_queryset().select_properties(*names)
+
+    @classmethod
+    def apply_to(cls, manager):
+        """
+        Copy the given manager and apply this mixin (and thus queryable
+        properties functionality) to it, returning a new manager that allows
+        to use queryable property interaction.
+
+        :param Manager manager: The manager to apply this mixin to.
+        :return: A copy of the given manager with queryable properties
+                 functionality.
+        :rtype: QueryablePropertiesManager
+        """
+        manager = copy(manager)
+        manager.name = '<{}_with_queryable_properties>'.format(manager.name or 'manager')
+        return cls.inject_into_object(manager)
+
+
+class QueryablePropertiesManager(QueryablePropertiesManagerMixin, Manager):
+    """
+    A special manager class that allows to use queryable properties methods
+    and returns :class:`QueryablePropertiesQuerySet` instances.
+    """
+
+    @classmethod
+    def get_for_model(cls, model, using=None, hints=None):
+        """
+        Get a new manager with queryable properties functionality for the
+        given model.
+
+        :param model: The model class for which the manager should be built.
+        :param str | None using: An optional name of the database connection
+                                 to use.
+        :param dict | None hints: Optional hints for the db connection.
+        :return: A new manager with queryable properties functionality.
+        :rtype: QueryablePropertiesManager
+        """
+        manager = cls()
+        manager.model = model
+        manager.name = '<manager_with_queryable_properties>'
+        manager._db = using
+        manager._hints = hints or {}
+        return manager
