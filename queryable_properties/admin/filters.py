@@ -10,7 +10,7 @@ from django.contrib.admin.views import main
 from django.db.models import BooleanField, DateField
 
 from ..exceptions import QueryablePropertyError
-from ..managers import QueryablePropertiesQuerySetMixin
+from ..managers import QueryablePropertiesQuerySet
 from ..properties import MappingProperty
 from ..utils.internal import QueryPath, get_output_field, resolve_queryable_property
 
@@ -85,8 +85,7 @@ class QueryablePropertyField(object):
                 yield value, label
         elif not isinstance(self.output_field, BooleanField):
             name = six.text_type(QueryPath(('', 'value')))
-            queryset = QueryablePropertiesQuerySetMixin.inject_into_object(
-                self.property_ref.model._default_manager.all())
+            queryset = QueryablePropertiesQuerySet.get_for_model(self.property_ref.model)
             queryset = queryset.annotate(**{name: self.property_ref.get_annotation()}).order_by(name).distinct()
             for value in queryset.values_list(name, flat=True):
                 yield value, six.text_type(value) if value is not None else self.empty_value_display

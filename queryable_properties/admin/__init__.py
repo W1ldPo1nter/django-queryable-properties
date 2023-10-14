@@ -2,7 +2,7 @@
 
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
-from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation, chain_queryset
+from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import QueryPath
@@ -73,7 +73,7 @@ class QueryablePropertiesAdminMixin(object):
         # comment on the constant definition).
         base_method = getattr(super(QueryablePropertiesAdminMixin, self), ADMIN_QUERYSET_METHOD_NAME)
         # Make sure to use a queryset with queryable properties features.
-        queryset = QueryablePropertiesQuerySetMixin.inject_into_object(chain_queryset(base_method(request)))
+        queryset = QueryablePropertiesQuerySetMixin.apply_to(base_method(request))
         # Apply list_select_properties.
         list_select_properties = self.get_list_select_properties(request)
         if list_select_properties:
