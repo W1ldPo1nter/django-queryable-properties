@@ -118,6 +118,10 @@ class CircularProperty(AnnotationMixin, QueryableProperty):
         return models.F('circular')
 
 
+class ApplicationTag(models.Model):  # Model with nothing queryable-property-related
+    label = models.CharField(max_length=100)
+
+
 class Category(models.Model):
     name = models.CharField(max_length=255)
 
@@ -165,6 +169,7 @@ class Application(models.Model):
 
 class ApplicationWithClassBasedProperties(Application):
     categories = models.ManyToManyField(CategoryWithClassBasedProperties, related_name='applications')
+    tags = models.ManyToManyField(ApplicationTag, related_name='tags')
 
     objects = QueryablePropertiesManager()
 

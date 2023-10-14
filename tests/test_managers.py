@@ -13,8 +13,8 @@ from queryable_properties.managers import (
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryablePropertyReference, QueryPath
 from .app_management.models import (
-    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
-    VersionWithDecoratorBasedProperties,
+    ApplicationTag, ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
+    VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
 )
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
@@ -82,6 +82,15 @@ class TestQueryablePropertiesQuerySetMixin(object):
         assert isinstance(clone, ValuesQuerySet) is change_class
         for name, value in kwargs.items():
             assert getattr(clone, name) == value
+
+    def test_apply_to(self):
+        queryset_without_properties = ApplicationTag.objects.all()
+        assert not isinstance(queryset_without_properties, QueryablePropertiesQuerySetMixin)
+
+        queryset = QueryablePropertiesQuerySetMixin.apply_to(queryset_without_properties)
+        assert queryset is not queryset_without_properties
+        assert isinstance(queryset, QueryablePropertiesQuerySetMixin)
+        assert list(queryset_without_properties) == list(queryset)
 
 
 class TestLegacyIterable(object):

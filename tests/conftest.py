@@ -16,8 +16,8 @@ except ImportError:
     Concat = Mock(return_value=Mock(output_field=None))
 
 from .app_management.models import (
-    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
-    CategoryWithDecoratorBasedProperties,
+    ApplicationTag, ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
+    CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
 )
 from .dummy_lib.models import ReleaseTypeModel
 
@@ -68,3 +68,14 @@ def versions(applications):
                                         release_type=ReleaseTypeModel.ALPHA, supported_from=date(2018, 11, 1)),
         ])
     return objs
+
+
+@pytest.fixture
+def tags(applications):
+    tags = [
+        ApplicationTag.objects.create(label='FOSS'),
+        ApplicationTag.objects.create(label='Proprietary'),
+    ]
+    applications[0].tags.add(tags[0])
+    applications[1].tags.add(tags[1])
+    return tags
