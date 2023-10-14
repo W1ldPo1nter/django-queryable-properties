@@ -12,6 +12,7 @@ except ImportError:  # pragma: no cover
 
 import six
 from django.contrib.admin.options import ModelAdmin
+from django.db.models import Manager
 from django.db.models.query import QuerySet
 from django.db.models.sql.query import Query
 
@@ -103,6 +104,7 @@ QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
 # Recent Django versions (>=3.1) have a property guarding the query attribute.
 QUERYSET_QUERY_ATTRIBUTE_NAME = '_query' if hasattr(QuerySet, 'query') else 'query'
 
+MANAGER_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(Manager, 'get_queryset') else 'get_query_set'
 # The `get_queryset` method of ModelAdmins was called `queryset` in very old
 # Django versions.
 ADMIN_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
