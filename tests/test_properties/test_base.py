@@ -10,6 +10,7 @@ from queryable_properties.properties import (
     CACHE_RETURN_VALUE, CACHE_VALUE, CLEAR_CACHE, DO_NOTHING, AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin,
     QueryableProperty, queryable_property,
 )
+from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.properties.base import QueryablePropertyDescriptor
 from queryable_properties.utils import get_queryable_property, reset_queryable_property
 from ..app_management.models import (
@@ -86,6 +87,15 @@ class TestQueryablePropertyDescriptor(object):
         for value, expected_value in zip(values, expected_values):
             setattr(model_instance, dummy_property.name, value)
             assert getattr(model_instance, dummy_property.name) == expected_value
+
+    @pytest.mark.parametrize('setter_cache_behavior', [CLEAR_CACHE, CACHE_VALUE, CACHE_RETURN_VALUE, DO_NOTHING])
+    def test_set_querying_properties_marker(self, monkeypatch, dummy_property, model_instance, setter_cache_behavior):
+        monkeypatch.setattr(dummy_property, 'setter_cache_behavior', setter_cache_behavior)
+        setattr(model_instance, QUERYING_PROPERTIES_MARKER, True)
+        setattr(model_instance, dummy_property.name, 1337)
+        descriptor = getattr(model_instance.__class__, dummy_property.name)
+        assert descriptor.has_cached_value(model_instance)
+        assert descriptor.get_cached_value(model_instance) == 1337
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_set_via_init_kwargs(self, model):

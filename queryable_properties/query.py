@@ -1,5 +1,6 @@
 # encoding: utf-8
 
+from collections import OrderedDict
 from contextlib import contextmanager
 
 import six
@@ -11,6 +12,8 @@ from .compat import (
 )
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
+
+QUERYING_PROPERTIES_MARKER = '__querying_properties__'
 
 
 class AggregatePropertyChecker(NodeChecker):
@@ -51,6 +54,28 @@ class AggregatePropertyChecker(NodeChecker):
 aggregate_property_checker = AggregatePropertyChecker()
 
 
+class QueryablePropertiesCompilerMixin(InjectableMixin):
+    """
+    A mixin for :class:`django.db.models.sql.compiler.SQLCompiler` objects that
+    extends the original Django objects to inject the
+    ``QUERYING_PROPERTIES_MARKER``.
+    """
+
+    def setup_query(self, *args, **kwargs):
+        super(QueryablePropertiesCompilerMixin, self).setup_query(*args, **kwargs)
+        # Add the marker to the column map while ensuring that it's the first
+        # entry.
+        annotation_col_map = OrderedDict()
+        annotation_col_map[QUERYING_PROPERTIES_MARKER] = -1
+        annotation_col_map.update(self.annotation_col_map)
+        self.annotation_col_map = annotation_col_map
+
+    def results_iter(self, *args, **kwargs):
+        for row in super(QueryablePropertiesCompilerMixin, self).results_iter(*args, **kwargs):
+            row += row.__class__((True,))  # TODO
+            yield row
+
+
 class QueryablePropertiesQueryMixin(InjectableMixin):
     """
     A mixin for :class:`django.db.models.sql.Query` objects that extends the
@@ -73,6 +98,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # A stack for queryable properties who are currently being annotated.
         # Required to correctly resolve dependencies and perform annotations.
         self._queryable_property_stack = []
+        # Determines whether to inject the QUERYING_PROPERTIES_MARKER.
+        self._use_querying_properties_marker = False
 
     @contextmanager
     def _add_queryable_property_annotation(self, property_ref, full_group_by, select=False):
@@ -269,6 +296,12 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                                 in self._queryable_property_annotations)
             self.set_annotation_mask(self.annotation_select_mask.union(annotation_names))
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
+
+    def get_compiler(self, *args, **kwargs):
+        compiler = super(QueryablePropertiesQueryMixin, self).get_compiler(*args, **kwargs)
+        if self._use_querying_properties_marker:
+            QueryablePropertiesCompilerMixin.inject_into_object(compiler)
+        return compiler
 
     def need_force_having(self, q_object):  # pragma: no cover
         # Same as need_having, but for even older versions. Simply delegate to
