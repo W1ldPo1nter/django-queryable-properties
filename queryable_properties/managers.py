@@ -12,7 +12,7 @@ from .compat import (
     DateTimeQuerySet, ModelIterable, ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset,
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from .query import QueryablePropertiesQueryMixin
+from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
 from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPath
 
@@ -144,42 +144,13 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
     different names and avoid using the setter methods.
     """
 
-    @cached_property
-    def _queryable_property_aliases(self):
-        """
-        Cache and return the final aliases for all selected queryable
-        properties.
-
-        :return: A dictionary mapping property references (keys) to their final
-                 aliases (values).
-        :rtype: dict[queryable_properties.utils.internal.QueryablePropertyReference, str]
-        """
-        query = self.queryset.query
-        # Suffix the original annotation name with the lookup separator to
-        # create a non-clashing name: both model field an queryable property
-        # names are not allowed to contain the separator and a relation path
-        # ending with the separator would be invalid as well.
-        return {ref: six.text_type(ref.full_path + '') for ref in query._queryable_property_annotations
-                if six.text_type(ref.full_path) in query.annotation_select}
-
     def _setup_queryable_properties(self):
         super(QueryablePropertiesModelIterableMixin, self)._setup_queryable_properties()
-        query = self.queryset.query
-        select = dict(query.annotation_select)
-
-        for property_ref, changed_name in six.iteritems(self._queryable_property_aliases):
-            select[changed_name] = select.pop(six.text_type(property_ref.full_path))
-        setattr(query, ANNOTATION_SELECT_CACHE_NAME, select)
+        self.queryset.query._use_querying_properties_marker = True
 
     def _postprocess_queryable_properties(self, obj):
         obj = super(QueryablePropertiesModelIterableMixin, self)._postprocess_queryable_properties(obj)
-        # Retrieve the annotation values from each renamed attribute and use it
-        # to populate the cache for the corresponding queryable property on
-        # each object while removing the weird, renamed attributes.
-        for property_ref, changed_name in six.iteritems(self._queryable_property_aliases):
-            value = getattr(obj, changed_name)
-            delattr(obj, changed_name)
-            property_ref.descriptor.set_cached_value(obj, value)
+        delattr(obj, QUERYING_PROPERTIES_MARKER)
         return obj
 
 
