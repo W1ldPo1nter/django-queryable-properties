@@ -167,37 +167,9 @@ class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyO
     versions that require additional ordering setup.
     """
 
-    @cached_property
-    def _discarded_attr_names(self):
-        """
-        Cache and return the attribute names of queryable properties that were
-        only selected for ordering and must thus be discarded.
-
-        :return: A set containing the attribute names to discard.
-        :rtype: set[str]
-        """
-        # The forcibly selected properties will have a changed alias due to the
-        # QueryablePropertiesModelIterableMixin. This alias should also be
-        # removed from the dictionary to keep the mixin from populating the
-        # properties.
-        return {self._queryable_property_aliases.pop(ref) for ref in self._order_by_select}
-
-    def _setup_queryable_properties(self):  # pragma: no cover
-        super(LegacyOrderingModelIterable, self)._setup_queryable_properties()
-        query = self.queryset.query
-
-        # Properties used for ordering may have a changed alias due to the
-        # QueryablePropertiesModelIterableMixin, so the order_by items must be
-        # adjusted accordingly.
-        for ref, occurrences in six.iteritems(self._order_by_occurrences):
-            annotation_name = six.text_type(ref.full_path)
-            changed_name = self._queryable_property_aliases[ref]
-            for index in occurrences:
-                query.order_by[index] = query.order_by[index].replace(annotation_name, changed_name)
-
     def _postprocess_queryable_properties(self, obj):
-        for attr_name in self._discarded_attr_names:
-            delattr(obj, attr_name)
+        for ref in self._order_by_select:
+            ref.descriptor.clear_cached_value(obj)
         return super(LegacyOrderingModelIterable, self)._postprocess_queryable_properties(obj)
 
 
