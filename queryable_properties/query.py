@@ -72,7 +72,12 @@ class QueryablePropertiesCompilerMixin(InjectableMixin):
 
     def results_iter(self, *args, **kwargs):
         for row in super(QueryablePropertiesCompilerMixin, self).results_iter(*args, **kwargs):
-            row += row.__class__((True,))  # TODO
+            addition = row.__class__((True,))
+            if not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
+                row += addition
+            else:  # pragma: no cover
+                index = len(row) - len(self.query.aggregate_select) - len(self.query.related_select_cols)
+                row = row[:index] + addition + row[index:]
             yield row
 
 
@@ -242,6 +247,15 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 self._auto_annotate(QueryPath(field_name))
         return super(QueryablePropertiesQueryMixin, self).add_ordering(*ordering, **kwargs)
 
+    @property
+    def aggregate_select(self):
+        select = original = super(QueryablePropertiesQueryMixin, self).aggregate_select
+        if self._use_querying_properties_marker:
+            select = OrderedDict()
+            select[QUERYING_PROPERTIES_MARKER] = None
+            select.update(original)
+        return select
+
     def build_filter(self, filter_expr, *args, **kwargs):
         # Check if the given filter expression is meant to use a queryable
         # property. Therefore, the possibility of filter_expr not being of the
@@ -298,8 +312,10 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
 
     def get_compiler(self, *args, **kwargs):
+        use_marker = self._use_querying_properties_marker
+        self._use_querying_properties_marker = False
         compiler = super(QueryablePropertiesQueryMixin, self).get_compiler(*args, **kwargs)
-        if self._use_querying_properties_marker:
+        if use_marker:
             QueryablePropertiesCompilerMixin.inject_into_object(compiler)
         return compiler
 
