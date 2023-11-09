@@ -346,7 +346,8 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # legacy ordering setup.
         if ('_iterable_class' not in self.__dict__ and
                 not (isinstance(self, ValuesQuerySet) and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and
-                not (DateQuerySet and isinstance(self, (DateQuerySet, DateTimeQuerySet)))):  # pragma: no cover
+                not (DateQuerySet and isinstance(self, DateQuerySet)) and
+                not (DateTimeQuerySet and isinstance(self, DateTimeQuerySet))):  # pragma: no cover
             iterable_class = LegacyOrderingModelIterable
             if not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
                 iterable_class = LegacyModelIterable
