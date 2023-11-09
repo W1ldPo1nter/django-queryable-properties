@@ -8,7 +8,7 @@ from six.moves import cPickle
 from queryable_properties.compat import ModelIterable, ValuesQuerySet
 from queryable_properties.managers import (
     LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable, LegacyValuesIterable, LegacyValuesListIterable,
-    QueryablePropertiesIterableMixin, QueryablePropertiesQuerySetMixin,
+    QueryablePropertiesIterableMixin, QueryablePropertiesQuerySetMixin, QueryingPropertiesMarkerMixin,
 )
 from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.utils import get_queryable_property
@@ -22,6 +22,10 @@ pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
 class DummyIterable(QueryablePropertiesIterableMixin, ModelIterable or LegacyIterable):
+    pass
+
+
+class DummyMarkerIterable(QueryingPropertiesMarkerMixin, LegacyIterable):
     pass
 
 
@@ -129,6 +133,15 @@ class TestQueryablePropertiesIterableMixin(object):
         assert mock_postprocess.call_count == len(applications)
         for application in applications:
             mock_postprocess.assert_any_call(application)
+
+
+class TestQueryingPropertiesMarkerMixin(object):
+
+    def test_setup_queryable_properties(self):
+        queryset = ApplicationWithClassBasedProperties.objects.all()
+        iterable = DummyMarkerIterable(queryset)
+        iterable._setup_queryable_properties()
+        assert iterable.queryset.query._inject_querying_properties_marker is True
 
 
 class TestLegacyOrderingMixin(object):

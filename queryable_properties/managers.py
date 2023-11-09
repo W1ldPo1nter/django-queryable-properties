@@ -136,17 +136,9 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
     """
     A mixin for iterables that yield model instances.
 
-    Changes the internal aliases of the annotations that belong to queryable
-    properties in the query of the associated queryset to something unique.
-    This is necessary to allow Django to populate the annotation attributes on
-    the resulting model instances, which would otherwise call the setter of the
-    queryable properties. This way, Django can populate attributes with
-    different names and avoid using the setter methods.
+    Removes the ``QUERYING_PROPERTIES_MARKER``from created model instances to
+    ensure that the setters of queryable properties can be used properly.
     """
-
-    def _setup_queryable_properties(self):
-        super(QueryablePropertiesModelIterableMixin, self)._setup_queryable_properties()
-        self.queryset.query._use_querying_properties_marker = True
 
     def _postprocess_queryable_properties(self, obj):
         obj = super(QueryablePropertiesModelIterableMixin, self)._postprocess_queryable_properties(obj)
@@ -154,14 +146,26 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
         return obj
 
 
-class LegacyModelIterable(QueryablePropertiesModelIterableMixin, LegacyIterable):
+class QueryingPropertiesMarkerMixin(QueryablePropertiesIterableMixin):
+    """
+    A mixin for iterables that ensures that the querying properties marker is
+    injected into the corresponding query.
+    """
+
+    def _setup_queryable_properties(self):
+        super(QueryingPropertiesMarkerMixin, self)._setup_queryable_properties()
+        self.queryset.query._inject_querying_properties_marker = True
+
+
+class LegacyModelIterable(QueryingPropertiesMarkerMixin, QueryablePropertiesModelIterableMixin, LegacyIterable):
     """
     Legacy iterable class for querysets that yield model instances in Django
     versions that don't require additional ordering setup.
     """
 
 
-class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyOrderingMixin, LegacyIterable):
+class LegacyOrderingModelIterable(QueryingPropertiesMarkerMixin, QueryablePropertiesModelIterableMixin,
+                                  LegacyOrderingMixin, LegacyIterable):
     """
     Legacy iterable class for querysets that yield model instances in Django
     versions that require additional ordering setup.
