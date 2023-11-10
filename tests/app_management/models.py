@@ -190,12 +190,6 @@ class ApplicationWithClassBasedProperties(Application):
     class Meta:
         verbose_name = 'Application'
 
-    @classmethod
-    def from_db(cls, db, field_names, values):
-        new = super(ApplicationWithClassBasedProperties, cls).from_db(db, field_names, values)
-        new._test = cls.__name__
-        return new
-
 
 class ApplicationWithDecoratorBasedProperties(Application):
     categories = models.ManyToManyField(CategoryWithDecoratorBasedProperties, related_name='applications')

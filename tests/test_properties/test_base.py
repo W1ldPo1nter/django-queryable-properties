@@ -14,8 +14,8 @@ from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.properties.base import QueryablePropertyDescriptor
 from queryable_properties.utils import get_queryable_property, reset_queryable_property
 from ..app_management.models import (
-    ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, Category, DummyProperty,
-    VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
+    ApplicationWithClassBasedProperties, Category, DummyProperty, VersionWithClassBasedProperties,
+    VersionWithDecoratorBasedProperties,
 )
 
 
@@ -166,21 +166,6 @@ class TestQueryableProperty(object):
         assert dummy_property.model is model_instance.__class__
         assert six.get_method_function(model_instance.reset_property) is reset_queryable_property
         # TODO: test that an existing method with the name reset_property will not be overridden
-
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="The from_db method didn't exist before Django 1.8")
-    @pytest.mark.parametrize('model, expect_test_attr', [
-        (ApplicationWithClassBasedProperties, True),
-        (ApplicationWithDecoratorBasedProperties, False),
-        (VersionWithClassBasedProperties, True),
-        (VersionWithDecoratorBasedProperties, True),
-    ])
-    def test_from_db(self, model, expect_test_attr):
-        instance = model.from_db(None, ['id'], [1337])
-        assert getattr(instance, QUERYING_PROPERTIES_MARKER) is True
-        if expect_test_attr:
-            assert instance._test == model.__name__
-        else:
-            assert not hasattr(instance, '_test')
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_pickle_unpickle(self, model):

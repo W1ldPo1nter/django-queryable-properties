@@ -26,9 +26,3 @@ class ReleaseTypeModel(models.Model):
 
     class Meta:
         abstract = True
-
-    @classmethod
-    def from_db(cls, db, field_names, values):
-        new = super(ReleaseTypeModel, cls).from_db(db, field_names, values)
-        new._test = cls.__name__
-        return new

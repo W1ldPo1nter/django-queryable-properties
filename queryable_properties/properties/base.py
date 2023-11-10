@@ -3,7 +3,7 @@
 from __future__ import unicode_literals
 
 from copy import deepcopy
-from functools import partial, wraps
+from functools import partial
 
 import six
 
@@ -207,30 +207,16 @@ class QueryableProperty(object):
         if LOOKUP_SEP in name:
             raise QueryablePropertyError('The name of a queryable property must not contain the lookup separator "{}".'
                                          .format(LOOKUP_SEP))
-
         # Store some useful values on model class initialization.
         self.model = self.model or cls
         self.name = self.name or name
         if self.verbose_name is None:
             self.verbose_name = pretty_name(self.name)
         setattr(cls, name, QueryablePropertyDescriptor(self))  # Add a descriptor for this property to the model class
-
         # If not already set, also add a method to the model class that allows
         # to reset the cached values of queryable properties.
         if not getattr(cls, RESET_METHOD_NAME, None):
             setattr(cls, RESET_METHOD_NAME, reset_queryable_property)
-
-        # Patch the from_db method to ensure that the querying properties
-        # marker is set whenever instances are loaded from the DB.
-        original_from_db = getattr(cls, 'from_db', None)
-        if original_from_db and not getattr(original_from_db.__func__, QUERYING_PROPERTIES_MARKER, False):
-            @wraps(cls.from_db)
-            def from_db(model, *args, **kwargs):
-                new = original_from_db.__func__(model, *args, **kwargs)
-                setattr(new, QUERYING_PROPERTIES_MARKER, True)
-                return new
-            setattr(from_db, QUERYING_PROPERTIES_MARKER, True)
-            cls.from_db = classmethod(from_db)
 
 
 class queryable_property(QueryableProperty):
