@@ -136,12 +136,8 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
     """
     A mixin for iterables that yield model instances.
 
-    Changes the internal aliases of the annotations that belong to queryable
-    properties in the query of the associated queryset to something unique.
-    This is necessary to allow Django to populate the annotation attributes on
-    the resulting model instances, which would otherwise call the setter of the
-    queryable properties. This way, Django can populate attributes with
-    different names and avoid using the setter methods.
+    Removes the ``QUERYING_PROPERTIES_MARKER``from created model instances to
+    ensure that the setters of queryable properties can be used properly.
     """
 
     def _setup_queryable_properties(self):

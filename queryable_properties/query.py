@@ -72,6 +72,11 @@ class QueryablePropertiesCompilerMixin(InjectableMixin):
 
     def results_iter(self, *args, **kwargs):
         for row in super(QueryablePropertiesCompilerMixin, self).results_iter(*args, **kwargs):
+            # Add the fixed value for the fake querying properties marker
+            # annotation to each row. In recent versions, the value can simply
+            # be appended since -1 can be specified as the index in the
+            # annotation_col_map. In old versions, the value must be injected
+            # as the first annotation value.
             addition = row.__class__((True,))
             if not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
                 row += addition
@@ -248,9 +253,13 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         return super(QueryablePropertiesQueryMixin, self).add_ordering(*ordering, **kwargs)
 
     @property
-    def aggregate_select(self):
+    def aggregate_select(self):  # pragma: no cover
         select = original = super(QueryablePropertiesQueryMixin, self).aggregate_select
         if self._use_querying_properties_marker:
+            # Since old Django versions don't offer the annotation_col_map on
+            # compilers, but read the annotations directly from the query, the
+            # querying properties marker has to be injected here. The value for
+            # the annotation will be provided via the compiler mixin.
             select = OrderedDict()
             select[QUERYING_PROPERTIES_MARKER] = None
             select.update(original)
