@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+- Selected queryable properties are no longer aliased with a unique name in queries and use their regular name instead
+  (also fixes errors that occurred when queries use themselves as subqueries recursively, e.g. in sliced prefetches)
+
 1.8.4 (2023-04-05)
 ------------------
 
