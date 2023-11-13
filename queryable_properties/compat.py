@@ -39,9 +39,14 @@ except ImportError:  # pragma: no cover
     ModelIterable = None
 
 try:  # pragma: no cover
-    from django.db.models.query import DateQuerySet, DateTimeQuerySet  # noqa: F401
+    from django.db.models.query import DateQuerySet  # noqa: F401
 except ImportError:  # pragma: no cover
-    DateQuerySet = DateTimeQuerySet = None  # noqa: F401
+    DateQuerySet = None  # noqa: F401
+
+try:  # pragma: no cover
+    from django.db.models.query import DateTimeQuerySet  # noqa: F401
+except ImportError:  # pragma: no cover
+    DateTimeQuerySet = None  # noqa: F401
 
 try:  # pragma: no cover
     from django.forms.utils import pretty_name  # noqa: F401
