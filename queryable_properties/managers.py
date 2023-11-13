@@ -12,7 +12,7 @@ from .compat import (
     DateTimeQuerySet, ModelIterable, ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset,
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from .query import QueryablePropertiesQueryMixin
+from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
 from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPath
 
@@ -136,50 +136,17 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
     """
     A mixin for iterables that yield model instances.
 
-    Changes the internal aliases of the annotations that belong to queryable
-    properties in the query of the associated queryset to something unique.
-    This is necessary to allow Django to populate the annotation attributes on
-    the resulting model instances, which would otherwise call the setter of the
-    queryable properties. This way, Django can populate attributes with
-    different names and avoid using the setter methods.
+    Removes the ``QUERYING_PROPERTIES_MARKER``from created model instances to
+    ensure that the setters of queryable properties can be used properly.
     """
-
-    @cached_property
-    def _queryable_property_aliases(self):
-        """
-        Cache and return the final aliases for all selected queryable
-        properties.
-
-        :return: A dictionary mapping property references (keys) to their final
-                 aliases (values).
-        :rtype: dict[queryable_properties.utils.internal.QueryablePropertyReference, str]
-        """
-        query = self.queryset.query
-        # Suffix the original annotation name with the lookup separator to
-        # create a non-clashing name: both model field an queryable property
-        # names are not allowed to contain the separator and a relation path
-        # ending with the separator would be invalid as well.
-        return {ref: six.text_type(ref.full_path + '') for ref in query._queryable_property_annotations
-                if six.text_type(ref.full_path) in query.annotation_select}
 
     def _setup_queryable_properties(self):
         super(QueryablePropertiesModelIterableMixin, self)._setup_queryable_properties()
-        query = self.queryset.query
-        select = dict(query.annotation_select)
-
-        for property_ref, changed_name in six.iteritems(self._queryable_property_aliases):
-            select[changed_name] = select.pop(six.text_type(property_ref.full_path))
-        setattr(query, ANNOTATION_SELECT_CACHE_NAME, select)
+        self.queryset.query._use_querying_properties_marker = True
 
     def _postprocess_queryable_properties(self, obj):
         obj = super(QueryablePropertiesModelIterableMixin, self)._postprocess_queryable_properties(obj)
-        # Retrieve the annotation values from each renamed attribute and use it
-        # to populate the cache for the corresponding queryable property on
-        # each object while removing the weird, renamed attributes.
-        for property_ref, changed_name in six.iteritems(self._queryable_property_aliases):
-            value = getattr(obj, changed_name)
-            delattr(obj, changed_name)
-            property_ref.descriptor.set_cached_value(obj, value)
+        delattr(obj, QUERYING_PROPERTIES_MARKER)
         return obj
 
 
@@ -196,37 +163,9 @@ class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyO
     versions that require additional ordering setup.
     """
 
-    @cached_property
-    def _discarded_attr_names(self):
-        """
-        Cache and return the attribute names of queryable properties that were
-        only selected for ordering and must thus be discarded.
-
-        :return: A set containing the attribute names to discard.
-        :rtype: set[str]
-        """
-        # The forcibly selected properties will have a changed alias due to the
-        # QueryablePropertiesModelIterableMixin. This alias should also be
-        # removed from the dictionary to keep the mixin from populating the
-        # properties.
-        return {self._queryable_property_aliases.pop(ref) for ref in self._order_by_select}
-
-    def _setup_queryable_properties(self):  # pragma: no cover
-        super(LegacyOrderingModelIterable, self)._setup_queryable_properties()
-        query = self.queryset.query
-
-        # Properties used for ordering may have a changed alias due to the
-        # QueryablePropertiesModelIterableMixin, so the order_by items must be
-        # adjusted accordingly.
-        for ref, occurrences in six.iteritems(self._order_by_occurrences):
-            annotation_name = six.text_type(ref.full_path)
-            changed_name = self._queryable_property_aliases[ref]
-            for index in occurrences:
-                query.order_by[index] = query.order_by[index].replace(annotation_name, changed_name)
-
     def _postprocess_queryable_properties(self, obj):
-        for attr_name in self._discarded_attr_names:
-            delattr(obj, attr_name)
+        for ref in self._order_by_select:
+            ref.descriptor.clear_cached_value(obj)
         return super(LegacyOrderingModelIterable, self)._postprocess_queryable_properties(obj)
 
 
@@ -403,7 +342,8 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         # legacy ordering setup.
         if ('_iterable_class' not in self.__dict__ and
                 not (isinstance(self, ValuesQuerySet) and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and
-                not (DateQuerySet and isinstance(self, (DateQuerySet, DateTimeQuerySet)))):  # pragma: no cover
+                not (DateQuerySet and isinstance(self, DateQuerySet)) and
+                not (DateTimeQuerySet and isinstance(self, DateTimeQuerySet))):  # pragma: no cover
             iterable_class = LegacyOrderingModelIterable
             if not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
                 iterable_class = LegacyModelIterable

@@ -9,6 +9,7 @@ import six
 
 from ..compat import LOOKUP_SEP, pretty_name
 from ..exceptions import QueryablePropertyError
+from ..query import QUERYING_PROPERTIES_MARKER
 from ..utils import get_queryable_property, reset_queryable_property
 from ..utils.internal import parametrizable_decorator_method
 from .cache_behavior import CLEAR_CACHE
@@ -57,6 +58,11 @@ class QueryablePropertyDescriptor(property):
         return value
 
     def __set__(self, obj, value):
+        # Values set while initializing new objects from DB values should
+        # always be cached regardless of the actual setter.
+        if getattr(obj, QUERYING_PROPERTIES_MARKER, False):
+            self.set_cached_value(obj, value)
+            return
         if not self.prop.set_value:
             raise AttributeError("Can't set queryable property.")
         return_value = self.prop.set_value(obj, value)
