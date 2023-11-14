@@ -17,6 +17,8 @@ supported Python versions:
 +----------------+---------------------------+
 | Django version | Supported Python versions |
 +================+===========================+
+| 5.0            | 3.12, 3.11, 3.10          |
++----------------+---------------------------+
 | 4.2            | 3.11, 3.10, 3.9, 3.8      |
 +----------------+---------------------------+
 | 4.1            | 3.11, 3.10, 3.9, 3.8      |
@@ -53,6 +55,6 @@ supported Python versions:
 +----------------+---------------------------+
 
 Support for certain Python versions was added to some Django versions retrospectively in a patch version.
-The tests run against the most recent patch version for each Django release. 
+The tests run against the most recent patch version for each Django release.
 
 Upcoming versions may also work, but are not officially supported as long as they are not added to the test setup.

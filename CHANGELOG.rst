@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 5.0
+- Added support for Python 3.12
+
 1.8.5 (2023-11-13)
 ------------------
 
