@@ -64,7 +64,7 @@ Queryable properties do **not** allow to do this in the same way because of two 
 - To encourage implementing properties using decorators, which is cleaner and makes code more readable.
 - Since queryable properties have a lot more functionality and options than regular properties, they would need to
   support a huge number of constructor parameters, which would make the constructor too complex and harder to maintain.
-  
+
 However, there are use cases where an option similar to the non-decorator usage of regular properties would be nice to
 have, e.g. when implementing a property without a getter or when the individual getter/setter methods are already
 present and cannot be easily deprecated in favor of the property.
@@ -174,7 +174,7 @@ For the example property above, this could look like the following example:
 When to use which approach
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-It all depends on your needs and preferences, but a general rule of thumb is using the class-based approach to 
+It all depends on your needs and preferences, but a general rule of thumb is using the class-based approach to
 implement re-usable queryable properties or to be able to use inheritance.
 It would also be pretty easy to write parameterizable property classes by adding parameters to their ``__init__``
 methods.
@@ -183,12 +183,22 @@ Class-based implementations come, however, with the small disadvantage of having
 of the actual model class (unlike regular property implementations).
 It would therefore probably be preferable to use the decorator-based approach for unique, non-reusable implementations.
 
-Using the required manager/queryset
------------------------------------
+Enabling queryset operations
+----------------------------
 
-If we were to actually implement queryset-related logic in the examples above, the ``ApplicationVersion`` model would
-be missing one small detail to actually be able to use the queryable properties in querysets: the model must use a
-special queryset class, which can most easily be achieved by using a special manager:
+To actually interact with queryable properties in queryset operations, the queryset extensions provided by
+*django-queryable-properties* must be used since regular querysets cannot deal with queryable properties on their own.
+
+The following sections describe how to properly set this up to either use the extensions by either applying them to
+querysets of models in general via managers or by creating querysets with the queryable properties extensions on
+demand.
+
+Defining managers on models
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The most common way to use the queryset extensions is by defining a manager that produces querysets with queryable
+properties functionality.
+The easiest way to do this is by simply using the :class:`queryable_properties.managers.QueryablePropertiesManager`:
 
 .. code-block:: python
 
@@ -202,21 +212,77 @@ special queryset class, which can most easily be achieved by using a special man
 
 This manager allows to use the queryable properties in querysets created by this manager (e.g. via
 ``ApplicationVersion.objects.all()``).
-If there's a need to use another special queryset class, ``queryable_properties`` also comes with a mixin to add its
-logic to other custom querysets: ``queryable_properties.managers.QueryablePropertiesQuerySetMixin``.
-A manager class can then be generated from the queryset class using ``CustomQuerySet.as_manager()`` or
-``CustomManager.from_queryset(CustomQuerySet)``.
 
-Using the special manager/queryset class may not only be important for models that define queryable properties.
-Since most features of queryable properties can also be used on related models in queryset operations, the manager is
-required whenever queryable property functionality should be offered, even if the corresponding model doesn't implement
-its own queryable properties.
-For example, if queryset filtering was implemented for the ``version_str`` property shown above, it could also be used
-in querysets of the ``Application`` model like this:
+For scenarios where querysets or managers need other extensions or base classes, *django-queryable-properties* also
+offers a queryset class as well as mixins for managers or querysets that can be combined with other base classes:
+
+* Queryset class: :class:`queryable_properties.managers.QueryablePropertiesQuerySet`
+* Queryset mixin: :class:`queryable_properties.managers.QueryablePropertiesQuerySetMixin`
+* Manager mixin: :class:`queryable_properties.managers.QueryablePropertiesManagerMixin`
+
+When implementing custom queryset classes, a manager class can be generated from the queryset class using
+``CustomQuerySet.as_manager()`` or ``CustomManager.from_queryset(CustomQuerySet)``.
+
+.. warning::
+   Since queryable property interaction in querysets is tied to the specific extensions, those extensions are also
+   required when trying to access queryable properties on related models.
+   This means that using the manager approach, all models from which queries that interact with queryable properties
+   are performed need to use a manager as described above, even if a model doesn't implement its own queryable
+   properties.
+
+   For example, if queryset filtering was implemented for the ``version_str`` property shown above, it could also be
+   used in querysets of the ``Application`` model like this:
+
+   .. code-block:: python
+
+       Application.objects.filter(versions__version_str='1.2')
+
+   To make this work, the ``objects`` manager of the ``Application`` model must also be a
+   ``QueryablePropertiesManager``, even if the model does not define queryable properties of its own.
+
+   If using a special manager just to access queryable properties on related models is not desirable, then the
+   following approaches to apply the queryable properties extensions on demand should offer an alternative.
+
+Creating managers/querysets on demand
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The non-mixin classes provided by *django-queryable-properties* also allow to create managers or querysets on demand,
+regardless of the presence of a manager with queryable properties extensions on the corresponding model.
+Both the :class:`queryable_properties.managers.QueryablePropertiesManager` and the
+:class:`queryable_properties.managers.QueryablePropertiesQuerySet` offer a ``get_for_model`` method for this purpose:
 
 .. code-block:: python
 
-    Application.objects.filter(versions__version_str='1.2')
+    from queryable_properties.managers import QueryablePropertiesManager, QueryablePropertiesQuerySet
 
-To make this work, the ``objects`` manager of the ``Application`` model must also be a ``QueryablePropertiesManager``,
-even if the model does not define queryable properties of its own.
+    # Create an ad hoc manager that produces querysets with queryable property extensions for the given model.
+    ad_hoc_manager = QueryablePropertiesManager.get_for_model(MyModel)
+    # Create an ad hoc queryset with queryable property extensions for the given model.
+    ad_hoc_queryset = QueryablePropertiesQuerySet.get_for_model(MyModel)
+
+.. note::
+   Querysets created using ``QueryablePropertiesQuerySet.get_for_model`` use the model's default manager to create the
+   underlying queryset, i.e. the queryset is generated using ``model._default_manager.all()`` before the queryable
+   properties extensions are applied.
+
+Applying the extensions to existing managers/querysets on demand
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+There might be scenarios where interacting with queryable properties is desired in an existing queryset or manager.
+The mixin classes provided by *django-queryable-properties* allow to inject the queryable properties extensions into
+an existing queryset or manager using their ``apply_to`` method.
+Both the :class:`queryable_properties.managers.QueryablePropertiesManagerMixin` and the
+:class:`queryable_properties.managers.QueryablePropertiesQuerySetMixin` create a copy of the original object in the
+process, leaving said object untouched.
+
+.. code-block:: python
+
+    from queryable_properties.managers import QueryablePropertiesManagerMixin, QueryablePropertiesQuerySetMixin
+
+    # Create an ad hoc manager based off the given manager instance that produces querysets with queryable property
+    # extensions for the given model.
+    ad_hoc_manager = QueryablePropertiesManagerMixin.apply_to(some_manager)
+    # Create an ad hoc queryset with queryable property extensions for the given model.
+    some_queryset = MyModel.objects.filter(...).order_by(...)  # A queryset without queryable properties features.
+    ad_hoc_queryset = QueryablePropertiesQuerySetMixin.apply_to(some_queryset)
+    ad_hoc_queryset.select_properties(...)  # Now queryable properties features can be used.
