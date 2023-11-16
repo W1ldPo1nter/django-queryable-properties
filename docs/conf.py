@@ -67,7 +67,7 @@ master_doc = 'index'
 # General information about the project.
 project = u'django-queryable-properties'
 title = u'{} Documentation'.format(project)
-copyright = meta['__copyright__'].replace('Copyright', '').strip() + u'.'
+copyright = meta['__copyright__'].replace('Copyright', '').strip()
 author = meta['__author__']
 description = meta['__doc__']
 

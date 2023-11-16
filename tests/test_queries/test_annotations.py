@@ -2,7 +2,7 @@
 
 import pytest
 from django import VERSION as DJANGO_VERSION
-from django.db import models
+from django.db import connection, models
 
 from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
@@ -91,8 +91,8 @@ class TestAggregateAnnotations(object):
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_removed_annotation(self, model):
         """
-        Test that queries can still be performed even if queryable property annotations have been manually removed from
-        the queryset.
+        Test that queries can still be performed even if queryable property
+        annotations have been manually removed from the queryset.
         """
         queryset = model.objects.select_properties('version_count')
         del queryset.query.annotations['version_count']
@@ -170,3 +170,16 @@ class TestExpressionAnnotations(object):
             assert model.version.has_cached_value(version)
             assert version.version == '2.0.0'
         assert queryset._result_cache is None
+
+    @pytest.mark.skipif(DJANGO_VERSION < (4, 2), reason='Sliced prefetches were introduced in Django 4.2')
+    def test_sliced_prefetch(self):
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as context:
+            versions = VersionWithClassBasedProperties.objects.select_properties('released_in_2018').order_by(
+                'major', 'minor', 'patch')
+            apps = ApplicationWithClassBasedProperties.objects.prefetch_related(
+                models.Prefetch('versions', versions[1:3], to_attr='prefetched_versions'))
+            for app in apps:
+                assert all(version.major_minor == '1.3' for version in app.prefetched_versions)
+            assert context.captured_queries[1]['sql'].count('"released_in_2018"') == 2

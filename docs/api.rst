@@ -19,9 +19,7 @@ Module ``queryable_properties.managers``
 ----------------------------------------
 
 .. automodule:: queryable_properties.managers
-   :members: QueryablePropertiesQuerySet, QueryablePropertiesQuerySetMixin
-
-.. autoattribute:: queryable_properties.managers.QueryablePropertiesManager
+   :members: QueryablePropertiesManager, QueryablePropertiesManagerMixin, QueryablePropertiesQuerySet, QueryablePropertiesQuerySetMixin
 
 Module ``queryable_properties.utils``
 -------------------------------------
