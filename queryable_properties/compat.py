@@ -103,7 +103,6 @@ if not hasattr(Query, 'annotation_select'):  # pragma: no cover
 
 # Recent Django versions (>=2.0) have separate methods for cloning and chaining
 # while older versions only have the clone method.
-QUERYSET_CHAIN_METHOD_NAME = '_chain' if hasattr(QuerySet, '_chain') else '_clone'
 QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
 # Recent Django versions (>=3.1) have a property guarding the query attribute.
 QUERYSET_QUERY_ATTRIBUTE_NAME = '_query' if hasattr(QuerySet, 'query') else 'query'
@@ -139,7 +138,7 @@ def chain_queryset(queryset, *args, **kwargs):
     :return: A copy of given queryset.
     :rtype: QuerySet
     """
-    method = getattr(queryset, QUERYSET_CHAIN_METHOD_NAME)
+    method = getattr(queryset, '_chain', queryset._clone)
     return method(*args, **kwargs)
 
 
