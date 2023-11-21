@@ -169,7 +169,7 @@ class Application(models.Model):
 
 class ApplicationWithClassBasedProperties(Application):
     categories = models.ManyToManyField(CategoryWithClassBasedProperties, related_name='applications')
-    tags = models.ManyToManyField(ApplicationTag, related_name='tags')
+    tags = models.ManyToManyField(ApplicationTag, related_name='applications')
 
     objects = QueryablePropertiesManager()
 
