@@ -119,7 +119,8 @@ class TestQueryablePropertiesManagerMixin(object):
         assert manager.model is ApplicationTag
         assert manager._db == ApplicationTag.objects._db
         assert manager._hints == ApplicationTag.objects._hints
-        assert manager.name == '<objects_with_queryable_properties>'
+        assert manager.name == '<{}_with_queryable_properties>'.format(
+            getattr(ApplicationTag.objects, 'name', 'manager'))
 
         queryset = manager.all()
         assert isinstance(queryset, QueryablePropertiesQuerySetMixin)
