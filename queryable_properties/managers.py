@@ -436,7 +436,7 @@ class QueryablePropertiesManagerMixin(InjectableMixin):
         :rtype: QueryablePropertiesManager
         """
         manager = copy(manager)
-        manager.name = '<{}_with_queryable_properties>'.format(manager.name or 'manager')
+        manager.name = '<{}_with_queryable_properties>'.format(getattr(manager, 'name', None) or 'manager')
         return cls.inject_into_object(manager)
 
 
