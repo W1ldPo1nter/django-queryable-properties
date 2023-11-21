@@ -8,7 +8,8 @@ from six.moves import cPickle
 from queryable_properties.compat import ModelIterable, ValuesQuerySet
 from queryable_properties.managers import (
     LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable, LegacyValuesIterable, LegacyValuesListIterable,
-    QueryablePropertiesIterableMixin, QueryablePropertiesQuerySetMixin,
+    QueryablePropertiesIterableMixin, QueryablePropertiesManager, QueryablePropertiesManagerMixin,
+    QueryablePropertiesQuerySet, QueryablePropertiesQuerySetMixin,
 )
 from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.utils import get_queryable_property
@@ -84,7 +85,7 @@ class TestQueryablePropertiesQuerySetMixin(object):
         for name, value in kwargs.items():
             assert getattr(clone, name) == value
 
-    def test_apply_to(self):
+    def test_apply_to(self, tags):
         queryset_without_properties = ApplicationTag.objects.all()
         assert not isinstance(queryset_without_properties, QueryablePropertiesQuerySetMixin)
 
@@ -92,6 +93,60 @@ class TestQueryablePropertiesQuerySetMixin(object):
         assert queryset is not queryset_without_properties
         assert isinstance(queryset, QueryablePropertiesQuerySetMixin)
         assert list(queryset_without_properties) == list(queryset)
+        assert set(queryset.filter(applications__version_count=4)) == set(tags)
+
+
+class TestQueryablePropertiesQuerySet(object):
+
+    def test_get_for_model(self, tags):
+        queryset_without_properties = ApplicationTag._default_manager.all()
+        assert not isinstance(queryset_without_properties, QueryablePropertiesQuerySetMixin)
+
+        queryset = QueryablePropertiesQuerySet.get_for_model(ApplicationTag)
+        assert isinstance(queryset, QueryablePropertiesQuerySetMixin)
+        assert list(queryset_without_properties) == list(queryset)
+        assert set(queryset.filter(applications__version_count=4)) == set(tags)
+
+
+class TestQueryablePropertiesManagerMixin(object):
+
+    def test_apply_to(self, tags):
+        assert not isinstance(ApplicationTag.objects, QueryablePropertiesManagerMixin)
+
+        manager = QueryablePropertiesManagerMixin.apply_to(ApplicationTag.objects)
+        assert manager is not ApplicationTag.objects
+        assert isinstance(manager, QueryablePropertiesManagerMixin)
+        assert manager.model is ApplicationTag
+        assert manager._db == ApplicationTag.objects._db
+        assert manager._hints == ApplicationTag.objects._hints
+        assert manager.name == '<objects_with_queryable_properties>'
+
+        queryset = manager.all()
+        assert isinstance(queryset, QueryablePropertiesQuerySetMixin)
+        assert set(queryset.filter(applications__version_count=4)) == set(tags)
+
+
+class TestQueryablePropertiesManager(object):
+
+    @pytest.mark.parametrize('using, hints', [
+        (None, None),
+        (None, {}),
+        ('default', None),
+        ('default', {'test': 'hint'}),
+    ])
+    def test_get_for_model(self, tags, using, hints):
+        assert not isinstance(ApplicationTag._default_manager, QueryablePropertiesManagerMixin)
+
+        manager = QueryablePropertiesManager.get_for_model(ApplicationTag, using, hints)
+        assert isinstance(manager, QueryablePropertiesManagerMixin)
+        assert manager.model is ApplicationTag
+        assert manager._db == using
+        assert manager._hints == (hints or {})
+        assert manager.name == '<manager_with_queryable_properties>'
+
+        queryset = manager.all()
+        assert isinstance(queryset, QueryablePropertiesQuerySetMixin)
+        assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
 class TestLegacyIterable(object):
