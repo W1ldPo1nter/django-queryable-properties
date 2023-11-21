@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added options to create querysets/managers with queryable property features on demand and without having to define
+  a manager on the corresponding model
+
 1.8.5 (2023-11-13)
 ------------------
 
