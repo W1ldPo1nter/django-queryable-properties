@@ -218,6 +218,25 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
         return obj
 
 
+class QueryablePropertiesRawQuerySetMixin(InjectableMixin):
+
+    def init_injected_attrs(self):
+        # To work correctly, a query using the QueryablePropertiesQueryMixin is
+        # required. If the current query is not using the mixin already, it
+        # will be dynamically injected into the query. That way, other Django
+        # extensions using custom query objects are also supported.
+        query = chain_query(getattr(self, 'query'), using=self.db)  # TODO
+        class_name = 'QueryableProperties' + query.__class__.__name__
+        setattr(self, 'query',  # TODO
+                QueryablePropertiesQueryMixin.inject_into_object(query, class_name))
+
+    def iterator(self):
+        from django.db.models.query import RawModelIterable  # TODO
+
+        for obj in QueryablePropertiesModelIterableMixin.mix_with_class(RawModelIterable)(self):
+            yield obj
+
+
 class QueryablePropertiesQuerySetMixin(InjectableMixin):
     """
     A mixin for Django's :class:`django.db.models.QuerySet` objects that allows
@@ -353,6 +372,10 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
                 iterable_class = LegacyValuesIterable
             return iter(iterable_class(self))
         return super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
+
+    def raw(self, *args, **kwargs):
+        queryset = super(QueryablePropertiesQuerySetMixin, self).raw(*args, **kwargs)
+        return QueryablePropertiesRawQuerySetMixin.inject_into_object(queryset)
 
     def update(self, **kwargs):
         # Resolve any queryable properties into their actual update kwargs

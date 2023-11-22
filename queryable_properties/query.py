@@ -101,6 +101,10 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             return getattr(self, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP[name])
         raise AttributeError()
 
+    def __iter__(self):  # Raw queries
+        for row in super(QueryablePropertiesQueryMixin, self).__iter__():
+            yield row.__class__((True,)) + row
+
     def init_injected_attrs(self):
         # Stores references to queryable properties used as annotations in this
         # query.
@@ -319,6 +323,11 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                                 in self._queryable_property_annotations)
             self.set_annotation_mask(self.annotation_select_mask.union(annotation_names))
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
+
+    def get_columns(self):  # Raw queries
+        columns = super(QueryablePropertiesQueryMixin, self).get_columns()
+        columns.insert(0, QUERYING_PROPERTIES_MARKER)
+        return columns
 
     def get_compiler(self, *args, **kwargs):
         use_marker = self._use_querying_properties_marker
