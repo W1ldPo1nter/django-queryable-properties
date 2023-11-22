@@ -99,6 +99,18 @@ class TestAggregateAnnotations(object):
         assert bool(queryset)
         assert all(not model.version_count.has_cached_value(obj) for obj in queryset)
 
+    @pytest.mark.skipif(DJANGO_VERSION < (1, 7), reason="Raw queries didn't exist before Django 1.7")
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_raw_query(self, model):
+        pks, names = zip(*model.objects.values_list('pk', 'name'))
+        queryset = model.objects.raw('SELECT id, name, 5 AS version_count FROM {}'.format(model._meta.db_table))
+        assert len(queryset) == 2
+        for application in queryset:
+            assert model.version_count.has_cached_value(application) is True
+            assert application.version_count == 5
+            assert application.pk in pks
+            assert application.name in names
+
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
 class TestExpressionAnnotations(object):
