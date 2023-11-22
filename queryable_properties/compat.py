@@ -38,6 +38,11 @@ except ImportError:  # pragma: no cover
     ModelIterable = None
 
 try:  # pragma: no cover
+    from django.db.models.query import RawModelIterable
+except ImportError:  # pragma: no cover
+    RawModelIterable = None
+
+try:  # pragma: no cover
     from django.db.models.query import DateQuerySet  # noqa: F401
 except ImportError:  # pragma: no cover
     DateQuerySet = None  # noqa: F401

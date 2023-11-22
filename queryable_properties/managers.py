@@ -9,7 +9,7 @@ from django.utils.functional import cached_property
 
 from .compat import (
     ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, QUERYSET_QUERY_ATTRIBUTE_NAME, DateQuerySet,
-    DateTimeQuerySet, ModelIterable, ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset,
+    DateTimeQuerySet, ModelIterable, RawModelIterable, ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset,
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin
@@ -231,9 +231,8 @@ class QueryablePropertiesRawQuerySetMixin(InjectableMixin):
                 QueryablePropertiesQueryMixin.inject_into_object(query, class_name))
 
     def iterator(self):
-        from django.db.models.query import RawModelIterable  # TODO
-
-        for obj in QueryablePropertiesModelIterableMixin.mix_with_class(RawModelIterable)(self):
+        iterable_class = RawModelIterable or LegacyIterable
+        for obj in QueryablePropertiesModelIterableMixin.mix_with_class(iterable_class)(self):
             yield obj
 
 
