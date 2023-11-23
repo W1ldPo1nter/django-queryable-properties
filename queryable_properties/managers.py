@@ -8,8 +8,8 @@ from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
 
 from .compat import (
-    ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, QUERYSET_QUERY_ATTRIBUTE_NAME, DateQuerySet,
-    DateTimeQuerySet, ModelIterable, RawModelIterable, ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset,
+    ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, DateQuerySet, DateTimeQuerySet,
+    ModelIterable, RawModelIterable, RawQuery, ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset,
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin
@@ -33,7 +33,7 @@ class LegacyIterable(object):
         self.queryset = queryset
 
     def __iter__(self):
-        return super(QueryablePropertiesQuerySetMixin, self.queryset).iterator()
+        return super(QueryablePropertiesBaseQuerySetMixin, self.queryset).iterator()
 
 
 class QueryablePropertiesIterableMixin(object):
@@ -218,17 +218,26 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
         return obj
 
 
-class QueryablePropertiesRawQuerySetMixin(InjectableMixin):
+class QueryablePropertiesBaseQuerySetMixin(InjectableMixin):
 
     def init_injected_attrs(self):
         # To work correctly, a query using the QueryablePropertiesQueryMixin is
         # required. If the current query is not using the mixin already, it
         # will be dynamically injected into the query. That way, other Django
         # extensions using custom query objects are also supported.
-        query = chain_query(getattr(self, 'query'), using=self.db)  # TODO
+        # Recent Django versions (>=3.1) have a property guarding the query
+        # attribute.
+        query_attr_name = '_query' if hasattr(self, '_query') else 'query'
+        query = getattr(self, query_attr_name)
+        chain_kwargs = {}
+        if RawQuery and isinstance(query, RawQuery):
+            chain_kwargs['using'] = self.db
+        query = chain_query(query, **chain_kwargs)
         class_name = 'QueryableProperties' + query.__class__.__name__
-        setattr(self, 'query',  # TODO
-                QueryablePropertiesQueryMixin.inject_into_object(query, class_name))
+        setattr(self, query_attr_name, QueryablePropertiesQueryMixin.inject_into_object(query, class_name))
+
+
+class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
 
     def iterator(self):
         iterable_class = RawModelIterable or LegacyIterable
@@ -236,21 +245,11 @@ class QueryablePropertiesRawQuerySetMixin(InjectableMixin):
             yield obj
 
 
-class QueryablePropertiesQuerySetMixin(InjectableMixin):
+class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
     """
     A mixin for Django's :class:`django.db.models.QuerySet` objects that allows
     to use queryable properties in filters, annotations and update queries.
     """
-
-    def init_injected_attrs(self):
-        # To work correctly, a query using the QueryablePropertiesQueryMixin is
-        # required. If the current query is not using the mixin already, it
-        # will be dynamically injected into the query. That way, other Django
-        # extensions using custom query objects are also supported.
-        query = chain_query(getattr(self, QUERYSET_QUERY_ATTRIBUTE_NAME))
-        class_name = 'QueryableProperties' + query.__class__.__name__
-        setattr(self, QUERYSET_QUERY_ATTRIBUTE_NAME,
-                QueryablePropertiesQueryMixin.inject_into_object(query, class_name))
 
     @property
     def _iterable_class(self):

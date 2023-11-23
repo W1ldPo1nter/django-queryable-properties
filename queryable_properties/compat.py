@@ -12,7 +12,6 @@ except ImportError:  # pragma: no cover
 
 import six
 from django.contrib.admin.options import ModelAdmin
-from django.db.models.query import QuerySet
 from django.db.models.sql.query import Query
 
 try:  # pragma: no cover
@@ -51,6 +50,11 @@ try:  # pragma: no cover
     from django.db.models.query import DateTimeQuerySet  # noqa: F401
 except ImportError:  # pragma: no cover
     DateTimeQuerySet = None  # noqa: F401
+
+try:  # pragma: no cover
+    from django.db.models.sql.query import RawQuery
+except ImportError:  # pragma: no cover
+    RawQuery = None
 
 try:  # pragma: no cover
     from django.forms.utils import pretty_name  # noqa: F401
@@ -109,8 +113,6 @@ if not hasattr(Query, 'annotation_select'):  # pragma: no cover
 # Recent Django versions (>=2.0) have separate methods for cloning and chaining
 # while older versions only have the clone method.
 QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
-# Recent Django versions (>=3.1) have a property guarding the query attribute.
-QUERYSET_QUERY_ATTRIBUTE_NAME = '_query' if hasattr(QuerySet, 'query') else 'query'
 
 # The `get_queryset` method of ModelAdmins was called `queryset` in very old
 # Django versions.
@@ -137,11 +139,11 @@ def chain_queryset(queryset, *args, **kwargs):
     Create a copy of the given queryset to chain a new queryset method call by
     calling the appropriate chain/clone method for the current Django version.
 
-    :param QuerySet queryset: The queryset to chain.
+    :param django.db.models.query.QuerySet queryset: The queryset to chain.
     :param args: Positional arguments passed through to the method call.
     :param kwargs: Keyword arguments passed through to the method call.
     :return: A copy of given queryset.
-    :rtype: QuerySet
+    :rtype: django.db.models.query.QuerySet
     """
     method = getattr(queryset, '_chain', queryset._clone)
     return method(*args, **kwargs)
