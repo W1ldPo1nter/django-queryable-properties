@@ -88,9 +88,10 @@ class QueryablePropertiesCompilerMixin(InjectableMixin):
 
 class QueryablePropertiesQueryMixin(InjectableMixin):
     """
-    A mixin for :class:`django.db.models.sql.Query` objects that extends the
-    original Django objects to deal with queryable properties, e.g. managing
-    used properties or automatically adding required properties as annotations.
+    A mixin for :class:`django.db.models.sql.Query` and
+    :class:`django.db.models.sql.Raw Query` objects that extends the original
+    Django objects to deal with queryable properties, e.g. managing used
+    properties or automatically adding required properties as annotations.
     """
 
     def __getattr__(self, name):  # pragma: no cover
@@ -102,6 +103,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         raise AttributeError()
 
     def __iter__(self):  # Raw queries
+        # See QueryablePropertiesCompilerMixin.results_iter, but for raw
+        # queries. The marker can simply be added as the first value as fields
+        # are not strictly grouped like in regular queries.
         for row in super(QueryablePropertiesQueryMixin, self).__iter__():
             yield row.__class__((True,)) + row
 
@@ -325,6 +329,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
 
     def get_columns(self):  # Raw queries
+        # Like QueryablePropertiesCompilerMixin.setup_query, but for raw
+        # queries. The marker can simply be added as the first value as fields
+        # are not strictly grouped like in regular queries.
         columns = super(QueryablePropertiesQueryMixin, self).get_columns()
         columns.insert(0, QUERYING_PROPERTIES_MARKER)
         return columns

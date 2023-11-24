@@ -219,6 +219,11 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
 
 
 class QueryablePropertiesBaseQuerySetMixin(InjectableMixin):
+    """
+    Base mixin for queryable properties queryset mixins that takes care of
+    injecting the :class:`QueryablePropertiesQueryMixin` into the associated
+    query.
+    """
 
     def init_injected_attrs(self):
         # To work correctly, a query using the QueryablePropertiesQueryMixin is
@@ -238,6 +243,10 @@ class QueryablePropertiesBaseQuerySetMixin(InjectableMixin):
 
 
 class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
+    """
+    A mixin for Django's :class:`django.db.models.RawQuerySet` objects that
+    allows to populate queryable properties in raw queries.
+    """
 
     def iterator(self):
         iterable_class = RawModelIterable or LegacyIterable
