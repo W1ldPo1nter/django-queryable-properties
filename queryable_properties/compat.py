@@ -1,6 +1,8 @@
 # encoding: utf-8
 """A stable import interface for Django classes that were moved in between versions and compatibility constants."""
 
+from copy import deepcopy
+
 try:  # pragma: no cover
     from contextlib import nullcontext  # noqa: F401
 except ImportError:  # pragma: no cover
@@ -145,8 +147,11 @@ def chain_queryset(queryset, *args, **kwargs):
     :return: A copy of given queryset.
     :rtype: django.db.models.query.QuerySet
     """
-    method = getattr(queryset, '_chain', queryset._clone)
-    return method(*args, **kwargs)
+    if hasattr(queryset, '_chain'):
+        return queryset._chain(*args, **kwargs)
+    if hasattr(queryset, '_clone'):
+        return queryset._clone(*args, **kwargs)
+    return deepcopy(queryset)  # pragma: no cover
 
 
 def chain_query(query, *args, **kwargs):

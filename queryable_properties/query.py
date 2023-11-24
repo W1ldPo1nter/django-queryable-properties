@@ -107,7 +107,9 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # queries. The marker can simply be added as the first value as fields
         # are not strictly grouped like in regular queries.
         for row in super(QueryablePropertiesQueryMixin, self).__iter__():
-            yield row.__class__((True,)) + row
+            if self._use_querying_properties_marker:
+                row = row.__class__((True,)) + row
+            yield row
 
     def init_injected_attrs(self):
         # Stores references to queryable properties used as annotations in this
@@ -333,7 +335,8 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # queries. The marker can simply be added as the first value as fields
         # are not strictly grouped like in regular queries.
         columns = super(QueryablePropertiesQueryMixin, self).get_columns()
-        columns.insert(0, QUERYING_PROPERTIES_MARKER)
+        if self._use_querying_properties_marker:
+            columns.insert(0, QUERYING_PROPERTIES_MARKER)
         return columns
 
     def get_compiler(self, *args, **kwargs):

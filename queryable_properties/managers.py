@@ -33,7 +33,8 @@ class LegacyIterable(object):
         self.queryset = queryset
 
     def __iter__(self):
-        return super(QueryablePropertiesBaseQuerySetMixin, self.queryset).iterator()
+        original = super(QueryablePropertiesBaseQuerySetMixin, self.queryset)
+        return getattr(original, 'iterator', original.__iter__)()
 
 
 class QueryablePropertiesIterableMixin(object):
@@ -247,6 +248,13 @@ class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
     A mixin for Django's :class:`django.db.models.RawQuerySet` objects that
     allows to populate queryable properties in raw queries.
     """
+
+    def __iter__(self):
+        original = super(QueryablePropertiesRawQuerySetMixin, self)
+        # Only recent Django versions (>= 2.1) have the iterator method.
+        iterator = original.__iter__ if hasattr(original, 'iterator') else self.iterator
+        for obj in iterator():
+            yield obj
 
     def iterator(self):
         iterable_class = RawModelIterable or LegacyIterable
