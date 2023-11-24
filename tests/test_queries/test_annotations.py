@@ -4,6 +4,7 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db import connection, models
 
+from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
@@ -28,10 +29,12 @@ class TestAggregateAnnotations(object):
         queryset = model.objects.filter(**filters).select_properties('version_count', 'major_sum').filter(**filters)
         assert 'version_count' in queryset.query.annotations
         assert 'major_sum' in queryset.query.annotations
-        assert all(model.version_count.has_cached_value(obj) for obj in queryset)
-        assert all(obj.version_count == 4 for obj in queryset)
-        assert all(model.major_sum.has_cached_value(obj) for obj in queryset)
-        assert all(obj.major_sum == 5 for obj in queryset)
+        for application in queryset:
+            assert model.version_count.has_cached_value(application)
+            assert application.version_count == 4
+            assert model.major_sum.has_cached_value(application)
+            assert application.major_sum == 5
+            assert not hasattr(application, QUERYING_PROPERTIES_MARKER)
 
     @pytest.mark.parametrize('model, limit, expected_total', [
         (ApplicationWithClassBasedProperties, None, 8),
@@ -110,6 +113,7 @@ class TestAggregateAnnotations(object):
             assert application.version_count == 5
             assert application.pk in pks
             assert application.name in names
+            assert not hasattr(application, QUERYING_PROPERTIES_MARKER)
             counter += 1
         assert counter == 2
 
