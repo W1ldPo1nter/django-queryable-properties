@@ -88,9 +88,10 @@ class QueryablePropertiesCompilerMixin(InjectableMixin):
 
 class QueryablePropertiesQueryMixin(InjectableMixin):
     """
-    A mixin for :class:`django.db.models.sql.Query` objects that extends the
-    original Django objects to deal with queryable properties, e.g. managing
-    used properties or automatically adding required properties as annotations.
+    A mixin for :class:`django.db.models.sql.Query` and
+    :class:`django.db.models.sql.Raw Query` objects that extends the original
+    Django objects to deal with queryable properties, e.g. managing used
+    properties or automatically adding required properties as annotations.
     """
 
     def __getattr__(self, name):  # pragma: no cover
@@ -100,6 +101,15 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         if name in ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
             return getattr(self, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP[name])
         raise AttributeError()
+
+    def __iter__(self):  # Raw queries
+        # See QueryablePropertiesCompilerMixin.results_iter, but for raw
+        # queries. The marker can simply be added as the first value as fields
+        # are not strictly grouped like in regular queries.
+        for row in super(QueryablePropertiesQueryMixin, self).__iter__():
+            if self._use_querying_properties_marker:
+                row = row.__class__((True,)) + row
+            yield row
 
     def init_injected_attrs(self):
         # Stores references to queryable properties used as annotations in this
@@ -319,6 +329,15 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                                 in self._queryable_property_annotations)
             self.set_annotation_mask(self.annotation_select_mask.union(annotation_names))
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
+
+    def get_columns(self):  # Raw queries
+        # Like QueryablePropertiesCompilerMixin.setup_query, but for raw
+        # queries. The marker can simply be added as the first value as fields
+        # are not strictly grouped like in regular queries.
+        columns = super(QueryablePropertiesQueryMixin, self).get_columns()
+        if self._use_querying_properties_marker:
+            columns.insert(0, QUERYING_PROPERTIES_MARKER)
+        return columns
 
     def get_compiler(self, *args, **kwargs):
         use_marker = self._use_querying_properties_marker

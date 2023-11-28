@@ -6,6 +6,7 @@ master (unreleased)
 
 - Added options to create querysets/managers with queryable property features on demand and without having to define
   a manager on the corresponding model
+- Queryable properties can now be populated in raw queries by using the property name as SQL column name
 
 1.8.5 (2023-11-13)
 ------------------
