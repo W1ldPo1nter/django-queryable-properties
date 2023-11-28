@@ -29,6 +29,12 @@ Solutions like these are genereally also not really reusable unless a lot of eff
 For example, even manager/queryset extensions will likely only work on the exact model they were designed for and will
 therefore not be usable from other models via relations.
 
+.. important::
+   Starting with Django 5.0,
+   `GeneratedFields <https://docs.djangoproject.com/en/stable/ref/models/fields/#generatedfield>`_ may be used to cover
+   many of the use-cases of *django-queryable-properties*.
+   Since they are native Django fields, the disadvantages mentioned above do not apply to them.
+
 *django-queryable-properties* does, in fact, not remove the general necessity of implementing the business logic in
 (at least) 2 parts - one for individual objects and one for batch/queryset operations.
 Instead, it aims to remove as much boilerplate as possible and offers an option to implement said parts in one place -
@@ -39,7 +45,7 @@ be accessed through relations when querying via other models.
 Examples in this documentation
 ------------------------------
 
-All parts of this documentation contain a few simple examples to show how to take advantage of all the features of 
+All parts of this documentation contain a few simple examples to show how to take advantage of all the features of
 queryable properties.
 For consistency, all of those examples are based on a few simple Django models, which are shown in the following code
 block.
