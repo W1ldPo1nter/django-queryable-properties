@@ -135,7 +135,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                                          .format(property_ref.property))
 
         annotation_name = six.text_type(property_ref.full_path)
-        annotation_mask = set(self.annotations) if self.annotation_select_mask is None else self.annotation_select_mask
+        annotation_mask = set(self.annotations if self.annotation_select_mask is None else self.annotation_select_mask)
         self._queryable_property_stack.append(property_ref)
         try:
             if property_ref not in self._queryable_property_annotations:
@@ -317,7 +317,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         if self.annotation_select_mask is not None and self._queryable_property_annotations:
             annotation_names = (six.text_type(property_ref.full_path) for property_ref
                                 in self._queryable_property_annotations)
-            self.set_annotation_mask(self.annotation_select_mask.union(annotation_names))
+            self.set_annotation_mask(set(self.annotation_select_mask).union(annotation_names))
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
 
     def get_compiler(self, *args, **kwargs):
