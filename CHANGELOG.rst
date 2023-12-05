@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.9.0 (2023-12-05)
+------------------
+
 - Added support for Django 5.0
 - Added support for Python 3.12
 - Added options to create querysets/managers with queryable property features on demand and without having to define
