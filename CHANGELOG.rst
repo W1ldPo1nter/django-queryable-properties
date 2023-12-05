@@ -4,6 +4,8 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 5.0
+- Added support for Python 3.12
 - Added options to create querysets/managers with queryable property features on demand and without having to define
   a manager on the corresponding model
 - Queryable properties can now be populated in raw queries by using the property name as SQL column name
