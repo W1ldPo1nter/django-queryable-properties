@@ -198,6 +198,14 @@ class TestFilterWithAggregateAnnotation(object):
         assert '"id" > 0' in six.text_type(queryset.query)
         assert queryset.count() == len(queryset) == 2
 
+    @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Filtered aggregates didn't exist before Django 2.0")
+    def test_aggregate_with_filter_on_related_model(self, categories, applications):
+        applications[1].versions.filter(version='1.3.0').delete()
+        assert CategoryWithClassBasedProperties.objects.get(has_multiple_stable_versions=True) == categories[0]
+        assert CategoryWithClassBasedProperties.objects.get(has_multiple_stable_versions=False) == categories[1]
+        assert categories[0].has_multiple_stable_versions is True
+        assert categories[1].has_multiple_stable_versions is False
+
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
 class TestFilterWithExpressionAnnotation(object):
