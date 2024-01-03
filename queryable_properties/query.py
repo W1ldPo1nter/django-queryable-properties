@@ -7,8 +7,9 @@ import six
 from django.utils.tree import Node
 
 from .compat import (
-    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, NEED_HAVING_METHOD_NAME,
-    QUERY_CHAIN_METHOD_NAME, ValuesQuerySet, contains_aggregate, convert_build_filter_to_add_q_kwargs, nullcontext,
+    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, NAMES_TO_PATH_METHOD_NAME,
+    NEED_HAVING_METHOD_NAME, QUERY_CHAIN_METHOD_NAME, ValuesQuerySet, contains_aggregate,
+    convert_build_filter_to_add_q_kwargs, nullcontext,
 )
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
@@ -347,11 +348,20 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             QueryablePropertiesCompilerMixin.inject_into_object(compiler)
         return compiler
 
+    def names_to_path(self, names, *args, **kwargs):
+        # This is a central method for resolving field names. To also allow the
+        # use of queryable properties across relations, the relation path on
+        # top of the stack must be prepended to trick Django into resolving
+        # correctly.
+        if self._queryable_property_stack:
+            names = self._queryable_property_stack[-1].relation_path + names
+        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NAMES_TO_PATH_METHOD_NAME)
+        return base_method(names, *args, **kwargs)
+
     def need_force_having(self, q_object):  # pragma: no cover
         # Same as need_having, but for even older versions. Simply delegate to
         # need_having, which is aware of the different methods in different
-        # versions and therefore calls the correct super methods if
-        # necessary.
+        # versions and therefore calls the correct super method if necessary.
         return self.need_having(q_object)
 
     def need_having(self, obj):  # pragma: no cover
@@ -387,13 +397,12 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                                                                       *args, **kwargs)
 
     def setup_joins(self, names, *args, **kwargs):
-        # This is a central method for resolving field names and joining the
-        # required tables when dealing with paths that involve relations. To
-        # also allow the usage of queryable properties across relations, the
-        # relation path on top of the stack must be prepended to trick Django
-        # into resolving correctly.
-        if self._queryable_property_stack:
-            names = self._queryable_property_stack[-1].relation_path + names
+        # This method contained the logic of names_to_path in very old Django
+        # versions. Simply delegate to the overridden names_to_path in this
+        # case, which is aware of the different methods in different versions
+        # and therefore calls the correct super method.
+        if NAMES_TO_PATH_METHOD_NAME == 'setup_joins':  # pragma: no cover
+            return self.names_to_path(names, *args, **kwargs)
         return super(QueryablePropertiesQueryMixin, self).setup_joins(names, *args, **kwargs)
 
     def clone(self, *args, **kwargs):
