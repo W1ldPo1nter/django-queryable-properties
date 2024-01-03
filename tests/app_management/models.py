@@ -133,6 +133,11 @@ class CategoryWithClassBasedProperties(Category):
     objects = QueryablePropertiesManager()
 
     has_versions = RelatedExistenceCheckProperty('applications__versions')
+    has_multiple_stable_versions = AnnotationProperty(models.Case(
+        models.When(applications__stable_version_count__gt=1, then=True),
+        default=False,
+        output_field=models.BooleanField(),
+    ))
     version_count = AnnotationProperty(models.Count('applications__versions'))
     has_v2 = SubqueryExistenceCheckProperty(
         lambda: VersionWithClassBasedProperties.objects.filter(application__categories=models.OuterRef('pk'), major=2)
@@ -181,6 +186,7 @@ class ApplicationWithClassBasedProperties(Application):
         output_field=models.CharField()
     )
     version_count = VersionCountProperty()
+    stable_version_count = AggregateProperty(models.Count('versions', filter=models.Q(versions__release_type='s')))
     major_sum = AggregateProperty(models.Sum('versions__major'))
     major_avg = MajorAverageProperty()
     if DJANGO_VERSION < (1, 8):
