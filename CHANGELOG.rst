@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.9.1 (2024-01-09)
+------------------
+
 - Fixed resolving of filter conditions of aggregate properties in cases where a property was accessed via relation
 
 1.9.0 (2023-12-05)
