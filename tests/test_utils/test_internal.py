@@ -1,11 +1,10 @@
 # encoding: utf-8
+import pickle
 from collections import Counter
 
 import pytest
-import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import CharField, Count, IntegerField, Q, Sum
-from six.moves import cPickle
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from queryable_properties.properties.base import QueryablePropertyDescriptor
@@ -44,11 +43,11 @@ class DummyMixin(InjectableMixin):
         self.mixin_attr2 = 'test'
 
 
-class DummyClassWithMetaclass(six.with_metaclass(BaseMetaclass)):
+class DummyClassWithMetaclass(metaclass=BaseMetaclass):
     pass
 
 
-class DummyMixinWithMetaclass(six.with_metaclass(MixinMetaclass, InjectableMixin)):
+class DummyMixinWithMetaclass(InjectableMixin, metaclass=MixinMetaclass):
     pass
 
 
@@ -93,7 +92,7 @@ class TestQueryPath(object):
 
     def test_string_representation(self):
         query_path = QueryPath(('a', 'b', 'c'))
-        assert six.text_type(query_path) == 'a__b__c'
+        assert str(query_path) == 'a__b__c'
 
     def test_representation(self):
         query_path = QueryPath(('a', 'b'))
@@ -171,8 +170,8 @@ class TestInjectableMixin(object):
     def test_pickle_unpickle(self):
         base_obj = DummyClass('xyz', 42.42)
         DummyMixin.inject_into_object(base_obj)
-        serialized_obj = cPickle.dumps(base_obj)
-        deserialized_obj = cPickle.loads(serialized_obj)
+        serialized_obj = pickle.dumps(base_obj)
+        deserialized_obj = pickle.loads(serialized_obj)
 
         for obj in (base_obj, deserialized_obj):
             assert isinstance(obj, DummyClass)
@@ -187,8 +186,8 @@ class TestInjectableMixin(object):
         monkeypatch.setattr(DummyMixin, '_created_classes', {})
         base_obj = DummyClass('xyz', 42.42)
         DummyMixin.inject_into_object(base_obj)
-        with pytest.raises(cPickle.PicklingError):
-            cPickle.dumps(base_obj)
+        with pytest.raises(pickle.PicklingError):
+            pickle.dumps(base_obj)
 
 
 class TestNodeProcessor(object):

@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 
 from copy import copy
 
-import six
 from django.db.models import Manager
 from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
@@ -100,7 +99,7 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):
         query = self.queryset.query
         occurrences = {}
         for ref in query._queryable_property_annotations:
-            annotation_name = six.text_type(ref.full_path)
+            annotation_name = str(ref.full_path)
             indexes = [index for index, field_name in enumerate(query.order_by)
                        if field_name in (annotation_name, '-{}'.format(annotation_name))]
             if indexes:
@@ -119,8 +118,8 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):
         """
         query = self.queryset.query
         select = set()
-        for ref, occurrences in six.iteritems(self._order_by_occurrences):
-            annotation_name = six.text_type(ref.full_path)
+        for ref, occurrences in self._order_by_occurrences.items():
+            annotation_name = str(ref.full_path)
             if annotation_name not in query.annotation_select and annotation_name in query.annotations:
                 select.add(ref)
         return select
@@ -131,7 +130,7 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):
         select = dict(query.annotation_select)
 
         for property_ref in self._order_by_select:
-            annotation_name = six.text_type(property_ref.full_path)
+            annotation_name = str(property_ref.full_path)
             select[annotation_name] = query.annotations[annotation_name]
         setattr(query, ANNOTATION_SELECT_CACHE_NAME, select)
 
@@ -181,7 +180,7 @@ class LegacyValuesIterable(LegacyOrderingMixin, LegacyIterable):
     def _postprocess_queryable_properties(self, obj):
         obj = super(LegacyValuesIterable, self)._postprocess_queryable_properties(obj)
         for ref in self._order_by_select:
-            obj.pop(six.text_type(ref.full_path), None)
+            obj.pop(str(ref.full_path), None)
         return obj
 
 
@@ -211,7 +210,7 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
         if self.queryset._fields:
             aggregate_names = [name for name in aggregate_names if name not in self.queryset._fields]
         aggregate_names.reverse()
-        forced_names = set(six.text_type(ref.full_path) for ref in self._order_by_select)
+        forced_names = set(str(ref.full_path) for ref in self._order_by_select)
         return {-i for i, name in enumerate(aggregate_names, start=1) if name in forced_names}
 
     def _postprocess_queryable_properties(self, obj):
@@ -334,7 +333,7 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
                 **prop.get_update_kwargs(self.model, kwargs.pop(original_name)))
             # Make sure that there are no conflicting values after resolving
             # the update keyword arguments of the queryable properties.
-            for additional_name, value in six.iteritems(additional_kwargs):
+            for additional_name, value in additional_kwargs.items():
                 if additional_name in kwargs and kwargs[additional_name] != value:
                     raise QueryablePropertyError(
                         'Updating queryable property "{prop}" would change field "{field}", but a conflicting value '

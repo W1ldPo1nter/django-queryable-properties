@@ -1,9 +1,10 @@
 # encoding: utf-8
 
+import pickle
+
 import pytest
 from django import VERSION as DJANGO_VERSION
 from mock import Mock, patch
-from six.moves import cPickle
 
 from queryable_properties.compat import ModelIterable, ValuesQuerySet
 from queryable_properties.managers import (
@@ -43,8 +44,8 @@ class TestQueryablePropertiesQuerySetMixin(object):
 
     def assert_queryset_picklable(self, queryset, selected_descriptors=()):
         expected_results = list(queryset)
-        serialized_queryset = cPickle.dumps(queryset)
-        deserialized_queryset = cPickle.loads(serialized_queryset)
+        serialized_queryset = pickle.dumps(queryset)
+        deserialized_queryset = pickle.loads(serialized_queryset)
         assert list(deserialized_queryset) == expected_results
         for descriptor in selected_descriptors:
             assert all(descriptor.has_cached_value(obj) for obj in deserialized_queryset)

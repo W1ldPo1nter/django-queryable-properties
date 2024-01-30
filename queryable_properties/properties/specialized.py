@@ -2,7 +2,6 @@
 
 import operator
 
-import six
 from django.db.models import Field
 
 from ..utils.internal import MISSING_OBJECT, ModelAttributeGetter
@@ -134,7 +133,7 @@ class MappingProperty(AnnotationMixin, QueryableProperty):
     """
 
     # Copy over Django's implementation to forcibly evaluate a lazy value.
-    _force_value = six.get_unbound_function(Field.get_prep_value)
+    _force_value = Field.get_prep_value
 
     def __init__(self, attribute_path, output_field, mappings, default=None, **kwargs):
         """

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-import six
 from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import ModelAdmin, SimpleListFilter, site
 from django.contrib.admin.filters import AllValuesFieldListFilter
@@ -58,7 +57,7 @@ def assert_admin_validation(admin_class, model, error_id=None, exception_text=No
                 admin_validation.validate(admin_class, model)
         except ImproperlyConfigured as e:
             assert exception_text is not None
-            assert exception_text in six.text_type(e)
+            assert exception_text in str(e)
         else:
             assert exception_text is None
 

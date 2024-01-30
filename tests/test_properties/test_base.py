@@ -1,6 +1,8 @@
 # encoding: utf-8
+import pickle
+import types
+
 import pytest
-import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import F, Model, Q
 
@@ -135,8 +137,8 @@ class TestQueryablePropertyDescriptor(object):
 
     def test_representations(self, dummy_property):
         descriptor = getattr(dummy_property.model, dummy_property.name)
-        assert six.text_type(descriptor) == six.text_type(dummy_property)
-        assert repr(descriptor) == '<QueryablePropertyDescriptor: {}>'.format(six.text_type(descriptor))
+        assert str(descriptor) == str(dummy_property)
+        assert repr(descriptor) == '<QueryablePropertyDescriptor: {}>'.format(str(descriptor))
 
 
 class TestQueryableProperty(object):
@@ -164,14 +166,14 @@ class TestQueryableProperty(object):
         assert dummy_property.name == 'dummy'
         assert dummy_property.verbose_name == 'Dummy'
         assert dummy_property.model is model_instance.__class__
-        assert six.get_method_function(model_instance.reset_property) is reset_queryable_property
+        assert model_instance.reset_property.__func__ is reset_queryable_property
         # TODO: test that an existing method with the name reset_property will not be overridden
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_pickle_unpickle(self, model):
         prop = get_queryable_property(model, 'version')
-        serialized_prop = six.moves.cPickle.dumps(prop)
-        deserialized_prop = six.moves.cPickle.loads(serialized_prop)
+        serialized_prop = pickle.dumps(prop)
+        deserialized_prop = pickle.loads(serialized_prop)
         assert deserialized_prop is prop
 
     @pytest.mark.parametrize('prop, expected_str, expected_class_name', [
@@ -181,7 +183,7 @@ class TestQueryableProperty(object):
          'tests.dummy_lib.models.ReleaseTypeModel.is_beta', 'ValueCheckProperty'),
     ])
     def test_representations(self, prop, expected_str, expected_class_name):
-        assert six.text_type(prop) == expected_str
+        assert str(prop) == expected_str
         assert repr(prop) == '<{}: {}>'.format(expected_class_name, expected_str)
 
     def test_invalid_property_name(self):
@@ -246,8 +248,7 @@ class TestDecorators(object):
         annotation_based = kwargs.get('annotation_based', False)
         assert isinstance(prop, AnnotationGetterMixin) is annotation_based
         if annotation_based:
-            assert prop.get_value == six.create_bound_method(six.get_unbound_function(AnnotationGetterMixin.get_value),
-                                                             prop)
+            assert prop.get_value == types.MethodType(AnnotationGetterMixin.get_value, prop)
             assert prop.get_annotation is func
         else:
             assert prop.get_value is func
@@ -273,10 +274,8 @@ class TestDecorators(object):
         clone = self.decorate_function(func, original.getter, kwargs)
         changed_attrs = dict(kwargs or {}, get_value=func, __doc__=new_docstring or old_docstring)
         if init_kwargs.get('annotation_based', False):
-            changed_attrs['get_filter'] = six.create_bound_method(
-                six.get_unbound_function(AnnotationMixin.get_filter), clone)
-            changed_attrs['get_annotation'] = six.create_bound_method(
-                six.get_unbound_function(AnnotationMixin.get_annotation), clone)
+            changed_attrs['get_filter'] = types.MethodType(AnnotationMixin.get_filter, clone)
+            changed_attrs['get_annotation'] = types.MethodType(AnnotationMixin.get_annotation, clone)
         self.assert_cloned_property(original, clone, changed_attrs)
 
     @pytest.mark.parametrize('old_setter, kwargs', [
@@ -328,7 +327,7 @@ class TestDecorators(object):
         original = queryable_property()
         original.model = Category
         original.name = 'test_property'
-        get_filter_func = six.get_unbound_function(LookupFilterMixin.get_filter)
+        get_filter_func = LookupFilterMixin.get_filter
 
         def func1(cls, lookup, value):
             return 1
@@ -337,7 +336,7 @@ class TestDecorators(object):
         assert isinstance(clone1, LookupFilterMixin)
         self.assert_cloned_property(original, clone1, {
             'lookup_mappings': {'lt': func1, 'gt': func1},
-            'get_filter': six.create_bound_method(get_filter_func, clone1),
+            'get_filter': types.MethodType(get_filter_func, clone1),
         })
         assert clone1.get_filter(None, 'lt', None) == 1
         assert clone1.get_filter(None, 'gt', None) == 1
@@ -355,7 +354,7 @@ class TestDecorators(object):
         assert isinstance(clone2, LookupFilterMixin)
         self.assert_cloned_property(clone1, clone2, {
             'lookup_mappings': {'lt': func2, 'lte': func2, 'gt': func1},
-            'get_filter': six.create_bound_method(get_filter_func, clone2),
+            'get_filter': types.MethodType(get_filter_func, clone2),
             'filter_requires_annotation': True,  # Should be overridable on every call.
             'remaining_lookups_via_parent': True,  # Should be overridable on every call.
         })
@@ -376,7 +375,7 @@ class TestDecorators(object):
         assert isinstance(clone3, LookupFilterMixin)
         self.assert_cloned_property(clone2, clone3, {
             'lookup_mappings': {'lt': func2, 'lte': func2, 'gt': func1, 'exact': func3},
-            'get_filter': six.create_bound_method(get_filter_func, clone3),
+            'get_filter': types.MethodType(get_filter_func, clone3),
             'filter_requires_annotation': False,  # Should be overridable on every call.
             'remaining_lookups_via_parent': False,  # Should be overridable on every call.
         })
@@ -458,8 +457,7 @@ class TestDecorators(object):
         self.assert_cloned_property(original, prop, {
             'get_annotation': func,
             'filter_requires_annotation': expected_requires_annotation,
-            'get_filter': initial_values.get(
-                'get_filter', six.create_bound_method(six.get_unbound_function(AnnotationMixin.get_filter), prop)),
+            'get_filter': initial_values.get('get_filter', types.MethodType(AnnotationMixin.get_filter, prop)),
         })
 
     @pytest.mark.parametrize('old_updater', [None, lambda: {}])

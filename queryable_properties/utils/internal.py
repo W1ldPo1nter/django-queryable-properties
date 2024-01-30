@@ -8,7 +8,6 @@ from collections import namedtuple
 from copy import deepcopy
 from functools import wraps
 
-import six
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Manager, Q
 from django.utils.decorators import method_decorator
@@ -20,7 +19,6 @@ from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, Query
 MISSING_OBJECT = object()  #: Arbitrary object to represent that an object in an attribute chain is missing.
 
 
-@six.python_2_unicode_compatible
 class QueryPath(tuple):
     """
     A utility class to represent query paths, i.e. paths using Django's
@@ -40,7 +38,7 @@ class QueryPath(tuple):
         :param collections.Iterable path: The query path to represent as string
                                           or other iterable.
         """
-        if isinstance(path, six.string_types):
+        if isinstance(path, str):
             path = path.split(LOOKUP_SEP)
         return super(QueryPath, cls).__new__(cls, path)
 
@@ -62,7 +60,7 @@ class QueryPath(tuple):
         return LOOKUP_SEP.join(self)
 
     def __repr__(self):
-        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
+        return '<{}: {}>'.format(self.__class__.__name__, str(self))
 
     def build_filter(self, value):
         """
@@ -72,7 +70,7 @@ class QueryPath(tuple):
         :return: The filter condition as a Q object.
         :rtype: django.db.models.Q
         """
-        return Q(**{six.text_type(self): value})
+        return Q(**{str(self): value})
 
 
 class NodeProcessor(object):
@@ -170,7 +168,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
     property across relations.
     """
     __slots__ = ()
-    node_modifier = NodeModifier(lambda item, ref: (six.text_type(ref.relation_path + item[0]), item[1]))
+    node_modifier = NodeModifier(lambda item, ref: (str(ref.relation_path + item[0]), item[1]))
 
     @property
     def full_path(self):
@@ -212,7 +210,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         # Use the model stored on this reference instead of the one on the
         # property since the query may be happening from a subclass of the
         # model the property is defined on.
-        q_obj = self.property.get_filter(self.model, six.text_type(lookups) or 'exact', value)
+        q_obj = self.property.get_filter(self.model, str(lookups) or 'exact', value)
         if self.relation_path:
             # If the resolved property belongs to a related model, all actual
             # conditions in the returned Q object must be modified to use the
@@ -381,7 +379,7 @@ class ModelAttributeGetter(object):
                                combined using the lookup separator (``__``).
         :type attribute_path: collections.Iterable
         """
-        if isinstance(attribute_path, six.string_types):
+        if isinstance(attribute_path, str):
             attribute_path = attribute_path.split(self.ATTRIBUTE_SEPARATOR)
         self.query_path = QueryPath(attribute_path)
 

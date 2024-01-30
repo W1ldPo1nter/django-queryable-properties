@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 import pytest
-import six
 from django import VERSION as DJANGO_VERSION
 from django.db import models
 
@@ -195,7 +194,7 @@ class TestFilterWithAggregateAnnotation(object):
         prop = get_queryable_property(model, 'version_count')
         monkeypatch.setattr(prop, 'get_filter', lambda cls, lookup, value: models.Q(pk__gt=0))
         queryset = model.objects.select_properties('version_count').filter(version_count__gt=5)
-        assert '"id" > 0' in six.text_type(queryset.query)
+        assert '"id" > 0' in str(queryset.query)
         assert queryset.count() == len(queryset) == 2
 
     @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Filtered aggregates didn't exist before Django 2.0")
@@ -267,7 +266,7 @@ class TestFilterWithExpressionAnnotation(object):
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_filter_implementation_used_despite_present_annotation(self, model):
         queryset = model.objects.select_properties('version').filter(version='2.0.0')
-        pseudo_sql = six.text_type(queryset.query)
+        pseudo_sql = str(queryset.query)
         assert '"major" = 2' in pseudo_sql
         assert '"minor" = 0' in pseudo_sql
         assert '"patch" = 0' in pseudo_sql

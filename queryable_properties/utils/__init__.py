@@ -2,8 +2,6 @@
 
 from collections import defaultdict
 
-import six
-
 from .internal import MISSING_OBJECT, ModelAttributeGetter, QueryPath, get_queryable_property_descriptor
 
 __all__ = ('MISSING_OBJECT', 'get_queryable_property', 'prefetch_queryable_properties', 'reset_queryable_property')
@@ -76,12 +74,12 @@ def prefetch_queryable_properties(model_instances, *property_paths):
 
     # Perform a single query for each model, querying all properties that have
     # been requested for that model (be it directly or via relations).
-    for model, property_mappings in six.iteritems(properties_by_model):
+    for model, property_mappings in properties_by_model.items():
         queryset = QueryablePropertiesQuerySetMixin.inject_into_object(model._base_manager.all())
         queryset = queryset.filter(pk__in=pks_by_model[model]).select_properties(*property_mappings)
         for result in queryset.values('pk', *property_mappings):
             pk = result.pop('pk')
-            for property_name, value in six.iteritems(result):
+            for property_name, value in result.items():
                 descriptor = get_queryable_property_descriptor(model, property_name)
                 for instance in property_mappings[property_name]:
                     # Only populate the cache for the concrete objects the

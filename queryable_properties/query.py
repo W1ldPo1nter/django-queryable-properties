@@ -3,7 +3,6 @@
 from collections import OrderedDict
 from contextlib import contextmanager
 
-import six
 from django.utils.tree import Node
 
 from .compat import (
@@ -145,7 +144,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
                                          .format(property_ref.property))
 
-        annotation_name = six.text_type(property_ref.full_path)
+        annotation_name = str(property_ref.full_path)
         annotation_mask = set(self.annotations if self.annotation_select_mask is None else self.annotation_select_mask)
         self._queryable_property_stack.append(property_ref)
         try:
@@ -228,7 +227,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # If it is based on a queryable property annotation, annotating the
             # current aggregate cannot be delegated to Django as it couldn't
             # deal with annotations containing the lookup separator.
-            aggregate.add_to_query(self, alias, six.text_type(query_path), property_annotation, is_summary)
+            aggregate.add_to_query(self, alias, str(query_path), property_annotation, is_summary)
         else:
             # The overridden method also allows to set a default value for the
             # model parameter, which will be missing if add_annotation calls are
@@ -257,7 +256,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # requires auto-annotating here, while a queryable property used
             # in a complex ordering expression is resolved through other
             # overridden methods.
-            if isinstance(field_name, six.string_types) and field_name != '?':
+            if isinstance(field_name, str) and field_name != '?':
                 if field_name.startswith('-'):
                     field_name = field_name[1:]
                 self._auto_annotate(QueryPath(field_name))
@@ -326,7 +325,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # a subquery), all queryable property annotations must be added to the
         # select mask to avoid potentially empty SELECT clauses.
         if self.annotation_select_mask is not None and self._queryable_property_annotations:
-            annotation_names = (six.text_type(property_ref.full_path) for property_ref
+            annotation_names = (str(property_ref.full_path) for property_ref
                                 in self._queryable_property_annotations)
             self.set_annotation_mask(set(self.annotation_select_mask).union(annotation_names))
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-import six
 from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import ModelAdmin, site
 from django.contrib.admin.filters import BooleanFieldListFilter, ChoicesFieldListFilter, DateFieldListFilter
@@ -109,7 +108,7 @@ class TestQueryablePropertyField(object):
         list_filter = creator(rf.get('/'), {}, admin_instance.model, admin_instance)
         assert isinstance(list_filter, expected_filter_class)
         assert list_filter.field is field
-        assert list_filter.field_path == six.text_type(field.property_path)
+        assert list_filter.field_path == str(field.property_path)
 
     @pytest.mark.django_db
     def test_date_list_filter(self, rf, admin_user, admin_instance):

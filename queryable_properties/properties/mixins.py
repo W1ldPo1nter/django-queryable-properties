@@ -2,7 +2,6 @@
 
 from functools import wraps
 
-import six
 from django.db.models import BooleanField
 
 from ..exceptions import QueryablePropertyError
@@ -23,7 +22,7 @@ class LookupFilterMeta(type):
         # Find all methods that have been marked with lookups via the
         # `lookup_filter` decorator.
         mappings = {}
-        for attr_name, attr in six.iteritems(attrs):
+        for attr_name, attr in attrs.items():
             if callable(attr) and hasattr(attr, '_lookups'):
                 for lookup in attr._lookups:
                     mappings[lookup] = attr_name
@@ -35,7 +34,7 @@ class LookupFilterMeta(type):
         return cls
 
 
-class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
+class LookupFilterMixin(InjectableMixin, metaclass=LookupFilterMeta):
     """
     A mixin for queryable properties that allows to implement queryset
     filtering via individual methods for different lookups.
@@ -51,7 +50,7 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
     remaining_lookups_via_parent = False
 
     def __init__(self, *args, **kwargs):
-        self.lookup_mappings = {lookup: getattr(self, name) for lookup, name in six.iteritems(self._lookup_mappings)}
+        self.lookup_mappings = {lookup: getattr(self, name) for lookup, name in self._lookup_mappings.items()}
         super(LookupFilterMixin, self).__init__(*args, **kwargs)
 
     @classmethod

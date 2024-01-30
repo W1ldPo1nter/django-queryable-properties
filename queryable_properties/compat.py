@@ -12,7 +12,6 @@ except ImportError:  # pragma: no cover
     def nullcontext(enter_result=None):
         yield enter_result
 
-import six
 from django.contrib.admin.options import ModelAdmin
 from django.db.models import Manager
 from django.db.models.sql.query import Query
@@ -138,7 +137,7 @@ def convert_build_filter_to_add_q_kwargs(**build_filter_kwargs):
     :return: The keywords argument to use for :meth:`Query._add_q`.
     :rtype: dict
     """
-    return {BUILD_FILTER_TO_ADD_Q_KWARGS_MAP[key]: value for key, value in six.iteritems(build_filter_kwargs)
+    return {BUILD_FILTER_TO_ADD_Q_KWARGS_MAP[key]: value for key, value in build_filter_kwargs.items()
             if key in BUILD_FILTER_TO_ADD_Q_KWARGS_MAP}
 
 

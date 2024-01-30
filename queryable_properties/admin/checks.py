@@ -2,7 +2,6 @@
 
 from itertools import chain
 
-import six
 from django.contrib.admin.options import InlineModelAdmin
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F, expressions
@@ -37,7 +36,7 @@ class Error(getattr(checks, 'Error', object)):
 
     def raise_exception(self):
         """Raise an ImproperlyConfigured exception for this error."""
-        raise ImproperlyConfigured('{}: ({}) {}'.format(six.text_type(self.obj), self.id, self.msg))
+        raise ImproperlyConfigured('{}: ({}) {}'.format(str(self.obj), self.id, self.msg))
 
 
 class QueryablePropertiesChecksMixin(InjectableMixin):
@@ -186,7 +185,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                  as well as a list of check errors.
         :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
         """
-        if not isinstance(field_name, six.string_types) and hasattr(expressions, 'Combinable'):
+        if not isinstance(field_name, str) and hasattr(expressions, 'Combinable'):
             if isinstance(field_name, expressions.Combinable):
                 field_name = field_name.asc()
             if isinstance(field_name, expressions.OrderBy) and isinstance(field_name.expression, F):
