@@ -32,7 +32,7 @@ class QueryablePropertyDescriptor(property):
         :param prop: The queryable property to allow attribute access for.
         :type prop: QueryableProperty
         """
-        descriptor = super(QueryablePropertyDescriptor, cls).__new__(cls, doc=prop.__doc__)
+        descriptor = super().__new__(cls, doc=prop.__doc__)
         descriptor.prop = prop
         return descriptor
 

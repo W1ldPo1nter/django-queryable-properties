@@ -27,7 +27,7 @@ class LookupFilterMeta(type):
 
         # Let the class construction take care of the lookup mappings of the
         # base class(es) and add the ones from the current class to them.
-        cls = super(LookupFilterMeta, mcs).__new__(mcs, name, bases, attrs)
+        cls = super().__new__(mcs, name, bases, attrs)
         cls._lookup_mappings = dict(cls._lookup_mappings, **mappings)
         return cls
 

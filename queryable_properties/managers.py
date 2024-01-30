@@ -28,8 +28,7 @@ class LegacyIterable:
         self.queryset = queryset
 
     def __iter__(self):
-        original = super(QueryablePropertiesBaseQuerySetMixin, self.queryset)
-        return getattr(original, 'iterator', original.__iter__)()
+        return getattr(super(), 'iterator', super().__iter__)()
 
 
 class QueryablePropertiesIterableMixin:

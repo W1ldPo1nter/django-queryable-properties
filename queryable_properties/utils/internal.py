@@ -39,7 +39,7 @@ class QueryPath(tuple):
         """
         if isinstance(path, str):
             path = path.split(LOOKUP_SEP)
-        return super(QueryPath, cls).__new__(cls, path)
+        return super().__new__(cls, path)
 
     def __add__(self, other):
         if not isinstance(other, self.__class__):

@@ -34,7 +34,7 @@ class QueryablePropertiesAdminMixin:
     @classmethod
     def validate(cls, model):  # pragma: no cover
         cls._ensure_queryable_property_checks()
-        return super(QueryablePropertiesAdminMixin, cls).validate(model)
+        return super().validate(model)
 
     def check(self, *args, **kwargs):
         self._ensure_queryable_property_checks(self)
