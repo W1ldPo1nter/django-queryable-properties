@@ -19,7 +19,7 @@ class AnnotationProperty(AnnotationGetterMixin, QueryableProperty):
         :param annotation: The static annotation to use to determine the value
                            of this property.
         """
-        super(AnnotationProperty, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.annotation = annotation
 
     def get_annotation(self, cls):
@@ -41,7 +41,7 @@ class AggregateProperty(AnnotationProperty):
                                                      determine the value of
                                                      this property.
         """
-        super(AggregateProperty, self).__init__(aggregate, **kwargs)
+        super().__init__(aggregate, **kwargs)
 
     def get_value(self, obj):
         return self.get_queryset_for_object(obj).aggregate(**{self.name: self.annotation})[self.name]
@@ -65,7 +65,7 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
                                   separator (``__``) to check for more remote
                                   relations.
         """
-        super(RelatedExistenceCheckProperty, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.query_path = QueryPath(relation_path) + 'isnull'
         self.negated = negated
 

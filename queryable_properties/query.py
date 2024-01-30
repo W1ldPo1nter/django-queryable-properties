@@ -22,7 +22,7 @@ class AggregatePropertyChecker(NodeChecker):
     """
 
     def __init__(self):
-        super(AggregatePropertyChecker, self).__init__(self.is_aggregate_property)
+        super().__init__(self.is_aggregate_property)
 
     def is_aggregate_property(self, item, model, ignored_refs=frozenset()):
         """
@@ -60,7 +60,7 @@ class QueryablePropertiesCompilerMixin(InjectableMixin):
     """
 
     def setup_query(self, *args, **kwargs):
-        super(QueryablePropertiesCompilerMixin, self).setup_query(*args, **kwargs)
+        super().setup_query(*args, **kwargs)
         # Add the marker to the column map while ensuring that it's the first
         # entry.
         annotation_col_map = OrderedDict()
@@ -69,7 +69,7 @@ class QueryablePropertiesCompilerMixin(InjectableMixin):
         self.annotation_col_map = annotation_col_map
 
     def results_iter(self, *args, **kwargs):
-        for row in super(QueryablePropertiesCompilerMixin, self).results_iter(*args, **kwargs):
+        for row in super().results_iter(*args, **kwargs):
             # Add the fixed value for the fake querying properties marker
             # annotation to each row. In recent versions, the value can simply
             # be appended since -1 can be specified as the index in the
@@ -104,7 +104,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # See QueryablePropertiesCompilerMixin.results_iter, but for raw
         # queries. The marker can simply be added as the first value as fields
         # are not strictly grouped like in regular queries.
-        for row in super(QueryablePropertiesQueryMixin, self).__iter__():
+        for row in super().__iter__():
             if self._use_querying_properties_marker:
                 row = row.__class__((True,)) + row
             yield row
@@ -231,7 +231,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # model parameter, which will be missing if add_annotation calls are
             # redirected to add_aggregate for older Django versions.
             model = model or self.model
-            super(QueryablePropertiesQueryMixin, self).add_aggregate(aggregate, model, alias, is_summary)
+            super().add_aggregate(aggregate, model, alias, is_summary)
         if self.annotation_select_mask is not None:
             self.set_annotation_mask(self.annotation_select_mask.union((alias,)))
 
@@ -246,7 +246,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             # versions and therefore calls the correct super methods if
             # necessary.
             return self.build_filter(*args, **kwargs)
-        return super(QueryablePropertiesQueryMixin, self).add_filter(*args, **kwargs)
+        return super().add_filter(*args, **kwargs)
 
     def add_ordering(self, *ordering, **kwargs):
         for field_name in ordering:
@@ -258,11 +258,11 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 if field_name.startswith('-'):
                     field_name = field_name[1:]
                 self._auto_annotate(QueryPath(field_name))
-        return super(QueryablePropertiesQueryMixin, self).add_ordering(*ordering, **kwargs)
+        return super().add_ordering(*ordering, **kwargs)
 
     @property
     def aggregate_select(self):  # pragma: no cover
-        select = original = super(QueryablePropertiesQueryMixin, self).aggregate_select
+        select = original = super().aggregate_select
         if self._use_querying_properties_marker:
             # Since old Django versions don't offer the annotation_col_map on
             # compilers, but read the annotations directly from the query, the
@@ -296,7 +296,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         if not property_ref or (self._queryable_property_stack and self._queryable_property_stack[-1] == property_ref):
             # The base method has different names in different Django versions
             # (see comment on the constant definition).
-            base_method = getattr(super(QueryablePropertiesQueryMixin, self), BUILD_FILTER_METHOD_NAME)
+            base_method = getattr(super(), BUILD_FILTER_METHOD_NAME)
             return base_method(filter_expr, *args, **kwargs)
 
         q_obj = property_ref.get_filter(lookups, value)
@@ -326,13 +326,13 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             annotation_names = (str(property_ref.full_path) for property_ref
                                 in self._queryable_property_annotations)
             self.set_annotation_mask(set(self.annotation_select_mask).union(annotation_names))
-        return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
+        return super().get_aggregation(*args, **kwargs)
 
     def get_columns(self):  # Raw queries
         # Like QueryablePropertiesCompilerMixin.setup_query, but for raw
         # queries. The marker can simply be added as the first value as fields
         # are not strictly grouped like in regular queries.
-        columns = super(QueryablePropertiesQueryMixin, self).get_columns()
+        columns = super().get_columns()
         if self._use_querying_properties_marker:
             columns.insert(0, QUERYING_PROPERTIES_MARKER)
         return columns
@@ -340,7 +340,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
     def get_compiler(self, *args, **kwargs):
         use_marker = self._use_querying_properties_marker
         self._use_querying_properties_marker = False
-        compiler = super(QueryablePropertiesQueryMixin, self).get_compiler(*args, **kwargs)
+        compiler = super().get_compiler(*args, **kwargs)
         if use_marker:
             QueryablePropertiesCompilerMixin.inject_into_object(compiler)
         return compiler
@@ -352,7 +352,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # correctly.
         if self._queryable_property_stack:
             names = self._queryable_property_stack[-1].relation_path + names
-        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NAMES_TO_PATH_METHOD_NAME)
+        base_method = getattr(super(), NAMES_TO_PATH_METHOD_NAME)
         return base_method(names, *args, **kwargs)
 
     def need_force_having(self, q_object):  # pragma: no cover
@@ -372,7 +372,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             return True
         # The base method has different names in different Django versions (see
         # comment on the constant definition).
-        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NEED_HAVING_METHOD_NAME)
+        base_method = getattr(super(), NEED_HAVING_METHOD_NAME)
         return base_method(obj)
 
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
@@ -390,7 +390,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 from django.db.models.expressions import Ref
                 return Ref(name, property_annotation)
             return property_annotation
-        return super(QueryablePropertiesQueryMixin, self).resolve_ref(name, allow_joins, reuse, summarize,
+        return super().resolve_ref(name, allow_joins, reuse, summarize,
                                                                       *args, **kwargs)
 
     def setup_joins(self, names, *args, **kwargs):
@@ -400,16 +400,16 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         # and therefore calls the correct super method.
         if NAMES_TO_PATH_METHOD_NAME == 'setup_joins':  # pragma: no cover
             return self.names_to_path(names, *args, **kwargs)
-        return super(QueryablePropertiesQueryMixin, self).setup_joins(names, *args, **kwargs)
+        return super().setup_joins(names, *args, **kwargs)
 
     def clone(self, *args, **kwargs):
-        obj = super(QueryablePropertiesQueryMixin, self).clone(*args, **kwargs)
+        obj = super().clone(*args, **kwargs)
         if QUERY_CHAIN_METHOD_NAME == 'clone':  # pragma: no cover
             obj = self._postprocess_clone(obj)
         return obj
 
     def chain(self, *args, **kwargs):
-        obj = super(QueryablePropertiesQueryMixin, self).chain(*args, **kwargs)
+        obj = super().chain(*args, **kwargs)
         if QUERY_CHAIN_METHOD_NAME == 'chain':
             obj = self._postprocess_clone(obj)
         return obj

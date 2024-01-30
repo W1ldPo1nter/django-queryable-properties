@@ -44,11 +44,11 @@ class QueryablePropertiesIterableMixin(object):
     """
 
     def __init__(self, queryset, *args, **kwargs):
-        super(QueryablePropertiesIterableMixin, self).__init__(chain_queryset(queryset), *args, **kwargs)
+        super().__init__(chain_queryset(queryset), *args, **kwargs)
 
     def __iter__(self):
         self._setup_queryable_properties()
-        for obj in super(QueryablePropertiesIterableMixin, self).__iter__():
+        for obj in super().__iter__():
             yield self._postprocess_queryable_properties(obj)
 
     def _setup_queryable_properties(self):  # pragma: no cover
@@ -121,7 +121,7 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):
         return select
 
     def _setup_queryable_properties(self):
-        super(LegacyOrderingMixin, self)._setup_queryable_properties()
+        super()._setup_queryable_properties()
         query = self.queryset.query
         select = dict(query.annotation_select)
 
@@ -140,11 +140,11 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
     """
 
     def _setup_queryable_properties(self):
-        super(QueryablePropertiesModelIterableMixin, self)._setup_queryable_properties()
+        super()._setup_queryable_properties()
         self.queryset.query._use_querying_properties_marker = True
 
     def _postprocess_queryable_properties(self, obj):
-        obj = super(QueryablePropertiesModelIterableMixin, self)._postprocess_queryable_properties(obj)
+        obj = super()._postprocess_queryable_properties(obj)
         delattr(obj, QUERYING_PROPERTIES_MARKER)
         return obj
 
@@ -165,7 +165,7 @@ class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyO
     def _postprocess_queryable_properties(self, obj):
         for ref in self._order_by_select:
             ref.descriptor.clear_cached_value(obj)
-        return super(LegacyOrderingModelIterable, self)._postprocess_queryable_properties(obj)
+        return super()._postprocess_queryable_properties(obj)
 
 
 class LegacyValuesIterable(LegacyOrderingMixin, LegacyIterable):
@@ -174,7 +174,7 @@ class LegacyValuesIterable(LegacyOrderingMixin, LegacyIterable):
     """
 
     def _postprocess_queryable_properties(self, obj):
-        obj = super(LegacyValuesIterable, self)._postprocess_queryable_properties(obj)
+        obj = super()._postprocess_queryable_properties(obj)
         for ref in self._order_by_select:
             obj.pop(str(ref.full_path), None)
         return obj
@@ -186,7 +186,7 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
     """
 
     def __init__(self, queryset, *args, **kwargs):
-        super(LegacyValuesListIterable, self).__init__(queryset, *args, **kwargs)
+        super().__init__(queryset, *args, **kwargs)
         self.flat = queryset.flat
         self.queryset.flat = False
 
@@ -210,7 +210,7 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
         return {-i for i, name in enumerate(aggregate_names, start=1) if name in forced_names}
 
     def _postprocess_queryable_properties(self, obj):
-        obj = super(LegacyValuesListIterable, self)._postprocess_queryable_properties(obj)
+        obj = super()._postprocess_queryable_properties(obj)
         obj = tuple(value for i, value in enumerate(obj, start=-len(obj)) if i not in self._discarded_indexes)
         if self.flat and len(self.queryset._fields) == 1:
             return obj[0]
@@ -248,7 +248,7 @@ class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
     """
 
     def __iter__(self):
-        original = super(QueryablePropertiesRawQuerySetMixin, self)
+        original = super()
         # Only recent Django versions (>= 2.1) have the iterator method.
         iterator = original.__iter__ if hasattr(original, 'iterator') else self.iterator
         for obj in iterator():
@@ -296,7 +296,7 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
             if klass:
                 klass = QueryablePropertiesQuerySetMixin.mix_with_class(klass, 'QueryableProperties' + klass.__name__)
             args = (klass,) + args
-        clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
+        clone = super()._clone(*args, **kwargs)
         # Since the _iterable_class property may return a dynamically created
         # class, the value of a clone must be reset to the base class.
         if has_iterable_class:
@@ -384,17 +384,17 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
             elif isinstance(self, ValuesQuerySet):
                 iterable_class = LegacyValuesIterable
             return iter(iterable_class(self))
-        return super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
+        return super().iterator(*args, **kwargs)
 
     def raw(self, *args, **kwargs):
-        queryset = super(QueryablePropertiesQuerySetMixin, self).raw(*args, **kwargs)
+        queryset = super().raw(*args, **kwargs)
         return QueryablePropertiesRawQuerySetMixin.inject_into_object(queryset)
 
     def update(self, **kwargs):
         # Resolve any queryable properties into their actual update kwargs
         # before calling the base update method.
         kwargs = self._resolve_update_kwargs(**kwargs)
-        return super(QueryablePropertiesQuerySetMixin, self).update(**kwargs)
+        return super().update(**kwargs)
 
     @classmethod
     def apply_to(cls, queryset):
@@ -438,7 +438,7 @@ class QueryablePropertiesManagerMixin(InjectableMixin):
     """
 
     def get_queryset(self):
-        queryset = getattr(super(QueryablePropertiesManagerMixin, self), MANAGER_QUERYSET_METHOD_NAME)()
+        queryset = getattr(super(), MANAGER_QUERYSET_METHOD_NAME)()
         return QueryablePropertiesQuerySetMixin.inject_into_object(queryset)
 
     get_query_set = get_queryset

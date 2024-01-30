@@ -25,7 +25,7 @@ class QueryablePropertiesAdminMixin(object):
     """A sequence of queryable property names that should be selected."""
 
     def __init__(self, *args, **kwargs):
-        super(QueryablePropertiesAdminMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if hasattr(self, 'list_filter') and not hasattr(ModelAdmin, 'get_list_filter'):  # pragma: no cover
             # In very old Django versions, there was no get_list_filter method,
             # therefore the processed queryable property filters must be stored
@@ -39,7 +39,7 @@ class QueryablePropertiesAdminMixin(object):
 
     def check(self, *args, **kwargs):
         self._ensure_queryable_property_checks(self)
-        return super(QueryablePropertiesAdminMixin, self).check(*args, **kwargs)
+        return super().check(*args, **kwargs)
 
     if getattr(getattr(ModelAdmin, 'check', None), '__self__', None):  # pragma: no cover
         # In old Django versions, check was a classmethod.
@@ -69,7 +69,7 @@ class QueryablePropertiesAdminMixin(object):
     def get_queryset(self, request):
         # The base method has different names in different Django versions (see
         # comment on the constant definition).
-        base_method = getattr(super(QueryablePropertiesAdminMixin, self), ADMIN_QUERYSET_METHOD_NAME)
+        base_method = getattr(super(), ADMIN_QUERYSET_METHOD_NAME)
         # Make sure to use a queryset with queryable properties features.
         queryset = QueryablePropertiesQuerySetMixin.apply_to(base_method(request))
         # Apply list_select_properties.
@@ -98,7 +98,7 @@ class QueryablePropertiesAdminMixin(object):
         return self.list_select_properties
 
     def get_list_filter(self, request):
-        list_filter = super(QueryablePropertiesAdminMixin, self).get_list_filter(request)
+        list_filter = super().get_list_filter(request)
         return self.process_queryable_property_filters(list_filter)
 
     def process_queryable_property_filters(self, list_filter):

@@ -239,7 +239,7 @@ class queryable_property(QueryableProperty):
                                  expected to decorate the getter method.
         :type annotation_based: bool
         """
-        super(queryable_property, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.__doc__ = None
         if getter:
             self(getter, force_getter=True)

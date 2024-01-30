@@ -47,13 +47,13 @@ class QueryPath(tuple):
         return self.__class__(tuple(self) + tuple(other))
 
     def __getitem__(self, item):
-        result = super(QueryPath, self).__getitem__(item)
+        result = super().__getitem__(item)
         if isinstance(item, slice):
             result = self.__class__(result)
         return result
 
     def __getslice__(self, i, j):  # pragma: no cover
-        return self.__class__(super(QueryPath, self).__getslice__(i, j))
+        return self.__class__(super().__getslice__(i, j))
 
     def __str__(self):
         return LOOKUP_SEP.join(self)
@@ -248,7 +248,7 @@ class InjectableMixin(object):
     _dynamic_pickling = True
 
     def __init__(self, *args, **kwargs):
-        super(InjectableMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.init_injected_attrs()
 
     def init_injected_attrs(self):

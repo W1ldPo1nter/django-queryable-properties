@@ -49,7 +49,7 @@ class LookupFilterMixin(InjectableMixin, metaclass=LookupFilterMeta):
 
     def __init__(self, *args, **kwargs):
         self.lookup_mappings = {lookup: getattr(self, name) for lookup, name in self._lookup_mappings.items()}
-        super(LookupFilterMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def lookup_filter(cls, *lookups):
@@ -106,7 +106,7 @@ class LookupFilterMixin(InjectableMixin, metaclass=LookupFilterMeta):
                     'Queryable property "{prop}" does not implement filtering with lookup "{lookup}".'
                     .format(prop=self, lookup=lookup)
                 )
-            method = super(LookupFilterMixin, self).get_filter
+            method = super().get_filter
         return method(cls, lookup, value)
 
 
@@ -188,7 +188,7 @@ class AnnotationGetterMixin(AnnotationMixin):
                        cached (similar to ``cached_property``). A value of None
                        means using the default value.
         """
-        super(AnnotationGetterMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if cached is not None:
             self.cached = cached
 
@@ -292,7 +292,7 @@ class SubqueryMixin(AnnotationGetterMixin):
         :type queryset: django.db.models.QuerySet | function
         """
         self.queryset = queryset
-        super(SubqueryMixin, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _build_subquery(self, queryset):  # pragma: no cover
         """

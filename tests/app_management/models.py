@@ -17,7 +17,7 @@ class DummyProperty(SetterMixin, QueryableProperty):
     get_filter = None
 
     def __init__(self):
-        super(DummyProperty, self).__init__()
+        super().__init__()
         self.counter = 0
 
     def get_value(self, obj):

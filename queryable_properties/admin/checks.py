@@ -26,7 +26,7 @@ class Error(getattr(checks, 'Error', object)):
         """
         error_id = 'queryable_properties.admin.E{:03}'.format(error_id)
         if self.__class__.__bases__ != (object,):
-            super(Error, self).__init__(msg, obj=obj, id=error_id)
+            super().__init__(msg, obj=obj, id=error_id)
         else:  # pragma: no cover
             self.msg = msg
             self.obj = obj
@@ -45,7 +45,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
     """
 
     def check(self, admin_obj, *args, **kwargs):
-        errors = super(QueryablePropertiesChecksMixin, self).check(admin_obj, *args, **kwargs)
+        errors = super().check(admin_obj, *args, **kwargs)
         # The number of arguments differs between old and recent Django
         # versions.
         model = getattr(admin_obj, 'model', args[0] if args else None)
@@ -54,7 +54,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
 
     def validate(self, cls, model):  # pragma: no cover
         fake_cls = self._validate_queryable_properties(cls, model)
-        super(QueryablePropertiesChecksMixin, self).validate(fake_cls, model)
+        super().validate(fake_cls, model)
 
     def _validate_queryable_properties(self, cls, model):  # pragma: no cover
         """
@@ -193,7 +193,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         return self._check_queryable_property(obj, model, QueryPath(field_name), label)
 
     def _check_list_filter_item(self, obj, *args):
-        errors = super(QueryablePropertiesChecksMixin, self)._check_list_filter_item(obj, *args)
+        errors = super()._check_list_filter_item(obj, *args)
         if not errors or errors[0].id != 'admin.E116':
             return errors
 
@@ -204,7 +204,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         return property_errors if prop else errors
 
     def _check_ordering_item(self, obj, *args):
-        errors = super(QueryablePropertiesChecksMixin, self)._check_ordering_item(obj, *args)
+        errors = super()._check_ordering_item(obj, *args)
         if not errors or errors[0].id != 'admin.E033':
             return errors
 

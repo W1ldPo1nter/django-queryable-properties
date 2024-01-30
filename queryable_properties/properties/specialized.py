@@ -33,7 +33,7 @@ class ValueCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
         """
         self.attribute_getter = ModelAttributeGetter(attribute_path)
         self.values = values
-        super(ValueCheckProperty, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def get_value(self, obj):
         return self.attribute_getter.get_value(obj) in self.values
@@ -93,7 +93,7 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
         self.include_boundaries = include_boundaries
         self.in_range = in_range
         self.include_missing = include_missing
-        super(RangeCheckProperty, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @property
     def final_value(self):
@@ -157,7 +157,7 @@ class MappingProperty(AnnotationMixin, QueryableProperty):
                         none of the mappings match an encountered value.
                         Defaults to None.
         """
-        super(MappingProperty, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.attribute_getter = ModelAttributeGetter(attribute_path)
         self.output_field = output_field
         self.mappings = mappings
