@@ -1,5 +1,3 @@
-# encoding: utf-8
-
 from ..utils import MISSING_OBJECT
 from .annotation import AggregateProperty, AnnotationProperty, RelatedExistenceCheckProperty
 from .base import QueryableProperty, queryable_property

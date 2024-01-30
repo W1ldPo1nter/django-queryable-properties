@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import pytest
 from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import site

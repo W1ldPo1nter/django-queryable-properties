@@ -1,5 +1,3 @@
-# encoding: utf-8
-
 from datetime import date
 
 from django import VERSION as DJANGO_VERSION

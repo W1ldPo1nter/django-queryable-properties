@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from .base import QueryableProperty
 from .mixins import SubqueryMixin
 

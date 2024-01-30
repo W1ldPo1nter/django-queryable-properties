@@ -1,5 +1,3 @@
-# encoding: utf-8
-
 from collections import defaultdict
 
 from .internal import MISSING_OBJECT, ModelAttributeGetter, QueryPath, get_queryable_property_descriptor

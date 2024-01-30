@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Internal utilities used by the queryable properties library, which may change
 without notice or be removed without deprecation.

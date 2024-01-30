@@ -1,4 +1,3 @@
-# encoding: utf-8
 """Write Django model properties that can be used in database queries."""
 
 from __future__ import unicode_literals

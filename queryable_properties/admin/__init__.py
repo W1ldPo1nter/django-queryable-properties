@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
 from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation

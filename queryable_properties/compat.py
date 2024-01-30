@@ -1,4 +1,3 @@
-# encoding: utf-8
 """A stable import interface for Django classes that were moved in between versions and compatibility constants."""
 
 from copy import deepcopy

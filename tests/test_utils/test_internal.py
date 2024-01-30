@@ -1,4 +1,3 @@
-# encoding: utf-8
 import pickle
 from collections import Counter
 

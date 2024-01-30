@@ -1,5 +1,3 @@
-# encoding: utf-8
-
 from contextlib import contextmanager
 from datetime import date
 from itertools import chain

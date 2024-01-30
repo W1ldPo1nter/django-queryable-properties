@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from queryable_properties.admin import QueryablePropertiesAdmin, QueryablePropertiesTabularInline
 from ..app_management.models import VersionWithClassBasedProperties
 
