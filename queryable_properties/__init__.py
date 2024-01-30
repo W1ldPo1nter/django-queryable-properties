@@ -1,7 +1,5 @@
 """Write Django model properties that can be used in database queries."""
 
-from __future__ import unicode_literals
-
 __version__ = '1.9.1'
 __author__ = 'Marcus Klöpfel'
 __copyright__ = 'Copyright 2024, Marcus Klöpfel'
