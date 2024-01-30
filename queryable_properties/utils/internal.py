@@ -9,10 +9,10 @@ from functools import wraps
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Manager, Q
+from django.db.models.constants import LOOKUP_SEP
 from django.utils.decorators import method_decorator
 from django.utils.tree import Node
 
-from ..compat import LOOKUP_SEP, get_related_model
 from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 
 MISSING_OBJECT = object()  #: Arbitrary object to represent that an object in an attribute chain is missing.
@@ -536,7 +536,7 @@ def resolve_queryable_property(model, query_path):
     # across relations.
     for index, name in enumerate(query_path):
         try:
-            related_model = get_related_model(model, name)
+            related_model = model._meta.get_field(name).related_model
         except FieldDoesNotExist:
             try:
                 prop = get_queryable_property(model, name)

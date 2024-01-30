@@ -5,7 +5,7 @@ from django.contrib.admin.filters import ChoicesFieldListFilter, FieldListFilter
 from django.db.models.query import QuerySet
 from mock import patch
 
-from queryable_properties.compat import ADMIN_QUERYSET_METHOD_NAME, nullcontext
+from queryable_properties.compat import nullcontext
 from queryable_properties.managers import QueryablePropertiesQuerySetMixin
 from queryable_properties.utils import get_queryable_property
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
@@ -36,8 +36,7 @@ class TestQueryablePropertiesAdminMixin:
         admin = admin_class(model, site)
         qs_patch = nullcontext()
         if apply_patch:
-            qs_patch = patch('django.contrib.admin.options.ModelAdmin.{}'.format(ADMIN_QUERYSET_METHOD_NAME),
-                             return_value=QuerySet(model))
+            qs_patch = patch('django.contrib.admin.options.ModelAdmin.get_queryset', return_value=QuerySet(model))
 
         with qs_patch:
             queryset = admin.get_queryset(rf.get('/'))

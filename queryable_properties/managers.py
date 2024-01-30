@@ -1,14 +1,11 @@
 from copy import copy
 
 from django.db.models import Manager
-from django.db.models.query import QuerySet
+from django.db.models.query import ModelIterable, QuerySet
+from django.db.models.sql.query import RawQuery
 from django.utils.functional import cached_property
 
-from .compat import (
-    ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, MANAGER_QUERYSET_METHOD_NAME, DateQuerySet,
-    DateTimeQuerySet, ModelIterable, RawModelIterable, RawQuery, ValuesListQuerySet, ValuesQuerySet, chain_query,
-    chain_queryset,
-)
+from .compat import RawModelIterable
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin
 from .utils import get_queryable_property
@@ -44,7 +41,7 @@ class QueryablePropertiesIterableMixin:
     """
 
     def __init__(self, queryset, *args, **kwargs):
-        super().__init__(chain_queryset(queryset), *args, **kwargs)
+        super().__init__(queryset._chain(), *args, **kwargs)
 
     def __iter__(self):
         self._setup_queryable_properties()
@@ -128,7 +125,8 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):
         for property_ref in self._order_by_select:
             annotation_name = str(property_ref.full_path)
             select[annotation_name] = query.annotations[annotation_name]
-        setattr(query, ANNOTATION_SELECT_CACHE_NAME, select)
+
+        query._annotation_select_cache = select
 
 
 class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryablePropertiesIterableMixin):
@@ -234,9 +232,9 @@ class QueryablePropertiesBaseQuerySetMixin(InjectableMixin):
         query_attr_name = '_query' if hasattr(self, '_query') else 'query'
         query = getattr(self, query_attr_name)
         chain_kwargs = {}
-        if RawQuery and isinstance(query, RawQuery):
+        if isinstance(query, RawQuery):
             chain_kwargs['using'] = self.db
-        query = chain_query(query, **chain_kwargs)
+        query = query.chain(**chain_kwargs)
         class_name = 'QueryableProperties' + query.__class__.__name__
         setattr(self, query_attr_name, QueryablePropertiesQueryMixin.inject_into_object(query, class_name))
 
@@ -351,7 +349,7 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
         :return: A copy of this queryset with the added annotations.
         :rtype: QuerySet
         """
-        queryset = chain_queryset(self)
+        queryset = self._chain()
         for name in names:
             property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, QueryPath())
             # A full GROUP BY is required if the query is not limited to
@@ -364,26 +362,8 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
         return queryset
 
     def iterator(self, *args, **kwargs):
-        # Recent Django versions use their own iterable classes, where the
-        # QueryablePropertiesModelIterableMixin will be already mixed in. In
-        # older Django versions, the standalone legacy iterables are used
-        # instead to perform the queryable properties processing. Exceptions
-        # are legacy Date(Time)QuerySets, which don't support annotations
-        # and override the ordering anyway as well as querysets that don't
-        # yield model instances in Django 1.8, which doesn't require the
-        # legacy ordering setup.
-        if ('_iterable_class' not in self.__dict__ and
-                not (isinstance(self, ValuesQuerySet) and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and
-                not (DateQuerySet and isinstance(self, DateQuerySet)) and
-                not (DateTimeQuerySet and isinstance(self, DateTimeQuerySet))):  # pragma: no cover
-            iterable_class = LegacyOrderingModelIterable
-            if not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
-                iterable_class = LegacyModelIterable
-            elif isinstance(self, ValuesListQuerySet):
-                iterable_class = LegacyValuesListIterable
-            elif isinstance(self, ValuesQuerySet):
-                iterable_class = LegacyValuesIterable
-            return iter(iterable_class(self))
+        if '_iterable_class' not in self.__dict__:
+            return iter(LegacyModelIterable(self))
         return super().iterator(*args, **kwargs)
 
     def raw(self, *args, **kwargs):
@@ -408,7 +388,7 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
                  functionality.
         :rtype: QueryablePropertiesQuerySet
         """
-        return cls.inject_into_object(chain_queryset(queryset))
+        return cls.inject_into_object(queryset._chain())
 
 
 class QueryablePropertiesQuerySet(QueryablePropertiesQuerySetMixin, QuerySet):
@@ -438,10 +418,8 @@ class QueryablePropertiesManagerMixin(InjectableMixin):
     """
 
     def get_queryset(self):
-        queryset = getattr(super(), MANAGER_QUERYSET_METHOD_NAME)()
+        queryset = super().get_queryset()
         return QueryablePropertiesQuerySetMixin.inject_into_object(queryset)
-
-    get_query_set = get_queryset
 
     def select_properties(self, *names):
         """

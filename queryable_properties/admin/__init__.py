@@ -1,6 +1,5 @@
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
-from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import QueryPath
@@ -67,11 +66,8 @@ class QueryablePropertiesAdminMixin:
                 setattr(obj, attr_name, QueryablePropertiesChecksMixin.mix_with_class(checks_class, class_name))
 
     def get_queryset(self, request):
-        # The base method has different names in different Django versions (see
-        # comment on the constant definition).
-        base_method = getattr(super(), ADMIN_QUERYSET_METHOD_NAME)
         # Make sure to use a queryset with queryable properties features.
-        queryset = QueryablePropertiesQuerySetMixin.apply_to(base_method(request))
+        queryset = QueryablePropertiesQuerySetMixin.apply_to(super().get_queryset(request))
         # Apply list_select_properties.
         list_select_properties = self.get_list_select_properties(request)
         if list_select_properties:
@@ -153,25 +149,5 @@ class QueryablePropertiesTabularInline(QueryablePropertiesAdminMixin, TabularInl
     """
 
 
-# In very old django versions, the admin validation happens in one big function
-# that cannot really be extended well. Therefore, the Django module will be
-# monkeypatched in order to allow the queryable properties validation to take
-# effect.
-django_validate = getattr(admin_validation, 'validate', None)
-django_validate_inline = getattr(admin_validation, 'validate_inline', None)
-
-if django_validate:  # pragma: no cover
-    def validate(cls, model):
-        if issubclass(cls, QueryablePropertiesAdminMixin):
-            cls = QueryablePropertiesChecksMixin()._validate_queryable_properties(cls, model)
-        django_validate(cls, model)
-
-    admin_validation.validate = validate
-
-if django_validate_inline:  # pragma: no cover
-    def validate_inline(cls, parent, parent_model):
-        if issubclass(cls, QueryablePropertiesAdminMixin):
-            cls = QueryablePropertiesChecksMixin()._validate_queryable_properties(cls, cls.model)
-        django_validate_inline(cls, parent, parent_model)
-
-    admin_validation.validate_inline = validate_inline
+django_validate = None
+django_validate_inline = None

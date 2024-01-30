@@ -6,7 +6,6 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F
 
 from queryable_properties.admin.checks import Error
-from queryable_properties.compat import admin_validation
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
 from ..conftest import Concat, Value
@@ -47,12 +46,9 @@ def assert_admin_validation(admin_class, model, error_id=None, exception_text=No
         else:
             assert any(error.id == error_id for error in errors)
 
-    if hasattr(admin_validation, 'validate') or hasattr(ModelAdmin, 'validate'):
+    if hasattr(ModelAdmin, 'validate'):
         try:
-            if hasattr(ModelAdmin, 'validate'):
-                admin_class.validate(model)
-            else:
-                admin_validation.validate(admin_class, model)
+            admin_class.validate(model)
         except ImproperlyConfigured as e:
             assert exception_text is not None
             assert exception_text in str(e)

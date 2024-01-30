@@ -1,10 +1,10 @@
 from itertools import chain
 
 from django.contrib.admin.options import InlineModelAdmin
+from django.core import checks
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F, expressions
 
-from ..compat import checks
 from ..utils.internal import InjectableMixin, QueryPath, resolve_queryable_property
 
 

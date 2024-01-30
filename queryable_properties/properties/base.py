@@ -1,7 +1,9 @@
 from copy import deepcopy
 from functools import partial
 
-from ..compat import LOOKUP_SEP, pretty_name
+from django.db.models.constants import LOOKUP_SEP
+from django.forms.utils import pretty_name
+
 from ..exceptions import QueryablePropertyError
 from ..query import QUERYING_PROPERTIES_MARKER
 from ..utils import get_queryable_property, reset_queryable_property
