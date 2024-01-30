@@ -1,5 +1,3 @@
-from django import VERSION as DJANGO_VERSION
-
 SECRET_KEY = '1337' * 8
 
 DATABASES = {
@@ -25,7 +23,4 @@ INSTALLED_APPS = (
     'queryable_properties',
     'tests.app_management',
 )
-if DJANGO_VERSION < (1, 9):
-    INSTALLED_APPS += ('tests.dummy_lib',)  # Django versions before 1.9 don't support abstract models outside of apps
-
 SITE_ID = 1

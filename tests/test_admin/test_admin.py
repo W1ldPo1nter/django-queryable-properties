@@ -55,9 +55,7 @@ class TestQueryablePropertiesAdminMixin:
     def test_get_list_filter(self, monkeypatch, rf, list_filter_item, property_name):
         monkeypatch.setattr(ApplicationAdmin, 'list_filter', ('common_data', list_filter_item))
         admin = ApplicationAdmin(ApplicationWithClassBasedProperties, site)
-        list_filter = admin.list_filter
-        if DJANGO_VERSION >= (1, 5):
-            list_filter = admin.get_list_filter(rf.get('/'))
+        list_filter = admin.get_list_filter(rf.get('/'))
         assert list_filter[0] == 'common_data'
         assert (list_filter[1] == list_filter_item) is (not property_name)
         if property_name:

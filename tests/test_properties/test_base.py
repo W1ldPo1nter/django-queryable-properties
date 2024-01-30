@@ -2,7 +2,6 @@ import pickle
 import types
 
 import pytest
-from django import VERSION as DJANGO_VERSION
 from django.db.models import F, Model, Q
 
 from queryable_properties.compat import nullcontext as does_not_raise
@@ -397,9 +396,6 @@ class TestDecorators:
         assert isinstance(clone, LookupFilterMixin)
         positive_condition = clone.get_filter(None, 'exact', True)
         negative_condition = clone.get_filter(None, 'exact', False)
-        if DJANGO_VERSION < (1, 6):
-            # In very old Django versions, negating adds another layer.
-            negative_condition = negative_condition.children[0]
         assert positive_condition.children == negative_condition.children == [('some_field', 5)]
         assert positive_condition.negated is False
         assert negative_condition.negated is True

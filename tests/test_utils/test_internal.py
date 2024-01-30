@@ -2,7 +2,6 @@ import pickle
 from collections import Counter
 
 import pytest
-from django import VERSION as DJANGO_VERSION
 from django.db.models import CharField, Count, IntegerField, Q, Sum
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
@@ -522,7 +521,6 @@ class TestGetOutputField:
     CHAR_FIELD = CharField()
     INTEGER_FIELD = IntegerField(null=True)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
     @pytest.mark.parametrize('annotation, expected_result', [
         (Concat(Value('test'), 'some_field', output_field=CHAR_FIELD), CHAR_FIELD),
         (Sum('aggregate', output_field=INTEGER_FIELD), INTEGER_FIELD),

@@ -1,5 +1,4 @@
 import pytest
-from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from queryable_properties.exceptions import FieldError, QueryablePropertyError
@@ -26,7 +25,6 @@ class TestFilter:
         with pytest.raises(FieldError):
             model.objects.filter(non_existent_field=1337)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="type check didn't exist before Django 1.9")
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_standard_exception_on_invalid_filter_expression(self, model):
         with pytest.raises(FieldError):
@@ -42,7 +40,6 @@ class TestAnnotation:
         with pytest.raises(QueryablePropertyError):
             model.objects.select_properties('major_minor')
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
     def test_circular_property(self, model):
         with pytest.raises(QueryablePropertyError, match='circular dependency'):

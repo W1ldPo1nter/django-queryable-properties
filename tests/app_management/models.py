@@ -1,6 +1,5 @@
 from datetime import date
 
-from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from queryable_properties.managers import QueryablePropertiesManager
@@ -131,12 +130,11 @@ class CategoryWithClassBasedProperties(Category):
     objects = QueryablePropertiesManager()
 
     has_versions = RelatedExistenceCheckProperty('applications__versions')
-    if DJANGO_VERSION >= (2, 0):
-        has_multiple_stable_versions = AnnotationProperty(models.Case(
-            models.When(applications__stable_version_count__gt=1, then=True),
-            default=False,
-            output_field=models.BooleanField(),
-        ))
+    has_multiple_stable_versions = AnnotationProperty(models.Case(
+        models.When(applications__stable_version_count__gt=1, then=True),
+        default=False,
+        output_field=models.BooleanField(),
+    ))
     version_count = AnnotationProperty(models.Count('applications__versions'))
     has_v2 = SubqueryExistenceCheckProperty(
         lambda: VersionWithClassBasedProperties.objects.filter(application__categories=models.OuterRef('pk'), major=2)
@@ -188,11 +186,8 @@ class ApplicationWithClassBasedProperties(Application):
     stable_version_count = AggregateProperty(models.Count('versions', filter=models.Q(versions__release_type='s')))
     major_sum = AggregateProperty(models.Sum('versions__major'))
     major_avg = MajorAverageProperty()
-    if DJANGO_VERSION < (1, 8):
-        support_start_date = AggregateProperty(models.Min('versions__supported_from'))
-    else:
-        support_start_date = AggregateProperty(models.Min('versions__supported_from',
-                                                          output_field=models.DateField(null=True)))
+    support_start_date = AggregateProperty(models.Min('versions__supported_from',
+                                                      output_field=models.DateField(null=True)))
     lowered_version_changes = LoweredVersionChangesProperty()
     has_version_with_changelog = RelatedExistenceCheckProperty('versions__changes')
     dummy = DummyProperty()

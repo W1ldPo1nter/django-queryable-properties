@@ -1,5 +1,4 @@
 import pytest
-from django import VERSION as DJANGO_VERSION
 
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
@@ -57,7 +56,6 @@ class TestAggregateAnnotations:
         assert results == sorted(results, key=lambda version: version.application.version_count, reverse=reverse)
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
 class TestExpressionAnnotations:
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
@@ -143,7 +141,6 @@ class TestExpressionAnnotations:
         assert [app.name for app in model.objects.order_by(*order_by)] == expected_names
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
 class TestSubqueryAnnotations:
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [

@@ -1,7 +1,6 @@
 import pickle
 
 import pytest
-from django import VERSION as DJANGO_VERSION
 from django.db.models.query import ModelIterable
 from mock import Mock, patch
 

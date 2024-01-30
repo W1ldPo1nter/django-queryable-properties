@@ -54,7 +54,6 @@ class TestAggregateAnnotations:
         result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum('application__version_count'))
         assert result['total_version_count'] == expected_total
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, annotation', [
         (VersionWithClassBasedProperties, models.F('application__version_count')),
         (VersionWithDecoratorBasedProperties, models.F('application__version_count')),
@@ -100,7 +99,6 @@ class TestAggregateAnnotations:
         assert bool(queryset)
         assert all(not model.version_count.has_cached_value(obj) for obj in queryset)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 7), reason="Raw queries didn't exist before Django 1.7")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_raw_query(self, model):
         pks, names = zip(*model.objects.values_list('pk', 'name'))
@@ -116,7 +114,6 @@ class TestAggregateAnnotations:
         assert counter == 2
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
 class TestExpressionAnnotations:
 
     @pytest.mark.parametrize('model, filters', [

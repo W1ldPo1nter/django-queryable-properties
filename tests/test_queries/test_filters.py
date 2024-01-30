@@ -85,7 +85,6 @@ class TestFilterWithoutAnnotations:
         assert len(non_v2_objects) == 6
         assert all(not version.is_version_2 for version in non_v2_objects)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, property_name, condition', [
         (VersionWithClassBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
         (VersionWithDecoratorBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
@@ -101,7 +100,6 @@ class TestFilterWithoutAnnotations:
         assert property_name not in queryset.query.annotations
         assert all(bool(version.is_13) is (version.major_minor == '1.3') for version in queryset)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Per-aggregate filters didn't exist before Django 2.0")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_in_aggregate(self, model):
         queryset = model.objects.annotate(
@@ -195,7 +193,6 @@ class TestFilterWithAggregateAnnotation:
         assert '"id" > 0' in str(queryset.query)
         assert queryset.count() == len(queryset) == 2
 
-    @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Filtered aggregates didn't exist before Django 2.0")
     def test_aggregate_with_filter_on_related_model(self, categories, applications):
         applications[1].versions.filter(version='1.3.0').delete()
         assert CategoryWithClassBasedProperties.objects.get(has_multiple_stable_versions=True) == categories[0]
@@ -204,7 +201,6 @@ class TestFilterWithAggregateAnnotation:
         assert categories[1].has_multiple_stable_versions is False
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
 class TestFilterWithExpressionAnnotation:
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count, expected_distinct_count, record_checker', [
@@ -271,7 +267,6 @@ class TestFilterWithExpressionAnnotation:
         assert queryset.count() == len(queryset) == 2
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
 class TestFilterWithSubqueryAnnotation:
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count, record_checker', [

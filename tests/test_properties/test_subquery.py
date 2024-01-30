@@ -1,5 +1,4 @@
 import pytest
-from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from queryable_properties.properties import QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty
@@ -8,9 +7,7 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
 )
 
-pytestmark = [
-    pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
-]
+pytestmark = []
 
 
 class TestSubqueryFieldProperty:
