@@ -72,7 +72,7 @@ class QueryPath(tuple):
         return Q(**{str(self): value})
 
 
-class NodeProcessor(object):
+class NodeProcessor:
     """
     Base class for utilities that work with Django's tree nodes.
     """
@@ -234,7 +234,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         return self.property.get_annotation(self.model)
 
 
-class InjectableMixin(object):
+class InjectableMixin:
     """
     A base class for mixin classes that are used to dynamically created classes
     based on a base class and the mixin class.
@@ -353,7 +353,7 @@ def _unpickle_injected_object(base_class, mixin_class, class_name=None):
 _unpickle_injected_object.__safe_for_unpickling__ = True
 
 
-class ModelAttributeGetter(object):
+class ModelAttributeGetter:
     """
     An attribute getter akin to :func:`operator.attrgetter` specifically
     designed for model objects. Like Python's attrgetter, it allows to access

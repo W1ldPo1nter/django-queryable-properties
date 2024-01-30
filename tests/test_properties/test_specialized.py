@@ -14,7 +14,7 @@ from ..app_management.models import VersionWithClassBasedProperties
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestValueCheckProperty(object):
+class TestValueCheckProperty:
 
     @pytest.mark.parametrize('index, is_alpha, is_beta, is_stable, is_unstable, released_in_2018', [
         (0, False, True, False, True, False),
@@ -76,7 +76,7 @@ class TestValueCheckProperty(object):
         ]
 
 
-class TestRangeCheckProperty(object):
+class TestRangeCheckProperty:
 
     def test_final_value(self, monkeypatch):
         prop = get_queryable_property(VersionWithClassBasedProperties, 'is_supported')
@@ -177,7 +177,7 @@ class TestRangeCheckProperty(object):
         ]
 
 
-class TestMappingProperty(object):
+class TestMappingProperty:
 
     TRANSLATION_TERMS = ('Alpha', 'Beta', 'Stable')
 

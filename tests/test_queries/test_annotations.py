@@ -13,7 +13,7 @@ from ..conftest import Concat, Value
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestAggregateAnnotations(object):
+class TestAggregateAnnotations:
 
     @pytest.mark.parametrize('model, filters', [
         (ApplicationWithClassBasedProperties, {}),
@@ -117,7 +117,7 @@ class TestAggregateAnnotations(object):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-class TestExpressionAnnotations(object):
+class TestExpressionAnnotations:
 
     @pytest.mark.parametrize('model, filters', [
         (VersionWithClassBasedProperties, {}),

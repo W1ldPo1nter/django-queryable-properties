@@ -13,7 +13,7 @@ pytestmark = [
 ]
 
 
-class TestSubqueryFieldProperty(object):
+class TestSubqueryFieldProperty:
 
     @pytest.mark.parametrize('kwargs', [
         {
@@ -46,7 +46,7 @@ class TestSubqueryFieldProperty(object):
         assert applications[0].highest_version == expected_value
 
 
-class TestSubqueryExistenceCheckProperty(object):
+class TestSubqueryExistenceCheckProperty:
 
     @pytest.mark.parametrize('kwargs', [
         {

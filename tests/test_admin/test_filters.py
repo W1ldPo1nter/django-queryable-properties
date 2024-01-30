@@ -16,7 +16,7 @@ from ..app_management.models import (
 )
 
 
-class TestQueryablePropertyField(object):
+class TestQueryablePropertyField:
 
     @pytest.fixture
     def admin_instance(self):
@@ -235,7 +235,7 @@ class TestQueryablePropertyField(object):
         assert self.get_list_filter_queryset(request, field, admin_instance, params).count() == expected_count
 
 
-class TestQueryablePropertyListFilter(object):
+class TestQueryablePropertyListFilter:
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
     @pytest.mark.parametrize('prop, admin_class, expected_filter_class', [

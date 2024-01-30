@@ -37,7 +37,7 @@ def model_instance():
     return ApplicationWithClassBasedProperties(name='Test')
 
 
-class TestQueryablePropertyDescriptor(object):
+class TestQueryablePropertyDescriptor:
 
     def test_initializer(self):
         prop = QueryableProperty()
@@ -140,7 +140,7 @@ class TestQueryablePropertyDescriptor(object):
         assert repr(descriptor) == '<QueryablePropertyDescriptor: {}>'.format(str(descriptor))
 
 
-class TestQueryableProperty(object):
+class TestQueryableProperty:
 
     @pytest.mark.parametrize('kwargs', [
         {},
@@ -191,7 +191,7 @@ class TestQueryableProperty(object):
                  {'dummy__dummy': DummyProperty(), '__module__': 'tests.app_management.models'})
 
 
-class TestDecorators(object):
+class TestDecorators:
 
     ATTR_NAMES = ('get_value', 'set_value', 'get_filter', 'get_annotation', 'get_update_kwargs', 'cached',
                   'setter_cache_behavior', 'filter_requires_annotation', 'lookup_mappings', '__doc__')

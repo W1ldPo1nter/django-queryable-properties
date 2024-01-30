@@ -38,7 +38,7 @@ def refs():
     }
 
 
-class TestQueryablePropertiesQuerySetMixin(object):
+class TestQueryablePropertiesQuerySetMixin:
 
     def assert_queryset_picklable(self, queryset, selected_descriptors=()):
         expected_results = list(queryset)
@@ -95,7 +95,7 @@ class TestQueryablePropertiesQuerySetMixin(object):
         assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
-class TestQueryablePropertiesQuerySet(object):
+class TestQueryablePropertiesQuerySet:
 
     def test_get_for_model(self, tags):
         queryset_without_properties = ApplicationTag._default_manager.all()
@@ -107,7 +107,7 @@ class TestQueryablePropertiesQuerySet(object):
         assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
-class TestQueryablePropertiesManagerMixin(object):
+class TestQueryablePropertiesManagerMixin:
 
     def test_apply_to(self, tags):
         assert not isinstance(ApplicationTag.objects, QueryablePropertiesManagerMixin)
@@ -126,7 +126,7 @@ class TestQueryablePropertiesManagerMixin(object):
         assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
-class TestQueryablePropertiesManager(object):
+class TestQueryablePropertiesManager:
 
     @pytest.mark.parametrize('using, hints', [
         (None, None),
@@ -149,7 +149,7 @@ class TestQueryablePropertiesManager(object):
         assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
-class TestLegacyIterable(object):
+class TestLegacyIterable:
 
     def test_initializer(self):
         queryset = ApplicationWithClassBasedProperties.objects.all()
@@ -167,7 +167,7 @@ class TestLegacyIterable(object):
             assert list(iterable) == list(queryset)
 
 
-class TestQueryablePropertiesIterableMixin(object):
+class TestQueryablePropertiesIterableMixin:
 
     def test_initializer(self):
         queryset = ApplicationWithClassBasedProperties.objects.order_by('pk')
@@ -195,7 +195,7 @@ class TestQueryablePropertiesIterableMixin(object):
             mock_postprocess.assert_any_call(application)
 
 
-class TestLegacyOrderingMixin(object):
+class TestLegacyOrderingMixin:
 
     @pytest.mark.parametrize('order_by, expected_indexes', [
         ((), {}),
@@ -243,7 +243,7 @@ class TestLegacyOrderingMixin(object):
                 assert prop_name not in query.annotation_select
 
 
-class TestLegacyOrderingModelIterable(object):
+class TestLegacyOrderingModelIterable:
 
     @pytest.mark.parametrize('select', [
         (),
@@ -262,7 +262,7 @@ class TestLegacyOrderingModelIterable(object):
             assert not ref.descriptor.has_cached_value(obj)
 
 
-class TestLegacyValuesIterable(object):
+class TestLegacyValuesIterable:
 
     @pytest.mark.parametrize('prop_names', [
         (),
@@ -278,7 +278,7 @@ class TestLegacyValuesIterable(object):
 
 
 @pytest.mark.skipif(DJANGO_VERSION >= (1, 9), reason='ValuesListQuerySets only exist in old Django versions.')
-class TestLegacyValuesListIterable(object):
+class TestLegacyValuesListIterable:
 
     @pytest.mark.parametrize('flat', [True, False])
     def test_initializer(self, flat):

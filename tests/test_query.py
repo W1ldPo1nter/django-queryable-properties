@@ -9,7 +9,7 @@ from .app_management.models import (
 )
 
 
-class TestAggregatePropertyChecker(object):
+class TestAggregatePropertyChecker:
 
     def test_initializer(self):
         checker = AggregatePropertyChecker()
@@ -29,7 +29,7 @@ class TestAggregatePropertyChecker(object):
         assert AggregatePropertyChecker().is_aggregate_property((path, value), model) is expected_result
 
 
-class TestQueryablePropertiesCompilerMixin(object):
+class TestQueryablePropertiesCompilerMixin:
 
     @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="The setup_query method didn't exist before Django 1.8")
     def test_setup_query(self):

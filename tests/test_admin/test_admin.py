@@ -13,7 +13,7 @@ from ..app_management.models import ApplicationWithClassBasedProperties, Version
 from .test_checks import DummyListFilter
 
 
-class TestQueryablePropertiesAdminMixin(object):
+class TestQueryablePropertiesAdminMixin:
 
     @pytest.mark.parametrize('admin_class, model, expected_value', [
         (VersionAdmin, VersionWithClassBasedProperties, ()),

@@ -10,7 +10,7 @@ from ..conftest import Concat, Value
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestAggregateAnnotations(object):
+class TestAggregateAnnotations:
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
@@ -58,7 +58,7 @@ class TestAggregateAnnotations(object):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-class TestExpressionAnnotations(object):
+class TestExpressionAnnotations:
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
@@ -144,7 +144,7 @@ class TestExpressionAnnotations(object):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
-class TestSubqueryAnnotations(object):
+class TestSubqueryAnnotations:
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the

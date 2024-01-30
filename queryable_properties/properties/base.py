@@ -116,7 +116,7 @@ class QueryablePropertyDescriptor(property):
         obj.__dict__.pop(self.prop.name, None)
 
 
-class QueryableProperty(object):
+class QueryableProperty:
     """
     Base class for all queryable property definitions, which provide methods
     for single object as well as queryset interaction.

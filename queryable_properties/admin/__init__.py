@@ -15,7 +15,7 @@ __all__ = [
 ]
 
 
-class QueryablePropertiesAdminMixin(object):
+class QueryablePropertiesAdminMixin:
     """
     A mixin for admin classes including inlines that allows to use queryable
     properties in various admin features.

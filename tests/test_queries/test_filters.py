@@ -12,7 +12,7 @@ from ..app_management.models import (
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestFilterWithoutAnnotations(object):
+class TestFilterWithoutAnnotations:
 
     @pytest.mark.parametrize('model, filters, expected_count, expected_major_minor', [
         # Test that filter that don't involve queryable properties still work
@@ -127,7 +127,7 @@ class TestFilterWithoutAnnotations(object):
         assert applications[0].versions.filter(version='2.0.0').exists()
 
 
-class TestFilterWithAggregateAnnotation(object):
+class TestFilterWithAggregateAnnotation:
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count', [
         (ApplicationWithClassBasedProperties, 'version_count', models.Q(version_count__gt=3), 2),
@@ -205,7 +205,7 @@ class TestFilterWithAggregateAnnotation(object):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-class TestFilterWithExpressionAnnotation(object):
+class TestFilterWithExpressionAnnotation:
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count, expected_distinct_count, record_checker', [
         (VersionWithClassBasedProperties, 'changes_or_default', models.Q(changes_or_default='(No data)'), 6, 6,
@@ -272,7 +272,7 @@ class TestFilterWithExpressionAnnotation(object):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
-class TestFilterWithSubqueryAnnotation(object):
+class TestFilterWithSubqueryAnnotation:
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count, record_checker', [
         (ApplicationWithClassBasedProperties, 'highest_version', models.Q(highest_version='2.0.0'), 1,

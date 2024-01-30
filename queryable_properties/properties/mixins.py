@@ -116,7 +116,7 @@ boolean_filter = LookupFilterMixin.boolean_filter
 lookup_filter = LookupFilterMixin.lookup_filter
 
 
-class SetterMixin(object):
+class SetterMixin:
     """
     A mixin for queryable properties that also define a setter.
     """
@@ -220,7 +220,7 @@ class AnnotationGetterMixin(AnnotationMixin):
         return self.get_queryset(obj.__class__).filter(pk=obj.pk)
 
 
-class UpdateMixin(object):
+class UpdateMixin:
     """
     A mixin for queryable properties that allows to use themselves in update
     queries.

@@ -28,7 +28,7 @@ class MixinMetaclass(type):
     pass
 
 
-class DummyClass(object):
+class DummyClass:
 
     def __init__(self, attr1, attr2):
         self.attr1 = attr1
@@ -57,7 +57,7 @@ def decorator(function, *args, **kwargs):
     return function
 
 
-class TestQueryPath(object):
+class TestQueryPath:
 
     @pytest.mark.parametrize('path, expected_result', [
         ([], QueryPath()),
@@ -107,7 +107,7 @@ class TestQueryPath(object):
         assert condition.children[0] == (path, value)
 
 
-class TestInjectableMixin(object):
+class TestInjectableMixin:
 
     @pytest.mark.parametrize('class_name, expected_class_name', [
         (None, DummyClass.__name__),
@@ -189,7 +189,7 @@ class TestInjectableMixin(object):
             pickle.dumps(base_obj)
 
 
-class TestNodeProcessor(object):
+class TestNodeProcessor:
 
     def test_initializer(self):
         def func(item):
@@ -209,7 +209,7 @@ class TestNodeProcessor(object):
         ]
 
 
-class TestNodeChecker(object):
+class TestNodeChecker:
 
     @pytest.mark.parametrize('node, path, expected_result', [
         (Q(a=1), 'a', True),
@@ -226,7 +226,7 @@ class TestNodeChecker(object):
         assert checker.check_leaves(node, required_path=path) is expected_result
 
 
-class TestNodeModifier(object):
+class TestNodeModifier:
 
     @pytest.mark.parametrize('copy', [True, False])
     @pytest.mark.parametrize('increment, expected_a, expected_b, expected_c', [
@@ -243,7 +243,7 @@ class TestNodeModifier(object):
         assert result.children[1] == ('new_c', expected_c)
 
 
-class TestModelAttributeGetter(object):
+class TestModelAttributeGetter:
 
     @pytest.mark.parametrize('path, expected_query_path', [
         ('attr', QueryPath('attr')),
@@ -351,7 +351,7 @@ def test_parametrizable_decorator():
     assert func3.kwargs == dict(kwarg='test')
 
 
-class TestGetQueryablePropertyDescriptor(object):
+class TestGetQueryablePropertyDescriptor:
 
     @pytest.mark.parametrize('model, property_name', [
         (VersionWithClassBasedProperties, 'major_minor'),
@@ -374,7 +374,7 @@ class TestGetQueryablePropertyDescriptor(object):
             get_queryable_property_descriptor(model, property_name)
 
 
-class TestQueryablePropertyReference(object):
+class TestQueryablePropertyReference:
 
     @pytest.mark.parametrize('relation_path, expected_result', [
         (QueryPath(), QueryPath('dummy')),
@@ -420,7 +420,7 @@ class TestQueryablePropertyReference(object):
             ref.get_annotation()
 
 
-class TestResolveQueryableProperty(object):
+class TestResolveQueryableProperty:
 
     @pytest.mark.parametrize('model, query_path, expected_property, expected_lookups', [
         # No relation involved
@@ -517,7 +517,7 @@ class TestResolveQueryableProperty(object):
         assert resolve_queryable_property(model, query_path) == (None, QueryPath())
 
 
-class TestGetOutputField(object):
+class TestGetOutputField:
 
     CHAR_FIELD = CharField()
     INTEGER_FIELD = IntegerField(null=True)

@@ -12,7 +12,7 @@ from ..app_management.models import ApplicationWithClassBasedProperties, Version
 from ..conftest import Concat, Value
 
 
-class Dummy(object):
+class Dummy:
 
     def __str__(self):
         return self.__class__.__name__
@@ -60,7 +60,7 @@ def assert_admin_validation(admin_class, model, error_id=None, exception_text=No
             assert exception_text is None
 
 
-class TestError(object):
+class TestError:
 
     def test_initializer(self):
         error = Error('test message', Dummy, 42)
@@ -74,7 +74,7 @@ class TestError(object):
             error.raise_exception()
 
 
-class TestQueryablePropertiesChecksMixin(object):
+class TestQueryablePropertiesChecksMixin:
 
     @pytest.mark.parametrize('admin, model', [
         (VersionAdmin, VersionWithClassBasedProperties),

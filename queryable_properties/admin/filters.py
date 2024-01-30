@@ -12,7 +12,7 @@ from ..properties import MappingProperty
 from ..utils.internal import QueryPath, get_output_field, resolve_queryable_property
 
 
-class QueryablePropertyField(object):
+class QueryablePropertyField:
     """
     Wrapper class for queryable property that offers an attribute interface
     similar to Django fields. This allows to reuse Django's existing list

@@ -10,7 +10,7 @@ from ..app_management.models import ApplicationWithClassBasedProperties, Categor
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestAnnotationProperty(object):
+class TestAnnotationProperty:
 
     @pytest.mark.parametrize('cached, expected_cached', [
         (None, False),
@@ -33,7 +33,7 @@ class TestAnnotationProperty(object):
         ]
 
 
-class TestAggregateProperty(object):
+class TestAggregateProperty:
 
     @pytest.mark.parametrize('cached, expected_cached', [
         (None, False),
@@ -52,7 +52,7 @@ class TestAggregateProperty(object):
         assert applications[0].major_sum == 4
 
 
-class TestRelatedExistenceCheckProperty(object):
+class TestRelatedExistenceCheckProperty:
 
     @pytest.mark.parametrize('path, kwargs, expected_query_path', [
         ('my_field', {}, QueryPath('my_field__isnull')),

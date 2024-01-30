@@ -12,7 +12,7 @@ from ..app_management.models import (
 pytestmark = pytest.mark.django_db
 
 
-class TestFilter(object):
+class TestFilter:
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_filter(self, monkeypatch, model):
@@ -35,7 +35,7 @@ class TestFilter(object):
             model.objects.filter(models.Q({'version': '2.0.0'}))
 
 
-class TestAnnotation(object):
+class TestAnnotation:
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_annotater(self, model):
@@ -51,7 +51,7 @@ class TestAnnotation(object):
             model.objects.select_properties('circular')
 
 
-class TestUpdate(object):
+class TestUpdate:
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_updater(self, model):
@@ -69,7 +69,7 @@ class TestUpdate(object):
             model.objects.update(**kwargs)
 
 
-class TestOrdering(object):
+class TestOrdering:
 
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_exception_on_unimplemented_annotater(self, model):

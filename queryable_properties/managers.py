@@ -15,7 +15,7 @@ from .utils import get_queryable_property
 from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPath
 
 
-class LegacyIterable(object):
+class LegacyIterable:
     """
     Base class for queryset iterables for old Django versions to mimic the
     iterable classes of new Django versions.
@@ -35,7 +35,7 @@ class LegacyIterable(object):
         return getattr(original, 'iterator', original.__iter__)()
 
 
-class QueryablePropertiesIterableMixin(object):
+class QueryablePropertiesIterableMixin:
     """
     Base class for iterable mixins that handle queryable properties logic.
 

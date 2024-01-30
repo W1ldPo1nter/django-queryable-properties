@@ -56,7 +56,7 @@ class MethodRemainingLookupFilterProperty(ParentRemainingLookupFilterProperty):
         return Q(remaining=value)
 
 
-class TestLookupFilterMixin(object):
+class TestLookupFilterMixin:
 
     def test_registration(self):
         base = BaseLookupFilterProperty()
@@ -131,7 +131,7 @@ class TestLookupFilterMixin(object):
             prop.get_filter(None, lookup, value)
 
 
-class TestAnnotationMixin(object):
+class TestAnnotationMixin:
 
     @pytest.fixture
     def prop(self):
@@ -155,7 +155,7 @@ class TestAnnotationMixin(object):
         assert q.children[0] == ('test__{}'.format(lookup), value)
 
 
-class TestAnnotationGetterMixin(object):
+class TestAnnotationGetterMixin:
 
     @pytest.fixture
     def prop(self):
@@ -210,7 +210,7 @@ class TestAnnotationGetterMixin(object):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
-class TestSubqueryMixin(object):
+class TestSubqueryMixin:
 
     @pytest.mark.parametrize('kwargs', [
         {'queryset': ApplicationWithClassBasedProperties.objects.filter(name='test')},

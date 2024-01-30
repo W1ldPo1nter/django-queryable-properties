@@ -11,7 +11,7 @@ from ..app_management.models import (
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestAggregateAnnotations(object):
+class TestAggregateAnnotations:
 
     @pytest.mark.parametrize('model, filters, expected_version_counts', [
         (ApplicationWithClassBasedProperties, {}, {3, 4}),
@@ -137,7 +137,7 @@ class TestAggregateAnnotations(object):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-class TestExpressionAnnotations(object):
+class TestExpressionAnnotations:
 
     @pytest.mark.parametrize('model, filters, expected_versions', [
         (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
