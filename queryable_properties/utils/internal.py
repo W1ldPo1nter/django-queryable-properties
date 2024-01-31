@@ -52,9 +52,6 @@ class QueryPath(tuple):
             result = self.__class__(result)
         return result
 
-    def __getslice__(self, i, j):  # pragma: no cover
-        return self.__class__(super().__getslice__(i, j))
-
     def __str__(self):
         return LOOKUP_SEP.join(self)
 
@@ -103,8 +100,7 @@ class NodeProcessor:
         """
         for index, child in enumerate(node.children):
             if isinstance(child, Node):
-                for result in self.iter_leaves(child):
-                    yield result
+                yield from self.iter_leaves(child)
             else:
                 yield node, index, child
 

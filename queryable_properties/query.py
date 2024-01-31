@@ -1,8 +1,6 @@
 from collections import OrderedDict
 from contextlib import contextmanager
 
-from django.utils.tree import Node
-
 from .compat import convert_build_filter_to_add_q_kwargs, nullcontext
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
@@ -193,28 +191,6 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         clone._queryable_property_annotations.update(self._queryable_property_annotations)
         return clone
 
-    def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
-        # This method is called in older versions to add an aggregate, which
-        # may be based on a queryable property annotation, which in turn must
-        # be auto-annotated here.
-        query_path = QueryPath(aggregate.lookup)
-        if self._queryable_property_stack:
-            query_path = self._queryable_property_stack[-1].relation_path + query_path
-        property_annotation = self._auto_annotate(query_path)
-        if property_annotation:
-            # If it is based on a queryable property annotation, annotating the
-            # current aggregate cannot be delegated to Django as it couldn't
-            # deal with annotations containing the lookup separator.
-            aggregate.add_to_query(self, alias, str(query_path), property_annotation, is_summary)
-        else:
-            # The overridden method also allows to set a default value for the
-            # model parameter, which will be missing if add_annotation calls are
-            # redirected to add_aggregate for older Django versions.
-            model = model or self.model
-            super().add_aggregate(aggregate, model, alias, is_summary)
-        if self.annotation_select_mask is not None:
-            self.set_annotation_mask(self.annotation_select_mask.union((alias,)))
-
     def add_ordering(self, *ordering, **kwargs):
         for field_name in ordering:
             # Ordering by a queryable property via simple string values
@@ -226,19 +202,6 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                     field_name = field_name[1:]
                 self._auto_annotate(QueryPath(field_name))
         return super().add_ordering(*ordering, **kwargs)
-
-    @property
-    def aggregate_select(self):  # pragma: no cover
-        select = original = super().aggregate_select
-        if self._use_querying_properties_marker:
-            # Since old Django versions don't offer the annotation_col_map on
-            # compilers, but read the annotations directly from the query, the
-            # querying properties marker has to be injected here. The value for
-            # the annotation will be provided via the compiler mixin.
-            select = OrderedDict()
-            select[QUERYING_PROPERTIES_MARKER] = None
-            select.update(original)
-        return select
 
     def build_filter(self, filter_expr, *args, **kwargs):
         # Check if the given filter expression is meant to use a queryable

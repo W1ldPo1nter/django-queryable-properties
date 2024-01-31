@@ -1,6 +1,5 @@
 from itertools import chain
 
-from django.contrib.admin.options import InlineModelAdmin
 from django.core import checks
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F, expressions
@@ -8,7 +7,7 @@ from django.db.models import F, expressions
 from ..utils.internal import InjectableMixin, QueryPath, resolve_queryable_property
 
 
-class Error(getattr(checks, 'Error', object)):
+class Error(checks.Error):
     """
     Custom error class to normalize check/validation error handling across
     all supported Django version. Also takes care of producing correct
@@ -25,12 +24,7 @@ class Error(getattr(checks, 'Error', object)):
         :param int error_id: A unique ID for the error.
         """
         error_id = 'queryable_properties.admin.E{:03}'.format(error_id)
-        if self.__class__.__bases__ != (object,):
-            super().__init__(msg, obj=obj, id=error_id)
-        else:  # pragma: no cover
-            self.msg = msg
-            self.obj = obj
-            self.id = error_id
+        super().__init__(msg, obj=obj, id=error_id)
 
     def raise_exception(self):
         """Raise an ImproperlyConfigured exception for this error."""
@@ -51,71 +45,6 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         model = getattr(admin_obj, 'model', args[0] if args else None)
         errors.extend(self._check_list_select_properties(admin_obj, model))
         return errors
-
-    def validate(self, cls, model):  # pragma: no cover
-        fake_cls = self._validate_queryable_properties(cls, model)
-        super().validate(fake_cls, model)
-
-    def _validate_queryable_properties(self, cls, model):  # pragma: no cover
-        """
-        Main routine regarding queryable properties for old-style validations.
-
-        Since validations raise an error as soon as they find a problem, they
-        cannot be extended the same way checks can (by inspecting errors and
-        suppressing/replacing them) as a suppressed exception could leave
-        subsequent errors undetected.
-        Instead, all queryable property validations are performed first and
-        an exception is raised if there's a problem. If everything related to
-        queryable properties validates successfully, a fake admin class is
-        created on the fly, which is stripped of all queryable property
-        references and can therefore be subjected to Django's standard
-        validations.
-
-        :param cls: The admin class to validate.
-        :param model: The model the admin class is used for.
-        :return: A fake class to be validated by Django's standard validation.
-        :rtype: type
-        """
-        list_filter = []
-        ordering = []
-        errors = self._check_list_select_properties(cls, model)
-        pk_name = model._meta.pk.name
-
-        if not issubclass(cls, InlineModelAdmin):
-            for i, item in enumerate(cls.list_filter or ()):
-                if not callable(item):
-                    prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
-                                                                                       'list_filter[{}]'.format(i))
-                    if prop:
-                        errors.extend(property_errors)
-                        # Replace a valid reference to a queryable property
-                        # with a reference to the PK field so avoid Django
-                        # validation errors while not changing indexes of
-                        # other items.
-                        item = (pk_name, item[1]) if isinstance(item, (tuple, list)) else pk_name
-                list_filter.append(item)
-
-        for i, field_name in enumerate(cls.ordering or ()):
-            prop, property_errors = self._check_ordering_queryable_property(cls, model, field_name,
-                                                                            'ordering[{}]'.format(i))
-            if prop:
-                errors.extend(property_errors)
-                # Replace a valid reference to a queryable property with a
-                # reference to the PK field so avoid Django validation errors
-                # while not changing indexes of other items.
-                field_name = pk_name
-            ordering.append(field_name)
-
-        if errors:
-            errors[0].raise_exception()
-
-        # Build a fake admin class without queryable property references to be
-        # validated by Django.
-        return type(cls.__name__, (cls,), {
-            '__module__': cls.__module__,
-            'list_filter': list_filter,
-            'ordering': ordering,
-        })
 
     def _check_queryable_property(self, obj, model, query_path, label, allow_relation=True, allow_lookups=True):
         """

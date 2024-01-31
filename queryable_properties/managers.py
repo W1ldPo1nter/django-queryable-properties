@@ -15,7 +15,7 @@ from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPa
 class LegacyIterable:
     """
     Base class for queryset iterables for old Django versions to mimic the
-    iterable classes of new Django versions.
+    iterable classes of new Django versions (4.1).
     """
 
     def __init__(self, queryset):
@@ -44,8 +44,7 @@ class QueryablePropertiesIterableMixin:
 
     def __iter__(self):
         self._setup_queryable_properties()
-        for obj in super().__iter__():
-            yield self._postprocess_queryable_properties(obj)
+        yield from super().__iter__()
 
     def _setup_queryable_properties(self):  # pragma: no cover
         """
@@ -199,16 +198,18 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
         :return: A set containing the field indexes to discard.
         :rtype: set[int]
         """
-        aggregate_names = list(self.queryset.query.aggregate_select)
-        if self.queryset._fields:
-            aggregate_names = [name for name in aggregate_names if name not in self.queryset._fields]
+        aggregate_names = list(self.queryset.query.annotation_select)
+        queryset_fields = self.queryset._fields
+        if queryset_fields:
+            aggregate_names = [name for name in aggregate_names if name not in queryset_fields]
         aggregate_names.reverse()
         forced_names = set(str(ref.full_path) for ref in self._order_by_select)
         return {-i for i, name in enumerate(aggregate_names, start=1) if name in forced_names}
 
     def _postprocess_queryable_properties(self, obj):
         obj = super()._postprocess_queryable_properties(obj)
-        obj = tuple(value for i, value in enumerate(obj, start=-len(obj)) if i not in self._discarded_indexes)
+        discarded_indexes = self._discarded_indexes
+        obj = tuple(value for i, value in enumerate(obj, start=-len(obj)) if i not in discarded_indexes)
         if self.flat and len(self.queryset._fields) == 1:
             return obj[0]
         return obj
@@ -247,14 +248,11 @@ class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
     def __iter__(self):
         original = super()
         # Only recent Django versions (>= 2.1) have the iterator method.
-        iterator = original.__iter__ if hasattr(original, 'iterator') else self.iterator
-        for obj in iterator():
-            yield obj
+        yield from original.__iter__() if hasattr(original, 'iterator') else self.iterator()
 
     def iterator(self):
         iterable_class = RawModelIterable or LegacyIterable
-        for obj in QueryablePropertiesModelIterableMixin.mix_with_class(iterable_class)(self):
-            yield obj
+        yield from QueryablePropertiesModelIterableMixin.mix_with_class(iterable_class)(self)
 
 
 class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
@@ -283,21 +281,10 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
         self.__dict__['_iterable_class'] = value
 
     def _clone(self, klass=None, *args, **kwargs):
-        has_iterable_class = '_iterable_class' in self.__dict__
-        if not has_iterable_class:  # pragma: no cover
-            # In older Django versions, the class of the queryset may be
-            # replaced with a dynamically created class based on the current
-            # class and the value of klass while cloning (e.g when using
-            # .values()). Therefore this needs to be re-injected to be on top
-            # of the MRO again to enable queryable properties functionality.
-            if klass:
-                klass = QueryablePropertiesQuerySetMixin.mix_with_class(klass, 'QueryableProperties' + klass.__name__)
-            args = (klass,) + args
         clone = super()._clone(*args, **kwargs)
         # Since the _iterable_class property may return a dynamically created
         # class, the value of a clone must be reset to the base class.
-        if has_iterable_class:
-            clone._iterable_class = self.__dict__['_iterable_class']
+        clone._iterable_class = self.__dict__['_iterable_class']
         return clone
 
     def _resolve_update_kwargs(self, **kwargs):

@@ -78,8 +78,7 @@ class QueryablePropertyField:
         if isinstance(self.property, MappingProperty):
             options = OrderedDict((to_value, to_value) for from_value, to_value in self.property.mappings)
             options.setdefault(self.property.default, self.empty_value_display)
-            for value, label in options.items():
-                yield value, label
+            yield from options.items()
         elif not isinstance(self.output_field, BooleanField):
             name = str(QueryPath(('', 'value')))
             queryset = QueryablePropertiesQuerySet.get_for_model(self.property_ref.model)

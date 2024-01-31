@@ -35,21 +35,11 @@ def assert_admin_validation(admin_class, model, error_id=None, exception_text=No
                                 that the validation is expected to not find any
                                 errors.
     """
-    if hasattr(ModelAdmin, 'check'):
-        errors = admin_class(model, site).check()
-        if error_id is None:
-            assert not errors
-        else:
-            assert any(error.id == error_id for error in errors)
-
-    if hasattr(ModelAdmin, 'validate'):
-        try:
-            admin_class.validate(model)
-        except ImproperlyConfigured as e:
-            assert exception_text is not None
-            assert exception_text in str(e)
-        else:
-            assert exception_text is None
+    errors = admin_class(model, site).check()
+    if error_id is None:
+        assert not errors
+    else:
+        assert any(error.id == error_id for error in errors)
 
 
 class TestError:

@@ -23,19 +23,6 @@ class QueryablePropertiesAdminMixin:
     list_select_properties = ()
     """A sequence of queryable property names that should be selected."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if hasattr(self, 'list_filter') and not hasattr(ModelAdmin, 'get_list_filter'):  # pragma: no cover
-            # In very old Django versions, there was no get_list_filter method,
-            # therefore the processed queryable property filters must be stored
-            # directly in the list_filter attribute.
-            self.list_filter = self.process_queryable_property_filters(self.list_filter)
-
-    @classmethod
-    def validate(cls, model):  # pragma: no cover
-        cls._ensure_queryable_property_checks()
-        return super().validate(model)
-
     def check(self, *args, **kwargs):
         self._ensure_queryable_property_checks(self)
         return super().check(*args, **kwargs)
@@ -73,13 +60,6 @@ class QueryablePropertiesAdminMixin:
         if list_select_properties:
             queryset = queryset.select_properties(*list_select_properties)
         return queryset
-
-    def queryset(self, request):  # pragma: no cover
-        # Same as get_queryset, but for very old Django versions. Simply
-        # delegate to get_queryset, which is aware of the different methods in
-        # different versions and therefore calls the correct super methods if
-        # necessary.
-        return self.get_queryset(request)
 
     def get_list_select_properties(self, request):
         """
