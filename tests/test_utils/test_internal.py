@@ -1,11 +1,9 @@
-# encoding: utf-8
+import pickle
 from collections import Counter
 
 import pytest
-import six
-from django import VERSION as DJANGO_VERSION
-from django.db.models import CharField, Count, IntegerField, Q, Sum
-from six.moves import cPickle
+from django.db.models import CharField, Count, IntegerField, Q, Sum, Value
+from django.db.models.functions import Concat
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from queryable_properties.properties.base import QueryablePropertyDescriptor
@@ -19,7 +17,6 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
     CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
 )
-from ..conftest import Concat, Value
 
 
 class BaseMetaclass(type):
@@ -30,7 +27,7 @@ class MixinMetaclass(type):
     pass
 
 
-class DummyClass(object):
+class DummyClass:
 
     def __init__(self, attr1, attr2):
         self.attr1 = attr1
@@ -44,11 +41,11 @@ class DummyMixin(InjectableMixin):
         self.mixin_attr2 = 'test'
 
 
-class DummyClassWithMetaclass(six.with_metaclass(BaseMetaclass)):
+class DummyClassWithMetaclass(metaclass=BaseMetaclass):
     pass
 
 
-class DummyMixinWithMetaclass(six.with_metaclass(MixinMetaclass, InjectableMixin)):
+class DummyMixinWithMetaclass(InjectableMixin, metaclass=MixinMetaclass):
     pass
 
 
@@ -59,7 +56,7 @@ def decorator(function, *args, **kwargs):
     return function
 
 
-class TestQueryPath(object):
+class TestQueryPath:
 
     @pytest.mark.parametrize('path, expected_result', [
         ([], QueryPath()),
@@ -93,7 +90,7 @@ class TestQueryPath(object):
 
     def test_string_representation(self):
         query_path = QueryPath(('a', 'b', 'c'))
-        assert six.text_type(query_path) == 'a__b__c'
+        assert str(query_path) == 'a__b__c'
 
     def test_representation(self):
         query_path = QueryPath(('a', 'b'))
@@ -109,7 +106,7 @@ class TestQueryPath(object):
         assert condition.children[0] == (path, value)
 
 
-class TestInjectableMixin(object):
+class TestInjectableMixin:
 
     @pytest.mark.parametrize('class_name, expected_class_name', [
         (None, DummyClass.__name__),
@@ -171,8 +168,8 @@ class TestInjectableMixin(object):
     def test_pickle_unpickle(self):
         base_obj = DummyClass('xyz', 42.42)
         DummyMixin.inject_into_object(base_obj)
-        serialized_obj = cPickle.dumps(base_obj)
-        deserialized_obj = cPickle.loads(serialized_obj)
+        serialized_obj = pickle.dumps(base_obj)
+        deserialized_obj = pickle.loads(serialized_obj)
 
         for obj in (base_obj, deserialized_obj):
             assert isinstance(obj, DummyClass)
@@ -187,11 +184,11 @@ class TestInjectableMixin(object):
         monkeypatch.setattr(DummyMixin, '_created_classes', {})
         base_obj = DummyClass('xyz', 42.42)
         DummyMixin.inject_into_object(base_obj)
-        with pytest.raises(cPickle.PicklingError):
-            cPickle.dumps(base_obj)
+        with pytest.raises(pickle.PicklingError):
+            pickle.dumps(base_obj)
 
 
-class TestNodeProcessor(object):
+class TestNodeProcessor:
 
     def test_initializer(self):
         def func(item):
@@ -211,7 +208,7 @@ class TestNodeProcessor(object):
         ]
 
 
-class TestNodeChecker(object):
+class TestNodeChecker:
 
     @pytest.mark.parametrize('node, path, expected_result', [
         (Q(a=1), 'a', True),
@@ -228,7 +225,7 @@ class TestNodeChecker(object):
         assert checker.check_leaves(node, required_path=path) is expected_result
 
 
-class TestNodeModifier(object):
+class TestNodeModifier:
 
     @pytest.mark.parametrize('copy', [True, False])
     @pytest.mark.parametrize('increment, expected_a, expected_b, expected_c', [
@@ -245,7 +242,7 @@ class TestNodeModifier(object):
         assert result.children[1] == ('new_c', expected_c)
 
 
-class TestModelAttributeGetter(object):
+class TestModelAttributeGetter:
 
     @pytest.mark.parametrize('path, expected_query_path', [
         ('attr', QueryPath('attr')),
@@ -353,7 +350,7 @@ def test_parametrizable_decorator():
     assert func3.kwargs == dict(kwarg='test')
 
 
-class TestGetQueryablePropertyDescriptor(object):
+class TestGetQueryablePropertyDescriptor:
 
     @pytest.mark.parametrize('model, property_name', [
         (VersionWithClassBasedProperties, 'major_minor'),
@@ -376,7 +373,7 @@ class TestGetQueryablePropertyDescriptor(object):
             get_queryable_property_descriptor(model, property_name)
 
 
-class TestQueryablePropertyReference(object):
+class TestQueryablePropertyReference:
 
     @pytest.mark.parametrize('relation_path, expected_result', [
         (QueryPath(), QueryPath('dummy')),
@@ -422,7 +419,7 @@ class TestQueryablePropertyReference(object):
             ref.get_annotation()
 
 
-class TestResolveQueryableProperty(object):
+class TestResolveQueryableProperty:
 
     @pytest.mark.parametrize('model, query_path, expected_property, expected_lookups', [
         # No relation involved
@@ -519,12 +516,11 @@ class TestResolveQueryableProperty(object):
         assert resolve_queryable_property(model, query_path) == (None, QueryPath())
 
 
-class TestGetOutputField(object):
+class TestGetOutputField:
 
     CHAR_FIELD = CharField()
     INTEGER_FIELD = IntegerField(null=True)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
     @pytest.mark.parametrize('annotation, expected_result', [
         (Concat(Value('test'), 'some_field', output_field=CHAR_FIELD), CHAR_FIELD),
         (Sum('aggregate', output_field=INTEGER_FIELD), INTEGER_FIELD),

@@ -120,7 +120,7 @@ For a quick overview, the ``ValueCheckProperty`` offers the following queryable 
 +------------+----------------------------+
 | Filtering  | Yes                        |
 +------------+----------------------------+
-| Annotation | Yes (Django 1.8 or higher) |
+| Annotation | Yes                        |
 +------------+----------------------------+
 | Updating   | No                         |
 +------------+----------------------------+
@@ -140,8 +140,6 @@ For example, a ``DateField`` may be defined as ``date_field = models.DateField()
 ``ValueCheckProperty`` to be set up with the path ``date_field.year``.
 This works because the ``date`` object has an attribute ``year`` on the object-level and Django offers a ``year``
 transform for querysets (so ``date_field__year`` does in fact work).
-However, this specific example requires at least Django 1.9 as older versions don't allow to combine transforms and
-lookups.
 In general, this means that the attribute path does not have to refer to an actual field, which also means that it may
 refer to another queryable property (which needs to support the ``in`` lookup to be able to filter correctly).
 
@@ -238,7 +236,7 @@ For a quick overview, the ``RangeCheckProperty`` offers the following queryable 
 +------------+----------------------------+
 | Filtering  | Yes                        |
 +------------+----------------------------+
-| Annotation | Yes (Django 1.8 or higher) |
+| Annotation | Yes                        |
 +------------+----------------------------+
 | Updating   | No                         |
 +------------+----------------------------+
@@ -330,8 +328,7 @@ the values of an attribute (most likely a field) to different values.
 While there is nothing special about this on an object basis, it allows to introduce values into querysets that
 otherwise are not database values.
 The value mapping inside querysets is achieved using ``CASE``/``WHEN`` expressions based on Django's ``Case``/``When``
-objects, which means that this property class can only be properly used in Django versions that provide these features
-(1.8+).
+objects.
 
 A common use case for this might be to set up a ``MappingProperty`` that simply works with a choice field and uses the
 choice definitions themselves as its mappings.
@@ -418,9 +415,9 @@ For a quick overview, the ``MappingProperty`` offers the following queryable pro
 +------------+----------------------------+
 | Setter     | No                         |
 +------------+----------------------------+
-| Filtering  | Yes (Django 1.8 or higher) |
+| Filtering  | Yes                        |
 +------------+----------------------------+
-| Annotation | Yes (Django 1.8 or higher) |
+| Annotation | Yes                        |
 +------------+----------------------------+
 | Updating   | No                         |
 +------------+----------------------------+
@@ -628,19 +625,17 @@ For a quick overview, the ``RelatedExistenceCheckProperty`` offers the following
 +------------+----------------------------+
 | Filtering  | Yes                        |
 +------------+----------------------------+
-| Annotation | Yes (Django 1.8 or higher) |
+| Annotation | Yes                        |
 +------------+----------------------------+
 | Updating   | No                         |
 +------------+----------------------------+
 
-Subquery-based properties (Django 1.11 or higher)
+Subquery-based properties
 -------------------------------------------------
 
 The properties in this category are all based on custom subqueries, i.e. they utilize Django's ``Subquery`` objects.
 They are therefore :ref:`annotation_based:Annotation-based properties`, which means their getter implementation will
 also perform a database query.
-Due to the utilization of ``Subquery`` objects, these properties can only be used in conjunction with a Django version
-that supports custom subqueries, i.e. Django 1.11 or higher.
 
 All subquery-based properties take a queryset that will be used to generate the custom subquery as their first
 argument.

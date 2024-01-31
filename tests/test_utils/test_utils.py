@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from itertools import groupby
 
 import pytest
@@ -14,7 +12,7 @@ from ..app_management.models import (
 )
 
 
-class TestGetQueryableProperty(object):
+class TestGetQueryableProperty:
 
     @pytest.mark.parametrize('model, property_name', [
         (VersionWithClassBasedProperties, 'major_minor'),
@@ -38,7 +36,7 @@ class TestGetQueryableProperty(object):
 
 
 @pytest.mark.django_db
-class TestPrefetchQueryableProperties(object):
+class TestPrefetchQueryableProperties:
 
     def assert_not_cached(self, descriptor, *model_instances):
         assert all(not descriptor.has_cached_value(instance) for instance in model_instances)

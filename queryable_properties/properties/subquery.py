@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from .base import QueryableProperty
 from .mixins import SubqueryMixin
 
@@ -28,7 +26,7 @@ class SubqueryFieldProperty(SubqueryMixin, QueryableProperty):
         """
         self.field_name = field_name
         self.output_field = output_field
-        super(SubqueryFieldProperty, self).__init__(queryset, **kwargs)
+        super().__init__(queryset, **kwargs)
 
     def _build_subquery(self, queryset):
         from django.db.models import Subquery
@@ -56,7 +54,7 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
                              objects exist when using ``negated=True``).
         """
         self.negated = negated
-        super(SubqueryExistenceCheckProperty, self).__init__(queryset, **kwargs)
+        super().__init__(queryset, **kwargs)
 
     def _build_subquery(self, queryset):
         from django.db.models import Exists

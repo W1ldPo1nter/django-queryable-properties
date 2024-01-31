@@ -1,21 +1,16 @@
-# -*- coding: utf-8 -*-
-
 import pytest
-import six
-from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import ModelAdmin, SimpleListFilter, site
 from django.contrib.admin.filters import AllValuesFieldListFilter
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import F
+from django.db.models import F, Value
+from django.db.models.functions import Concat
 
 from queryable_properties.admin.checks import Error
-from queryable_properties.compat import admin_validation
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
-from ..conftest import Concat, Value
 
 
-class Dummy(object):
+class Dummy:
 
     def __str__(self):
         return self.__class__.__name__
@@ -40,30 +35,14 @@ def assert_admin_validation(admin_class, model, error_id=None, exception_text=No
                                 that the validation is expected to not find any
                                 errors.
     """
-    if hasattr(ModelAdmin, 'check'):
-        if DJANGO_VERSION >= (1, 9):
-            errors = admin_class(model, site).check()
-        else:
-            errors = admin_class.check(model)
-        if error_id is None:
-            assert not errors
-        else:
-            assert any(error.id == error_id for error in errors)
-
-    if hasattr(admin_validation, 'validate') or hasattr(ModelAdmin, 'validate'):
-        try:
-            if hasattr(ModelAdmin, 'validate'):
-                admin_class.validate(model)
-            else:
-                admin_validation.validate(admin_class, model)
-        except ImproperlyConfigured as e:
-            assert exception_text is not None
-            assert exception_text in six.text_type(e)
-        else:
-            assert exception_text is None
+    errors = admin_class(model, site).check()
+    if error_id is None:
+        assert not errors
+    else:
+        assert any(error.id == error_id for error in errors)
 
 
-class TestError(object):
+class TestError:
 
     def test_initializer(self):
         error = Error('test message', Dummy, 42)
@@ -77,7 +56,7 @@ class TestError(object):
             error.raise_exception()
 
 
-class TestQueryablePropertiesChecksMixin(object):
+class TestQueryablePropertiesChecksMixin:
 
     @pytest.mark.parametrize('admin, model', [
         (VersionAdmin, VersionWithClassBasedProperties),
@@ -142,7 +121,6 @@ class TestQueryablePropertiesChecksMixin(object):
         monkeypatch.setattr(admin_class, 'ordering', ('-' + property_name,))
         assert_admin_validation(ApplicationAdmin, ApplicationWithClassBasedProperties)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Expression-based ordering wasn't supported before Django 2.0")
     @pytest.mark.parametrize('admin_class, expression', [
         (ApplicationAdmin, F('highest_version')),
         (VersionInline, F('version')),

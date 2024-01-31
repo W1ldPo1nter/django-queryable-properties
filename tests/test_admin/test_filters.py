@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
 import pytest
-import six
 from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import ModelAdmin, site
 from django.contrib.admin.filters import BooleanFieldListFilter, ChoicesFieldListFilter, DateFieldListFilter
@@ -19,7 +16,7 @@ from ..app_management.models import (
 )
 
 
-class TestQueryablePropertyField(object):
+class TestQueryablePropertyField:
 
     @pytest.fixture
     def admin_instance(self):
@@ -42,7 +39,7 @@ class TestQueryablePropertyField(object):
             model=model_admin.model,
             list_display=list_display,
             list_display_links=model_admin.get_list_display_links(request, list_display),
-            list_filter=model_admin.get_list_filter(request) if DJANGO_VERSION >= (1, 5) else model_admin.list_filter,
+            list_filter=model_admin.get_list_filter(request),
             date_hierarchy=model_admin.date_hierarchy,
             search_fields=model_admin.search_fields,
             list_select_related=model_admin.list_select_related,
@@ -109,7 +106,7 @@ class TestQueryablePropertyField(object):
         list_filter = creator(rf.get('/'), {}, admin_instance.model, admin_instance)
         assert isinstance(list_filter, expected_filter_class)
         assert list_filter.field is field
-        assert list_filter.field_path == six.text_type(field.property_path)
+        assert list_filter.field_path == str(field.property_path)
 
     @pytest.mark.django_db
     def test_date_list_filter(self, rf, admin_user, admin_instance):
@@ -120,9 +117,7 @@ class TestQueryablePropertyField(object):
         list_filter = field.get_filter_creator()(request, {}, admin_instance.model, admin_instance)
         changelist = self.get_changelist(request, admin_instance)
         display_values = [item['display'] for item in list_filter.choices(changelist)]
-        expected_values = ['Any date', 'Today', 'Past 7 days', 'This month', 'This year']
-        if DJANGO_VERSION >= (1, 10):
-            expected_values += ['No date', 'Has date']
+        expected_values = ['Any date', 'Today', 'Past 7 days', 'This month', 'This year', 'No date', 'Has date']
         assert display_values == expected_values
 
     @pytest.mark.django_db
@@ -141,7 +136,6 @@ class TestQueryablePropertyField(object):
         request.user = admin_user
         assert self.get_list_filter_queryset(request, field, admin_instance, params).count() == expected_count
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.django_db
     def test_boolean_list_filter(self, rf, admin_user, admin_instance):
         field = QueryablePropertyField(admin_instance, QueryPath('has_version_with_changelog'))
@@ -154,7 +148,6 @@ class TestQueryablePropertyField(object):
         display_values = [item['display'] for item in list_filter.choices(changelist)]
         assert display_values == ['All', 'Yes', 'No']
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.django_db
     @pytest.mark.parametrize('params, expected_count', [
         ({}, 2),
@@ -168,7 +161,6 @@ class TestQueryablePropertyField(object):
         request.user = admin_user
         assert self.get_list_filter_queryset(request, field, admin_instance, params).count() == expected_count
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.django_db
     def test_mapping_choices_list_filter(self, rf, admin_user):
         admin = VersionAdmin(VersionWithClassBasedProperties, site)
@@ -187,7 +179,6 @@ class TestQueryablePropertyField(object):
         display_values = [item['display'] for item in list_filter.choices(changelist)]
         assert display_values == ['All', 'Alpha', 'Beta', 'Stable', field.empty_value_display]
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.django_db
     @pytest.mark.parametrize('params, expected_count', [
         ({}, 8),
@@ -207,9 +198,7 @@ class TestQueryablePropertyField(object):
     @pytest.mark.parametrize('query_path, expected_choices', [
         (QueryPath('version_count'), ((3, '3'), (4, '4'))),
         (QueryPath('categories__version_count'), ((4, '4'), (7, '7'))),
-        pytest.param(QueryPath('major_avg'), ((1.0, '1.0'), (1.25, '1.25')),
-                     marks=pytest.mark.skipif(DJANGO_VERSION < (1, 10),
-                                              reason="The Cast() expression didn't exist before Django 1.10")),
+        (QueryPath('major_avg'), ((1.0, '1.0'), (1.25, '1.25'))),
     ])
     def test_choices_list_filter(self, rf, admin_user, versions, admin_instance, query_path, expected_choices):
         versions[3].delete()
@@ -238,9 +227,8 @@ class TestQueryablePropertyField(object):
         assert self.get_list_filter_queryset(request, field, admin_instance, params).count() == expected_count
 
 
-class TestQueryablePropertyListFilter(object):
+class TestQueryablePropertyListFilter:
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
     @pytest.mark.parametrize('prop, admin_class, expected_filter_class', [
         (get_queryable_property(ApplicationWithClassBasedProperties, 'has_version_with_changelog'),
          ApplicationAdmin, BooleanFieldListFilter),

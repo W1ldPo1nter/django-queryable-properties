@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
 import pytest
-from django import VERSION as DJANGO_VERSION
 
 from queryable_properties.query import (
     QUERYING_PROPERTIES_MARKER, AggregatePropertyChecker, QueryablePropertiesCompilerMixin,
@@ -11,7 +8,7 @@ from .app_management.models import (
 )
 
 
-class TestAggregatePropertyChecker(object):
+class TestAggregatePropertyChecker:
 
     def test_initializer(self):
         checker = AggregatePropertyChecker()
@@ -25,15 +22,14 @@ class TestAggregatePropertyChecker(object):
         # Queryable property without required annotation
         (VersionWithClassBasedProperties, 'version', '1.2.3', False),
         # Self-references don't lead to infinite loops
-        (CategoryWithClassBasedProperties, 'circular', None, DJANGO_VERSION < (1, 8)),
+        (CategoryWithClassBasedProperties, 'circular', None, False),
     ])
     def test_is_aggregate_property(self, model, path, value, expected_result):
         assert AggregatePropertyChecker().is_aggregate_property((path, value), model) is expected_result
 
 
-class TestQueryablePropertiesCompilerMixin(object):
+class TestQueryablePropertiesCompilerMixin:
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="The setup_query method didn't exist before Django 1.8")
     def test_setup_query(self):
         queryset = ApplicationWithClassBasedProperties.objects.select_properties('version_count')
         compiler = QueryablePropertiesCompilerMixin.inject_into_object(queryset.query.get_compiler(using=queryset.db))

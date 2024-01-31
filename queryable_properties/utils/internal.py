@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Internal utilities used by the queryable properties library, which may change
 without notice or be removed without deprecation.
@@ -8,19 +7,17 @@ from collections import namedtuple
 from copy import deepcopy
 from functools import wraps
 
-import six
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Manager, Q
+from django.db.models.constants import LOOKUP_SEP
 from django.utils.decorators import method_decorator
 from django.utils.tree import Node
 
-from ..compat import LOOKUP_SEP, get_related_model
 from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
 
 MISSING_OBJECT = object()  #: Arbitrary object to represent that an object in an attribute chain is missing.
 
 
-@six.python_2_unicode_compatible
 class QueryPath(tuple):
     """
     A utility class to represent query paths, i.e. paths using Django's
@@ -40,9 +37,9 @@ class QueryPath(tuple):
         :param collections.Iterable path: The query path to represent as string
                                           or other iterable.
         """
-        if isinstance(path, six.string_types):
+        if isinstance(path, str):
             path = path.split(LOOKUP_SEP)
-        return super(QueryPath, cls).__new__(cls, path)
+        return super().__new__(cls, path)
 
     def __add__(self, other):
         if not isinstance(other, self.__class__):
@@ -50,19 +47,16 @@ class QueryPath(tuple):
         return self.__class__(tuple(self) + tuple(other))
 
     def __getitem__(self, item):
-        result = super(QueryPath, self).__getitem__(item)
+        result = super().__getitem__(item)
         if isinstance(item, slice):
             result = self.__class__(result)
         return result
-
-    def __getslice__(self, i, j):  # pragma: no cover
-        return self.__class__(super(QueryPath, self).__getslice__(i, j))
 
     def __str__(self):
         return LOOKUP_SEP.join(self)
 
     def __repr__(self):
-        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
+        return '<{}: {}>'.format(self.__class__.__name__, str(self))
 
     def build_filter(self, value):
         """
@@ -72,10 +66,10 @@ class QueryPath(tuple):
         :return: The filter condition as a Q object.
         :rtype: django.db.models.Q
         """
-        return Q(**{six.text_type(self): value})
+        return Q(**{str(self): value})
 
 
-class NodeProcessor(object):
+class NodeProcessor:
     """
     Base class for utilities that work with Django's tree nodes.
     """
@@ -106,8 +100,7 @@ class NodeProcessor(object):
         """
         for index, child in enumerate(node.children):
             if isinstance(child, Node):
-                for result in self.iter_leaves(child):
-                    yield result
+                yield from self.iter_leaves(child)
             else:
                 yield node, index, child
 
@@ -170,7 +163,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
     property across relations.
     """
     __slots__ = ()
-    node_modifier = NodeModifier(lambda item, ref: (six.text_type(ref.relation_path + item[0]), item[1]))
+    node_modifier = NodeModifier(lambda item, ref: (str(ref.relation_path + item[0]), item[1]))
 
     @property
     def full_path(self):
@@ -212,7 +205,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         # Use the model stored on this reference instead of the one on the
         # property since the query may be happening from a subclass of the
         # model the property is defined on.
-        q_obj = self.property.get_filter(self.model, six.text_type(lookups) or 'exact', value)
+        q_obj = self.property.get_filter(self.model, str(lookups) or 'exact', value)
         if self.relation_path:
             # If the resolved property belongs to a related model, all actual
             # conditions in the returned Q object must be modified to use the
@@ -237,7 +230,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         return self.property.get_annotation(self.model)
 
 
-class InjectableMixin(object):
+class InjectableMixin:
     """
     A base class for mixin classes that are used to dynamically created classes
     based on a base class and the mixin class.
@@ -251,7 +244,7 @@ class InjectableMixin(object):
     _dynamic_pickling = True
 
     def __init__(self, *args, **kwargs):
-        super(InjectableMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.init_injected_attrs()
 
     def init_injected_attrs(self):
@@ -356,7 +349,7 @@ def _unpickle_injected_object(base_class, mixin_class, class_name=None):
 _unpickle_injected_object.__safe_for_unpickling__ = True
 
 
-class ModelAttributeGetter(object):
+class ModelAttributeGetter:
     """
     An attribute getter akin to :func:`operator.attrgetter` specifically
     designed for model objects. Like Python's attrgetter, it allows to access
@@ -381,7 +374,7 @@ class ModelAttributeGetter(object):
                                combined using the lookup separator (``__``).
         :type attribute_path: collections.Iterable
         """
-        if isinstance(attribute_path, six.string_types):
+        if isinstance(attribute_path, str):
             attribute_path = attribute_path.split(self.ATTRIBUTE_SEPARATOR)
         self.query_path = QueryPath(attribute_path)
 
@@ -539,7 +532,7 @@ def resolve_queryable_property(model, query_path):
     # across relations.
     for index, name in enumerate(query_path):
         try:
-            related_model = get_related_model(model, name)
+            related_model = model._meta.get_field(name).related_model
         except FieldDoesNotExist:
             try:
                 prop = get_queryable_property(model, name)

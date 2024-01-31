@@ -1,13 +1,4 @@
-# encoding: utf-8
-
-from __future__ import unicode_literals
-
-from django.core.exceptions import FieldError
-
-try:  # pragma: no cover
-    from django.core.exceptions import FieldDoesNotExist
-except ImportError:  # pragma: no cover
-    from django.db.models.fields import FieldDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, FieldError
 
 
 class QueryablePropertyError(FieldError):

@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
 import pytest
-import six
-from django import VERSION as DJANGO_VERSION
 from django.db.models import Avg, Q
 
 from queryable_properties.properties import AggregateProperty, AnnotationProperty, RelatedExistenceCheckProperty
@@ -12,7 +9,7 @@ from ..app_management.models import ApplicationWithClassBasedProperties, Categor
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestAnnotationProperty(object):
+class TestAnnotationProperty:
 
     @pytest.mark.parametrize('cached, expected_cached', [
         (None, False),
@@ -35,7 +32,7 @@ class TestAnnotationProperty(object):
         ]
 
 
-class TestAggregateProperty(object):
+class TestAggregateProperty:
 
     @pytest.mark.parametrize('cached, expected_cached', [
         (None, False),
@@ -54,7 +51,7 @@ class TestAggregateProperty(object):
         assert applications[0].major_sum == 4
 
 
-class TestRelatedExistenceCheckProperty(object):
+class TestRelatedExistenceCheckProperty:
 
     @pytest.mark.parametrize('path, kwargs, expected_query_path', [
         ('my_field', {}, QueryPath('my_field__isnull')),
@@ -73,7 +70,7 @@ class TestRelatedExistenceCheckProperty(object):
         condition = prop._base_condition
         assert isinstance(condition, Q)
         assert len(condition.children) == 1
-        assert condition.children[0] == (six.text_type(QueryPath(path) + 'isnull'), False)
+        assert condition.children[0] == (str(QueryPath(path) + 'isnull'), False)
 
     @pytest.mark.parametrize('negated', [False, True])
     def test_getter(self, monkeypatch, categories, applications, negated):
@@ -123,14 +120,12 @@ class TestRelatedExistenceCheckProperty(object):
         assert category_queryset.get(applications__has_version_with_changelog=not negated) == categories[0]
         assert category_queryset.get(applications__has_version_with_changelog=negated) == categories[1]
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     def test_annotation(self, categories, applications):
         queryset = CategoryWithClassBasedProperties.objects.all()
         assert list(queryset.order_by('has_versions', 'pk')) == categories[:2]
         applications[1].versions.all().delete()
         assert list(queryset.order_by('has_versions', 'pk')) == [categories[1], categories[0]]
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     def test_annotation_based_on_non_relation_field(self, categories, applications):
         app_queryset = ApplicationWithClassBasedProperties.objects.all()
         category_queryset = CategoryWithClassBasedProperties.objects.all()

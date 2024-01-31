@@ -1,9 +1,8 @@
-# encoding: utf-8
-
 from datetime import date
 
-from django import VERSION as DJANGO_VERSION
 from django.db import models
+from django.db.models import Value
+from django.db.models.functions import Cast, Coalesce, Concat, Lower
 
 from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
@@ -19,7 +18,7 @@ class DummyProperty(SetterMixin, QueryableProperty):
     get_filter = None
 
     def __init__(self):
-        super(DummyProperty, self).__init__()
+        super().__init__()
         self.counter = 0
 
     def get_value(self, obj):
@@ -39,7 +38,6 @@ class VersionCountProperty(AnnotationGetterMixin, QueryableProperty):
 class MajorAverageProperty(AnnotationGetterMixin, QueryableProperty):
 
     def get_annotation(self, cls):
-        from django.db.models.functions import Cast
         output_field = models.FloatField()
         return Cast('major_sum', output_field=output_field) / Cast('version_count', output_field=output_field)
 
@@ -47,7 +45,6 @@ class MajorAverageProperty(AnnotationGetterMixin, QueryableProperty):
 class LoweredVersionChangesProperty(AnnotationMixin, QueryableProperty):
 
     def get_annotation(self, cls):
-        from django.db.models.functions import Lower
         return Lower('versions__changes_or_default')
 
 
@@ -83,7 +80,6 @@ class FullVersionProperty(LookupFilterMixin, UpdateMixin, AnnotationMixin, Sette
         return models.Q(major_minor=parts[0], patch=parts[1])
 
     def get_annotation(self, cls):
-        from django.db.models.functions import Concat
         return Concat('major', models.Value('.'), 'minor', models.Value('.'), 'patch', output_field=models.CharField())
 
     def get_update_kwargs(self, cls, value):
@@ -97,8 +93,6 @@ class DefaultChangesProperty(AnnotationMixin, QueryableProperty):
         return obj.changes or '(No data)'
 
     def get_annotation(self, cls):
-        from django.db.models import Value
-        from django.db.models.functions import Coalesce
         return Coalesce('changes', Value('(No data)'), output_field=models.TextField())
 
 
@@ -133,12 +127,11 @@ class CategoryWithClassBasedProperties(Category):
     objects = QueryablePropertiesManager()
 
     has_versions = RelatedExistenceCheckProperty('applications__versions')
-    if DJANGO_VERSION >= (2, 0):
-        has_multiple_stable_versions = AnnotationProperty(models.Case(
-            models.When(applications__stable_version_count__gt=1, then=True),
-            default=False,
-            output_field=models.BooleanField(),
-        ))
+    has_multiple_stable_versions = AnnotationProperty(models.Case(
+        models.When(applications__stable_version_count__gt=1, then=True),
+        default=False,
+        output_field=models.BooleanField(),
+    ))
     version_count = AnnotationProperty(models.Count('applications__versions'))
     has_v2 = SubqueryExistenceCheckProperty(
         lambda: VersionWithClassBasedProperties.objects.filter(application__categories=models.OuterRef('pk'), major=2)
@@ -190,11 +183,8 @@ class ApplicationWithClassBasedProperties(Application):
     stable_version_count = AggregateProperty(models.Count('versions', filter=models.Q(versions__release_type='s')))
     major_sum = AggregateProperty(models.Sum('versions__major'))
     major_avg = MajorAverageProperty()
-    if DJANGO_VERSION < (1, 8):
-        support_start_date = AggregateProperty(models.Min('versions__supported_from'))
-    else:
-        support_start_date = AggregateProperty(models.Min('versions__supported_from',
-                                                          output_field=models.DateField(null=True)))
+    support_start_date = AggregateProperty(models.Min('versions__supported_from',
+                                                      output_field=models.DateField(null=True)))
     lowered_version_changes = LoweredVersionChangesProperty()
     has_version_with_changelog = RelatedExistenceCheckProperty('versions__changes')
     dummy = DummyProperty()
@@ -249,7 +239,6 @@ class ApplicationWithDecoratorBasedProperties(Application):
     @lowered_version_changes.annotater
     @classmethod
     def lowered_version_changes(cls):
-        from django.db.models.functions import Lower
         return Lower('versions__changes_or_default')
 
 
@@ -322,7 +311,6 @@ class VersionWithDecoratorBasedProperties(Version):
     @version.annotater
     @classmethod
     def version(cls):
-        from django.db.models.functions import Concat
         return Concat('major', models.Value('.'), 'minor', models.Value('.'), 'patch', output_field=models.CharField())
 
     @version.filter(requires_annotation=False, lookups=('exact',))
@@ -344,8 +332,6 @@ class VersionWithDecoratorBasedProperties(Version):
     @changes_or_default.annotater
     @classmethod
     def changes_or_default(cls):
-        from django.db.models import Value
-        from django.db.models.functions import Coalesce
         return Coalesce('changes', Value('(No data)'), output_field=models.TextField())
 
     @queryable_property

@@ -1,8 +1,5 @@
-# encoding: utf-8
-
 from functools import wraps
 
-import six
 from django.db.models import BooleanField
 
 from ..exceptions import QueryablePropertyError
@@ -23,19 +20,19 @@ class LookupFilterMeta(type):
         # Find all methods that have been marked with lookups via the
         # `lookup_filter` decorator.
         mappings = {}
-        for attr_name, attr in six.iteritems(attrs):
+        for attr_name, attr in attrs.items():
             if callable(attr) and hasattr(attr, '_lookups'):
                 for lookup in attr._lookups:
                     mappings[lookup] = attr_name
 
         # Let the class construction take care of the lookup mappings of the
         # base class(es) and add the ones from the current class to them.
-        cls = super(LookupFilterMeta, mcs).__new__(mcs, name, bases, attrs)
+        cls = super().__new__(mcs, name, bases, attrs)
         cls._lookup_mappings = dict(cls._lookup_mappings, **mappings)
         return cls
 
 
-class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
+class LookupFilterMixin(InjectableMixin, metaclass=LookupFilterMeta):
     """
     A mixin for queryable properties that allows to implement queryset
     filtering via individual methods for different lookups.
@@ -51,8 +48,8 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
     remaining_lookups_via_parent = False
 
     def __init__(self, *args, **kwargs):
-        self.lookup_mappings = {lookup: getattr(self, name) for lookup, name in six.iteritems(self._lookup_mappings)}
-        super(LookupFilterMixin, self).__init__(*args, **kwargs)
+        self.lookup_mappings = {lookup: getattr(self, name) for lookup, name in self._lookup_mappings.items()}
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def lookup_filter(cls, *lookups):
@@ -109,7 +106,7 @@ class LookupFilterMixin(six.with_metaclass(LookupFilterMeta, InjectableMixin)):
                     'Queryable property "{prop}" does not implement filtering with lookup "{lookup}".'
                     .format(prop=self, lookup=lookup)
                 )
-            method = super(LookupFilterMixin, self).get_filter
+            method = super().get_filter
         return method(cls, lookup, value)
 
 
@@ -119,7 +116,7 @@ boolean_filter = LookupFilterMixin.boolean_filter
 lookup_filter = LookupFilterMixin.lookup_filter
 
 
-class SetterMixin(object):
+class SetterMixin:
     """
     A mixin for queryable properties that also define a setter.
     """
@@ -191,7 +188,7 @@ class AnnotationGetterMixin(AnnotationMixin):
                        cached (similar to ``cached_property``). A value of None
                        means using the default value.
         """
-        super(AnnotationGetterMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if cached is not None:
             self.cached = cached
 
@@ -223,7 +220,7 @@ class AnnotationGetterMixin(AnnotationMixin):
         return self.get_queryset(obj.__class__).filter(pk=obj.pk)
 
 
-class UpdateMixin(object):
+class UpdateMixin:
     """
     A mixin for queryable properties that allows to use themselves in update
     queries.
@@ -295,7 +292,7 @@ class SubqueryMixin(AnnotationGetterMixin):
         :type queryset: django.db.models.QuerySet | function
         """
         self.queryset = queryset
-        super(SubqueryMixin, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _build_subquery(self, queryset):  # pragma: no cover
         """

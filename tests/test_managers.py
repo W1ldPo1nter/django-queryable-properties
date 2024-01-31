@@ -1,11 +1,9 @@
-# encoding: utf-8
+import pickle
 
 import pytest
-from django import VERSION as DJANGO_VERSION
+from django.db.models.query import ModelIterable
 from mock import Mock, patch
-from six.moves import cPickle
 
-from queryable_properties.compat import ModelIterable, ValuesQuerySet
 from queryable_properties.managers import (
     LegacyIterable, LegacyOrderingMixin, LegacyOrderingModelIterable, LegacyValuesIterable, LegacyValuesListIterable,
     QueryablePropertiesIterableMixin, QueryablePropertiesManager, QueryablePropertiesManagerMixin,
@@ -39,12 +37,12 @@ def refs():
     }
 
 
-class TestQueryablePropertiesQuerySetMixin(object):
+class TestQueryablePropertiesQuerySetMixin:
 
     def assert_queryset_picklable(self, queryset, selected_descriptors=()):
         expected_results = list(queryset)
-        serialized_queryset = cPickle.dumps(queryset)
-        deserialized_queryset = cPickle.loads(serialized_queryset)
+        serialized_queryset = pickle.dumps(queryset)
+        deserialized_queryset = pickle.loads(serialized_queryset)
         assert list(deserialized_queryset) == expected_results
         for descriptor in selected_descriptors:
             assert all(descriptor.has_cached_value(obj) for obj in deserialized_queryset)
@@ -69,22 +67,6 @@ class TestQueryablePropertiesQuerySetMixin(object):
         queryset = model.objects.filter(application__version_count=3).dates('supported_from', 'year')
         self.assert_queryset_picklable(queryset)
 
-    @pytest.mark.skipif(DJANGO_VERSION >= (1, 9), reason="_clone doesn't change the class in recent Django versions.")
-    @pytest.mark.parametrize('change_class, setup, kwargs', [
-        (False, False, {}),
-        (False, True, {'dummy': None}),
-        (True, False, {}),
-        (True, True, {'test1': 'test', 'test2': 1337}),
-    ])
-    def test_clone_with_class_change(self, change_class, setup, kwargs):
-        queryset = ApplicationWithClassBasedProperties.objects.all()
-        assert isinstance(queryset, QueryablePropertiesQuerySetMixin)
-        cls = ValuesQuerySet if change_class else None
-        clone = queryset._clone(cls, setup, _fields=[], **kwargs)
-        assert isinstance(clone, ValuesQuerySet) is change_class
-        for name, value in kwargs.items():
-            assert getattr(clone, name) == value
-
     def test_apply_to(self, tags):
         queryset_without_properties = ApplicationTag.objects.all()
         assert not isinstance(queryset_without_properties, QueryablePropertiesQuerySetMixin)
@@ -96,7 +78,7 @@ class TestQueryablePropertiesQuerySetMixin(object):
         assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
-class TestQueryablePropertiesQuerySet(object):
+class TestQueryablePropertiesQuerySet:
 
     def test_get_for_model(self, tags):
         queryset_without_properties = ApplicationTag._default_manager.all()
@@ -108,7 +90,7 @@ class TestQueryablePropertiesQuerySet(object):
         assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
-class TestQueryablePropertiesManagerMixin(object):
+class TestQueryablePropertiesManagerMixin:
 
     def test_apply_to(self, tags):
         assert not isinstance(ApplicationTag.objects, QueryablePropertiesManagerMixin)
@@ -127,7 +109,7 @@ class TestQueryablePropertiesManagerMixin(object):
         assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
-class TestQueryablePropertiesManager(object):
+class TestQueryablePropertiesManager:
 
     @pytest.mark.parametrize('using, hints', [
         (None, None),
@@ -150,7 +132,7 @@ class TestQueryablePropertiesManager(object):
         assert set(queryset.filter(applications__version_count=4)) == set(tags)
 
 
-class TestLegacyIterable(object):
+class TestLegacyIterable:
 
     def test_initializer(self):
         queryset = ApplicationWithClassBasedProperties.objects.all()
@@ -168,7 +150,7 @@ class TestLegacyIterable(object):
             assert list(iterable) == list(queryset)
 
 
-class TestQueryablePropertiesIterableMixin(object):
+class TestQueryablePropertiesIterableMixin:
 
     def test_initializer(self):
         queryset = ApplicationWithClassBasedProperties.objects.order_by('pk')
@@ -196,7 +178,7 @@ class TestQueryablePropertiesIterableMixin(object):
             mock_postprocess.assert_any_call(application)
 
 
-class TestLegacyOrderingMixin(object):
+class TestLegacyOrderingMixin:
 
     @pytest.mark.parametrize('order_by, expected_indexes', [
         ((), {}),
@@ -244,7 +226,7 @@ class TestLegacyOrderingMixin(object):
                 assert prop_name not in query.annotation_select
 
 
-class TestLegacyOrderingModelIterable(object):
+class TestLegacyOrderingModelIterable:
 
     @pytest.mark.parametrize('select', [
         (),
@@ -263,7 +245,7 @@ class TestLegacyOrderingModelIterable(object):
             assert not ref.descriptor.has_cached_value(obj)
 
 
-class TestLegacyValuesIterable(object):
+class TestLegacyValuesIterable:
 
     @pytest.mark.parametrize('prop_names', [
         (),
@@ -276,44 +258,3 @@ class TestLegacyValuesIterable(object):
         obj = {'name': 'My cool App', 'version_count': 4, 'major_sum': 5}
         result = iterable._postprocess_queryable_properties(dict(obj))
         assert result == {name: value for name, value in obj.items() if name not in prop_names}
-
-
-@pytest.mark.skipif(DJANGO_VERSION >= (1, 9), reason='ValuesListQuerySets only exist in old Django versions.')
-class TestLegacyValuesListIterable(object):
-
-    @pytest.mark.parametrize('flat', [True, False])
-    def test_initializer(self, flat):
-        queryset = ApplicationWithClassBasedProperties.objects.values_list('name', flat=flat)
-        iterable = LegacyValuesListIterable(queryset)
-        assert iterable.queryset.flat is False
-        assert iterable.flat is flat
-
-    @pytest.mark.parametrize('select, values, expected_indexes', [
-        ((), (), {-1, -2}),
-        ((), ('name', 'common_data'), {-1, -2}),
-        (('version_count',), (), 'major_sum'),
-        (('version_count',), ('version_count', 'name'), {-1}),
-        (('major_sum', 'version_count'), (), set()),
-        (('major_sum', 'version_count'), ('name',), {-1, -2}),
-        (('major_sum', 'version_count'), ('version_count', 'name'), {-1}),
-    ])
-    def test_discarded_indexes(self, select, values, expected_indexes):
-        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select)
-        iterable = LegacyValuesListIterable(queryset.order_by('major_sum', 'version_count').values_list(*values))
-        iterable._setup_queryable_properties()
-        if not isinstance(expected_indexes, set):
-            expected_indexes = {list(iterable.queryset.query.aggregate_select).index(expected_indexes) - 2}
-        assert iterable._discarded_indexes == expected_indexes
-
-    @pytest.mark.parametrize('discarded_indexes, expected_result', [
-        (set(), tuple(range(10))),
-        ({-1}, tuple(range(9))),
-        ({-2}, (0, 1, 2, 3, 4, 5, 6, 7, 9)),
-        ({-1, -2, -5}, (0, 1, 2, 3, 4, 6, 7)),
-    ])
-    def test_postprocess_queryable_properties(self, discarded_indexes, expected_result):
-        queryset = ApplicationWithClassBasedProperties.objects.values_list('name')
-        iterable = LegacyValuesListIterable(queryset)
-        iterable.__dict__['_discarded_indexes'] = discarded_indexes
-        obj = tuple(range(10))
-        assert iterable._postprocess_queryable_properties(obj) == expected_result
