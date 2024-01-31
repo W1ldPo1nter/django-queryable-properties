@@ -4,14 +4,8 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from mock import Mock
 
-try:
-    from django.db.models import Value
-except ImportError:
-    Value = Mock()
-try:
-    from django.db.models.functions import Concat
-except ImportError:
-    Concat = Mock(return_value=Mock(output_field=None))
+from django.db.models import Value
+from django.db.models.functions import Concat
 
 from .app_management.models import (
     ApplicationTag, ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,

@@ -2,12 +2,12 @@ import pytest
 from django.contrib.admin import ModelAdmin, SimpleListFilter, site
 from django.contrib.admin.filters import AllValuesFieldListFilter
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import F
+from django.db.models import F, Value
+from django.db.models.functions import Concat
 
 from queryable_properties.admin.checks import Error
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
-from ..conftest import Concat, Value
 
 
 class Dummy:

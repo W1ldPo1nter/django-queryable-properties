@@ -2,7 +2,8 @@ import pickle
 from collections import Counter
 
 import pytest
-from django.db.models import CharField, Count, IntegerField, Q, Sum
+from django.db.models import CharField, Count, IntegerField, Q, Sum, Value
+from django.db.models.functions import Concat
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from queryable_properties.properties.base import QueryablePropertyDescriptor
@@ -16,7 +17,6 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
     CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
 )
-from ..conftest import Concat, Value
 
 
 class BaseMetaclass(type):

@@ -1,10 +1,11 @@
 import pytest
+from django.db.models import Value
+from django.db.models.functions import Concat
 
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
     VersionWithDecoratorBasedProperties,
 )
-from ..conftest import Concat, Value
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 

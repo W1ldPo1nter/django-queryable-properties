@@ -1,6 +1,8 @@
 import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db import connection, models
+from django.db.models import Value
+from django.db.models.functions import Concat
 
 from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.utils.internal import get_queryable_property_descriptor
@@ -8,7 +10,6 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
     VersionWithDecoratorBasedProperties,
 )
-from ..conftest import Concat, Value
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
