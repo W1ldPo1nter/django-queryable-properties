@@ -15,7 +15,7 @@ from .compat import (
     chain_queryset,
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin
+from .query import QUERYING_PROPERTIES_MARKER, inject_query_mixin
 from .utils import get_queryable_property
 from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPath
 
@@ -225,8 +225,7 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
 class QueryablePropertiesBaseQuerySetMixin(InjectableMixin):
     """
     Base mixin for queryable properties queryset mixins that takes care of
-    injecting the :class:`QueryablePropertiesQueryMixin` into the associated
-    query.
+    injecting the appropriate query mixin into the associated query.
     """
 
     def init_injected_attrs(self):
@@ -241,9 +240,7 @@ class QueryablePropertiesBaseQuerySetMixin(InjectableMixin):
         chain_kwargs = {}
         if RawQuery and isinstance(query, RawQuery):
             chain_kwargs['using'] = self.db
-        query = chain_query(query, **chain_kwargs)
-        class_name = 'QueryableProperties' + query.__class__.__name__
-        setattr(self, query_attr_name, QueryablePropertiesQueryMixin.inject_into_object(query, class_name))
+        setattr(self, query_attr_name, inject_query_mixin(chain_query(query, **chain_kwargs)))
 
 
 class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
