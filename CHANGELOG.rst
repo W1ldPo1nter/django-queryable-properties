@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.9.2 (2024-03-06)
+------------------
+
 - Fixed an error that prevented querysets with queryable property features from being used as filter values in ``__in``
   filters (i.e. implicit subqueries)
 
