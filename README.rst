@@ -2,13 +2,15 @@
 django-queryable-properties
 ===========================
 
-.. image:: https://github.com/W1ldPo1nter/django-queryable-properties/actions/workflows/test.yaml/badge.svg?branch=master
+|tests| |coverage| |docs| |pypi|
+
+.. |tests| image:: https://github.com/W1ldPo1nter/django-queryable-properties/actions/workflows/test.yaml/badge.svg?branch=master
    :target: https://github.com/W1ldPo1nter/django-queryable-properties/actions/workflows/test.yaml
-.. image:: https://codecov.io/gh/W1ldPo1nter/django-queryable-properties/branch/master/graph/badge.svg
+.. |coverage| image:: https://codecov.io/gh/W1ldPo1nter/django-queryable-properties/branch/master/graph/badge.svg
    :target: https://codecov.io/gh/W1ldPo1nter/django-queryable-properties
-.. image:: https://readthedocs.org/projects/django-queryable-properties/badge/?version=latest
+.. |docs| image:: https://readthedocs.org/projects/django-queryable-properties/badge/?version=latest
    :target: https://django-queryable-properties.readthedocs.io/en/latest/?badge=latest
-.. image:: https://img.shields.io/pypi/v/django-queryable-properties.svg
+.. |pypi| image:: https://img.shields.io/pypi/v/django-queryable-properties.svg
    :target: https://pypi.org/project/django-queryable-properties
 
 *django-queryable-properties* is a `Django`_ extension that allows to implement model properties which can be used
