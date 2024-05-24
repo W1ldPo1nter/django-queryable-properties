@@ -6,6 +6,7 @@ from collections import OrderedDict
 from contextlib import contextmanager
 
 import six
+from django.db.models import F
 from django.db.models.sql.query import RawQuery
 from django.utils.tree import Node
 
@@ -22,9 +23,9 @@ QUERYING_PROPERTIES_MARKER = '__querying_properties__'
 
 class AggregatePropertyChecker(NodeChecker):
     """
-    A specialized node checker that checks whether or not a node contains a
-    reference to an aggregate property for the purposes of determining whether
-    or not a HAVING clause is required.
+    A specialized node checker that checks whether a node contains a reference
+    to an aggregate property for the purposes of determining whether a HAVING
+    clause is required.
     """
 
     def __init__(self):
@@ -174,9 +175,10 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
 
         annotation_name = six.text_type(property_ref.full_path)
         annotation_mask = set(self.annotations if self.annotation_select_mask is None else self.annotation_select_mask)
+        was_present = property_ref in self._queryable_property_annotations
         self._queryable_property_stack.append(property_ref)
         try:
-            if property_ref not in self._queryable_property_annotations:
+            if not was_present:
                 self.add_annotation(property_ref.get_annotation(), alias=annotation_name)
                 if not select:
                     self.set_annotation_mask(annotation_mask)
@@ -190,7 +192,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
 
         # Perform the required GROUP BY setup if the annotation contained
         # aggregates, which is normally done by QuerySet.annotate.
-        if contains_aggregate(annotation):
+        if (not was_present or select) and contains_aggregate(annotation):
             if full_group_by and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
                 # In recent Django versions, a full GROUP BY can be achieved by
                 # simply setting group_by to True.
@@ -212,21 +214,24 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
 
         :param QueryPath query_path: The query path to resolve.
         :param bool | None full_group_by: Optional override to indicate whether
-                                          or not all fields must be contained
-                                          in a GROUP BY clause for aggregate
+                                          all fields must be contained in a
+                                          ``GROUP BY`` clause for aggregate
                                           annotations. If not set, it will be
                                           determined from the state of this
                                           query.
-        :return: The resolved annotation or None if the path couldn't be
-                 resolved.
+        :return: A 2-tuple containing the resolved annotation as well as the
+                 remaining lookups/transforms. The annotation will be None and
+                 the remaining lookups/transforms will be an empty query path
+                 if the path couldn't be resolved.
+        :rtype: (django.db.models.expressions.BaseExpression | None, QueryPath)
         """
-        property_ref = resolve_queryable_property(self.model, query_path)[0]
+        property_ref, lookups = resolve_queryable_property(self.model, query_path)
         if not property_ref:
-            return None
+            return None, lookups
         if full_group_by is None:
-            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
+            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) or not self.select
         with self._add_queryable_property_annotation(property_ref, full_group_by) as annotation:
-            return annotation
+            return annotation, lookups
 
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
         # This method is called in older versions to add an aggregate, which
@@ -235,7 +240,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         query_path = QueryPath(aggregate.lookup)
         if self._queryable_property_stack:
             query_path = self._queryable_property_stack[-1].relation_path + query_path
-        property_annotation = self._auto_annotate(query_path)
+        property_annotation = self._auto_annotate(query_path)[0]
         if property_annotation:
             # If it is based on a queryable property annotation, annotating the
             # current aggregate cannot be delegated to Django as it couldn't
@@ -264,15 +269,25 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         return super(QueryablePropertiesQueryMixin, self).add_filter(*args, **kwargs)
 
     def add_ordering(self, *ordering, **kwargs):
-        for field_name in ordering:
+        ordering = list(ordering)
+        for index, item in enumerate(ordering):
             # Ordering by a queryable property via simple string values
-            # requires auto-annotating here, while a queryable property used
-            # in a complex ordering expression is resolved through other
-            # overridden methods.
-            if isinstance(field_name, six.string_types) and field_name != '?':
-                if field_name.startswith('-'):
-                    field_name = field_name[1:]
-                self._auto_annotate(QueryPath(field_name))
+            # requires auto-annotating here as well as a transformation into
+            # OrderBy expressions in recent Django versions as they may contain
+            # the lookup separator, which will be confused for transform
+            # application by Django. Queryable properties used in a complex
+            # ordering expression is resolved through other overridden methods.
+            if isinstance(item, six.string_types) and item != '?':
+                descending = item.startswith('-')
+                query_path = QueryPath(item.lstrip('-'))
+                property_annotation, transforms = self._auto_annotate(query_path)
+                if property_annotation and hasattr(F, 'resolve_expression'):
+                    if transforms:
+                        query_path = query_path[:-len(transforms)]
+                    item = F(six.text_type(query_path))
+                    for transform in transforms:
+                        item = self.try_transform(item, transform)
+                    ordering[index] = item.desc() if descending else item.asc()
         return super(QueryablePropertiesQueryMixin, self).add_ordering(*ordering, **kwargs)
 
     @property
@@ -321,7 +336,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # resolved filter will likely contain the same property name again.
         context = nullcontext()
         if property_ref.property.filter_requires_annotation:
-            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
+            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) or not self.select
             context = self._add_queryable_property_annotation(property_ref, full_group_by)
 
         with context:
@@ -388,7 +403,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         query_path = QueryPath(name)
         if self._queryable_property_stack:
             query_path = self._queryable_property_stack[-1].relation_path + query_path
-        property_annotation = self._auto_annotate(query_path, full_group_by=ValuesQuerySet is not None)
+        property_annotation = self._auto_annotate(query_path, full_group_by=ValuesQuerySet is not None)[0]
         if property_annotation:
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
