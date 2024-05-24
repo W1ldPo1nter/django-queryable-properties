@@ -74,7 +74,7 @@ class QueryablePropertiesIterableMixin(object):
         return obj
 
 
-class LegacyOrderingMixin(QueryablePropertiesIterableMixin):
+class LegacyOrderingMixin(QueryablePropertiesIterableMixin):  # pragma: no cover
     """
     A mixin for the legacy iterables that properly sets up queryable properties
     that are used for ordering.

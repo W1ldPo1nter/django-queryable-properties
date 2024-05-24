@@ -196,6 +196,7 @@ class TestQueryablePropertiesIterableMixin(object):
             mock_postprocess.assert_any_call(application)
 
 
+@pytest.mark.skipif(DJANGO_VERSION >= (1, 8), reason='Legacy ordering only affects very old Django versions.')
 class TestLegacyOrderingMixin(object):
 
     @pytest.mark.parametrize('order_by, expected_indexes', [
