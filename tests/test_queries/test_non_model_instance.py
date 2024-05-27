@@ -55,8 +55,8 @@ class TestAggregateAnnotations(object):
         assert all(set(obj_dict) == set(values) for obj_dict in queryset)
 
     @pytest.mark.parametrize('model, values, property_name, select, expected_count', [
-        (ApplicationWithClassBasedProperties, ('common_data',), 'version_count', False, 2),
-        (ApplicationWithDecoratorBasedProperties, ('common_data',), 'version_count', False, 2),
+        (ApplicationWithClassBasedProperties, ('common_data',), 'version_count', False, 1),
+        (ApplicationWithDecoratorBasedProperties, ('common_data',), 'version_count', False, 1),
         (ApplicationWithClassBasedProperties, ('common_data', 'version_count'), 'version_count', True, 2),
         (ApplicationWithDecoratorBasedProperties, ('common_data', 'version_count'), 'version_count', True, 2),
         (CategoryWithClassBasedProperties, ('pk', 'applications__pk'), 'applications__version_count', False, 3),
@@ -97,18 +97,18 @@ class TestAggregateAnnotations(object):
         assert set(queryset) == expected_version_counts
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
-    @pytest.mark.parametrize('select, order_by, values_list', [
-        ((), ('version_count',), ()),
-        ((), ('-version_count',), ('common_data',)),
-        (('version_count',), ('version_count',), ()),
-        (('version_count',), ('-version_count',), ('common_data',)),
-        (('version_count',), ('version_count',), ('common_data', 'version_count')),
-        (('major_sum',), ('-version_count',), ('common_data', 'name', 'major_sum')),
+    @pytest.mark.parametrize('select, order_by, values_list, expected_count', [
+        ((), ('version_count',), (), 2),
+        ((), ('-version_count',), ('common_data',), 1),
+        (('version_count',), ('version_count',), (), 2),
+        (('version_count',), ('-version_count',), ('common_data',), 2),
+        (('version_count',), ('version_count',), ('common_data', 'version_count'), 2),
+        (('major_sum',), ('-version_count',), ('common_data', 'name', 'major_sum'), 2),
     ])
-    def test_values_list_with_order_by_property(self, model, select, order_by, values_list):
+    def test_values_list_with_order_by_property(self, model, select, order_by, values_list, expected_count):
         # In Django versions below 1.8, annotations used for ordering MUST be
         # selected, which expectedly tinkers with the GROUPing.
-        expected_count = 2 + int(DJANGO_VERSION < (1, 8) and bool(values_list) and not select)
+        expected_count = expected_count + int(DJANGO_VERSION < (1, 8) and bool(values_list) and not select)
         expected_tuple_len = len(values_list) if values_list else (3 + len(select))
         queryset = model.objects.order_by(*order_by)
         if select:

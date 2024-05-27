@@ -232,7 +232,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         if not property_ref:
             return None, lookups
         if full_group_by is None:
-            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) or not self.select
+            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
         with self._add_queryable_property_annotation(property_ref, full_group_by) as annotation:
             return annotation, lookups
 
@@ -339,7 +339,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # resolved filter will likely contain the same property name again.
         context = nullcontext()
         if property_ref.property.filter_requires_annotation:
-            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) or not self.select
+            full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
             context = self._add_queryable_property_annotation(property_ref, full_group_by)
 
         with context:
