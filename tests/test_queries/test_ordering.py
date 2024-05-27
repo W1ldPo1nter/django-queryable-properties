@@ -144,6 +144,16 @@ class TestExpressionAnnotations(object):
         version_model.objects.get(version='1.2.3', application__name__startswith='Another').delete()
         assert [app.name for app in model.objects.order_by(*order_by)] == expected_names
 
+    @pytest.mark.skipif(DJANGO_VERSION < (5, 1), reason='Ordering by transforms was introduced in Django 5.1')
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('select', [False, True])
+    def test_order_by_transform(self, model, select):
+        queryset = model.objects.order_by('version__sha1')
+        if select:
+            queryset = queryset.select_properties('version')
+        assert [version.version for version in queryset] == [
+            '1.3.0', '1.3.0', '1.2.3', '1.2.3', '1.3.1', '1.3.1', '2.0.0', '2.0.0']
+
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
 class TestSubqueryAnnotations(object):

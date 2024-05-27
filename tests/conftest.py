@@ -4,6 +4,7 @@ from datetime import date
 
 import pytest
 from django import VERSION as DJANGO_VERSION
+from django.db.models import CharField
 from mock import Mock
 
 try:
@@ -24,6 +25,15 @@ from .dummy_lib.models import ReleaseTypeModel
 collect_ignore = []
 if DJANGO_VERSION < (4, 1):
     collect_ignore.append('test_queries/test_async.py')
+
+
+@pytest.fixture(autouse=True, scope='session')
+def sha1_lookup():
+    try:
+        from django.db.models.functions import SHA1
+    except ImportError:
+        pass
+    CharField.register_lookup(SHA1)
 
 
 @pytest.fixture

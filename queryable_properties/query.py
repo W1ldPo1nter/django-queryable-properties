@@ -283,11 +283,10 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             if isinstance(item, six.string_types) and item != '?':
                 descending = item.startswith('-')
                 query_path = QueryPath(item.lstrip('-'))
-                property_annotation, transforms = self._auto_annotate(query_path)
-                if property_annotation and hasattr(F, 'resolve_expression'):
-                    if transforms:
-                        query_path = query_path[:-len(transforms)]
-                    item = F(six.text_type(query_path))
+                item, transforms = self._auto_annotate(query_path)
+                if item and hasattr(F, 'resolve_expression'):
+                    if not transforms:
+                        item = F(six.text_type(query_path))
                     for transform in transforms:
                         item = self.try_transform(item, transform)
                     ordering[index] = item.desc() if descending else item.asc()
