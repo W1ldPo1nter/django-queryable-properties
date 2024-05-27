@@ -176,6 +176,9 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         annotation_name = six.text_type(property_ref.full_path)
         annotation_mask = set(self.annotations if self.annotation_select_mask is None else self.annotation_select_mask)
         was_present = property_ref in self._queryable_property_annotations
+        was_selected = was_present and (self.annotation_select_mask is None or
+                                        annotation_name in self.annotation_select_mask)
+
         self._queryable_property_stack.append(property_ref)
         try:
             if not was_present:
@@ -192,7 +195,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
 
         # Perform the required GROUP BY setup if the annotation contained
         # aggregates, which is normally done by QuerySet.annotate.
-        if (not was_present or select) and contains_aggregate(annotation):
+        if (not was_present or (select and not was_selected)) and contains_aggregate(annotation):
             if full_group_by and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
                 # In recent Django versions, a full GROUP BY can be achieved by
                 # simply setting group_by to True.
