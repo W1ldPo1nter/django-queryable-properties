@@ -279,7 +279,7 @@ class TestLegacyValuesIterable(object):
         assert result == {name: value for name, value in obj.items() if name not in prop_names}
 
 
-@pytest.mark.skipif(DJANGO_VERSION >= (1, 9), reason='ValuesListQuerySets only exist in old Django versions.')
+@pytest.mark.skipif(DJANGO_VERSION >= (1, 8), reason='ValuesListQuerySets only exist in old Django versions.')
 class TestLegacyValuesListIterable(object):
 
     @pytest.mark.parametrize('flat', [True, False])
