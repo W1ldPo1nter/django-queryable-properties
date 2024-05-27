@@ -33,7 +33,8 @@ def sha1_lookup():
         from django.db.models.functions import SHA1
     except ImportError:
         pass
-    CharField.register_lookup(SHA1)
+    else:
+        CharField.register_lookup(SHA1)
 
 
 @pytest.fixture
