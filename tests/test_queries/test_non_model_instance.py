@@ -108,7 +108,7 @@ class TestAggregateAnnotations(object):
     def test_values_list_with_order_by_property(self, model, select, order_by, values_list, expected_count):
         # In Django versions below 1.8, annotations used for ordering MUST be
         # selected, which expectedly tinkers with the GROUPing.
-        expected_count = expected_count + int(DJANGO_VERSION < (1, 8) and bool(values_list) and not select)
+        expected_count += int(DJANGO_VERSION < (1, 8) and bool(values_list) and not select)
         expected_tuple_len = len(values_list) if values_list else (3 + len(select))
         queryset = model.objects.order_by(*order_by)
         if select:
