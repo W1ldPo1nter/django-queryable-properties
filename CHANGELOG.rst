@@ -4,6 +4,8 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Django 5.1
+
 1.9.2 (2024-03-06)
 ------------------
 
