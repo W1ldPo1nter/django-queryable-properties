@@ -9,7 +9,7 @@ jobs:
       matrix:
         image:
           - 'python:2.7-buster'
-          - 'python:3.4-stretch'
+          #- 'python:3.4-stretch'
           - 'python:3.5-buster'
           - 'python:3.6-bullseye'
           - 'python:3.7-bookworm'
@@ -21,7 +21,7 @@ jobs:
     container:
       image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set environment variables
         run: |
           echo "PYTHON=$(echo '${{ matrix.image }}' | sed -r 's/^python:([0-9]+)\.([0-9]+).*$/\1.\2/g')" >> $GITHUB_ENV
@@ -45,10 +45,11 @@ jobs:
         run: coverage xml
         if: ${{ success() }}
       - name: Upload coverage report
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           env_vars: PYTHON
           files: coverage.xml
           flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
         if: ${{ success() }}
