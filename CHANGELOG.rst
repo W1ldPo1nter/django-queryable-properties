@@ -5,6 +5,7 @@ master (unreleased)
 -------------------
 
 - Added support for Django 5.1
+- Dropped support for Python 3.4
 
 1.9.2 (2024-03-06)
 ------------------
