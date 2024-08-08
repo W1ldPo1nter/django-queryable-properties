@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.9.3 (2024-08-08)
+------------------
+
 - Added support for Django 5.1
 - Dropped support for Python 3.4
 
