@@ -140,7 +140,7 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
     """
     A mixin for iterables that yield model instances.
 
-    Removes the ``QUERYING_PROPERTIES_MARKER``from created model instances to
+    Removes the ``QUERYING_PROPERTIES_MARKER`` from created model instances to
     ensure that the setters of queryable properties can be used properly.
     """
 
