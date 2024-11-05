@@ -85,6 +85,16 @@ class TestFilterWithoutAnnotations:
         assert len(non_v2_objects) == 6
         assert all(not version.is_version_2 for version in non_v2_objects)
 
+    @pytest.mark.parametrize('application_model, version_model', [
+        (ApplicationWithClassBasedProperties, VersionWithClassBasedProperties),
+        (ApplicationWithDecoratorBasedProperties, VersionWithDecoratorBasedProperties),
+    ])
+    def test_in_subquery(self, application_model, version_model):
+        version_model.objects.filter(application__name='Another App', major=2).delete()
+        apps = application_model.objects.filter(version_count=4)
+        for version in version_model.objects.filter(application__in=apps).select_related('application'):
+            assert version.application.name == 'My cool App'
+
     @pytest.mark.parametrize('model, property_name, condition', [
         (VersionWithClassBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
         (VersionWithDecoratorBasedProperties, 'major_minor', models.Q(major_minor='1.3')),

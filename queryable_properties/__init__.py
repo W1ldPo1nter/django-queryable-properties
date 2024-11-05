@@ -1,6 +1,6 @@
 """Write Django model properties that can be used in database queries."""
 
-__version__ = '1.9.1'
+__version__ = '1.9.3'
 __author__ = 'Marcus Klöpfel'
 __copyright__ = 'Copyright 2024, Marcus Klöpfel'
 __license__ = 'BSD'

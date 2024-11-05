@@ -32,7 +32,7 @@ class QueryablePropertyField:
         """
         property_ref, lookups = resolve_queryable_property(model_admin.model, query_path)
         if not property_ref or lookups:
-            raise QueryablePropertyError('The query path must point to a valid queryable property and may not contain'
+            raise QueryablePropertyError('The query path must point to a valid queryable property and may not contain '
                                          'lookups/transforms.')
 
         self.output_field = get_output_field(property_ref.get_annotation())

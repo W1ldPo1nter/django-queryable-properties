@@ -4,6 +4,20 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Python 3.13
+
+1.9.3 (2024-08-08)
+------------------
+
+- Added support for Django 5.1
+- Dropped support for Python 3.4
+
+1.9.2 (2024-03-06)
+------------------
+
+- Fixed an error that prevented querysets with queryable property features from being used as filter values in ``__in``
+  filters (i.e. implicit subqueries)
+
 1.9.1 (2024-01-09)
 ------------------
 

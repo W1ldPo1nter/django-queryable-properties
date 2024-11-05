@@ -1,6 +1,9 @@
 from collections import OrderedDict
 from contextlib import contextmanager
 
+from django.db.models import F
+from django.db.models.sql.query import RawQuery
+
 from .compat import convert_build_filter_to_add_q_kwargs, nullcontext
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
@@ -10,9 +13,9 @@ QUERYING_PROPERTIES_MARKER = '__querying_properties__'
 
 class AggregatePropertyChecker(NodeChecker):
     """
-    A specialized node checker that checks whether or not a node contains a
-    reference to an aggregate property for the purposes of determining whether
-    or not a HAVING clause is required.
+    A specialized node checker that checks whether a node contains a reference
+    to an aggregate property for the purposes of determining whether a HAVING
+    clause is required.
     """
 
     def __init__(self):
@@ -70,22 +73,11 @@ class QueryablePropertiesCompilerMixin(InjectableMixin):
             yield row + row.__class__((True,))
 
 
-class QueryablePropertiesQueryMixin(InjectableMixin):
+class QueryablePropertiesBaseQueryMixin(InjectableMixin):
     """
-    A mixin for :class:`django.db.models.sql.Query` and
-    :class:`django.db.models.sql.Raw Query` objects that extends the original
-    Django objects to deal with queryable properties, e.g. managing used
-    properties or automatically adding required properties as annotations.
+    Base mixin for queryable properties query mixins that covers common
+    functionality for all query mixins.
     """
-
-    def __iter__(self):  # Raw queries
-        # See QueryablePropertiesCompilerMixin.results_iter, but for raw
-        # queries. The marker can simply be added as the first value as fields
-        # are not strictly grouped like in regular queries.
-        for row in super().__iter__():
-            if self._use_querying_properties_marker:
-                row = row.__class__((True,)) + row
-            yield row
 
     def init_injected_attrs(self):
         # Stores references to queryable properties used as annotations in this
@@ -96,6 +88,49 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         self._queryable_property_stack = []
         # Determines whether to inject the QUERYING_PROPERTIES_MARKER.
         self._use_querying_properties_marker = False
+
+    def _postprocess_clone(self, clone):
+        """
+        Postprocess a query that was the result of cloning this query. This
+        ensures that the cloned query also uses the correct mixin and that the
+        queryable property attributes are initialized correctly.
+
+        :param django.db.models.sql.Query clone: The cloned query.
+        :return: The postprocessed cloned query.
+        :rtype: django.db.models.sql.Query
+        """
+        inject_query_mixin(clone)
+        clone.init_injected_attrs()
+        clone._queryable_property_annotations.update(self._queryable_property_annotations)
+        return clone
+
+    def clone(self, *args, **kwargs):
+        obj = super(QueryablePropertiesBaseQueryMixin, self).clone(*args, **kwargs)
+        if QUERY_CHAIN_METHOD_NAME == 'clone':  # pragma: no cover
+            obj = self._postprocess_clone(obj)
+        return obj
+
+    def chain(self, *args, **kwargs):
+        obj = super(QueryablePropertiesBaseQueryMixin, self).chain(*args, **kwargs)
+        if QUERY_CHAIN_METHOD_NAME == 'chain':
+            obj = self._postprocess_clone(obj)
+        return obj
+
+
+class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
+    """
+    A mixin for :class:`django.db.models.sql.Query` objects that extends the
+    original Django objects to deal with queryable properties, e.g. managing
+    used properties or automatically adding required properties as annotations.
+    """
+
+    def __getattr__(self, name):  # pragma: no cover
+        # Redirect some attribute accesses for older Django versions (where
+        # annotations were tied to aggregations, hence "aggregation" in the
+        # names instead of "annotation").
+        if name in ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
+            return getattr(self, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP[name])
+        raise AttributeError()
 
     @contextmanager
     def _add_queryable_property_annotation(self, property_ref, full_group_by, select=False):
@@ -122,9 +157,13 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
 
         annotation_name = str(property_ref.full_path)
         annotation_mask = set(self.annotations if self.annotation_select_mask is None else self.annotation_select_mask)
+        was_present = property_ref in self._queryable_property_annotations
+        was_selected = was_present and (self.annotation_select_mask is None or
+                                        annotation_name in self.annotation_select_mask)
+
         self._queryable_property_stack.append(property_ref)
         try:
-            if property_ref not in self._queryable_property_annotations:
+            if not was_present:
                 self.add_annotation(property_ref.get_annotation(), alias=annotation_name)
                 if not select:
                     self.set_annotation_mask(annotation_mask)
@@ -138,7 +177,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
 
         # Perform the required GROUP BY setup if the annotation contained
         # aggregates, which is normally done by QuerySet.annotate.
-        if annotation.contains_aggregate:
+        if (not was_present or (select and not was_selected)) and annotation.contains_aggregate:
             if full_group_by:
                 # In recent Django versions, a full GROUP BY can be achieved by
                 # simply setting group_by to True.
@@ -160,47 +199,44 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
 
         :param QueryPath query_path: The query path to resolve.
         :param bool | None full_group_by: Optional override to indicate whether
-                                          or not all fields must be contained
-                                          in a GROUP BY clause for aggregate
+                                          all fields must be contained in a
+                                          ``GROUP BY`` clause for aggregate
                                           annotations. If not set, it will be
                                           determined from the state of this
                                           query.
-        :return: The resolved annotation or None if the path couldn't be
-                 resolved.
+        :return: A 2-tuple containing the resolved annotation as well as the
+                 remaining lookups/transforms. The annotation will be None and
+                 the remaining lookups/transforms will be an empty query path
+                 if the path couldn't be resolved.
+        :rtype: (django.db.models.expressions.BaseExpression | None, QueryPath)
         """
-        property_ref = resolve_queryable_property(self.model, query_path)[0]
+        property_ref, lookups = resolve_queryable_property(self.model, query_path)
         if not property_ref:
-            return None
+            return None, lookups
         if full_group_by is None:
             full_group_by = False
         with self._add_queryable_property_annotation(property_ref, full_group_by) as annotation:
-            return annotation
-
-    def _postprocess_clone(self, clone):
-        """
-        Postprocess a query that was the result of cloning this query. This
-        ensures that the cloned query also uses this mixin and that the
-        queryable property attributes are initialized correctly.
-
-        :param django.db.models.sql.Query clone: The cloned query.
-        :return: The postprocessed cloned query.
-        :rtype: django.db.models.sql.Query
-        """
-        QueryablePropertiesQueryMixin.inject_into_object(clone)
-        clone.init_injected_attrs()
-        clone._queryable_property_annotations.update(self._queryable_property_annotations)
-        return clone
+            return annotation, lookups
 
     def add_ordering(self, *ordering, **kwargs):
-        for field_name in ordering:
+        ordering = list(ordering)
+        for index, item in enumerate(ordering):
             # Ordering by a queryable property via simple string values
-            # requires auto-annotating here, while a queryable property used
-            # in a complex ordering expression is resolved through other
-            # overridden methods.
-            if isinstance(field_name, str) and field_name != '?':
-                if field_name.startswith('-'):
-                    field_name = field_name[1:]
-                self._auto_annotate(QueryPath(field_name))
+            # requires auto-annotating here as well as a transformation into
+            # OrderBy expressions in recent Django versions as they may contain
+            # the lookup separator, which will be confused for transform
+            # application by Django. Queryable properties used in a complex
+            # ordering expression is resolved through other overridden methods.
+            if isinstance(item, str) and item != '?':
+                descending = item.startswith('-')
+                query_path = QueryPath(item.lstrip('-'))
+                item, transforms = self._auto_annotate(query_path)
+                if item and hasattr(F, 'resolve_expression'):
+                    if not transforms:
+                        item = F(str(query_path))
+                    for transform in transforms:
+                        item = self.try_transform(item, transform)
+                    ordering[index] = item.desc() if descending else item.asc()
         return super().add_ordering(*ordering, **kwargs)
 
     def build_filter(self, filter_expr, *args, **kwargs):
@@ -252,15 +288,6 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
             self.set_annotation_mask(set(self.annotation_select_mask).union(annotation_names))
         return super().get_aggregation(*args, **kwargs)
 
-    def get_columns(self):  # Raw queries
-        # Like QueryablePropertiesCompilerMixin.setup_query, but for raw
-        # queries. The marker can simply be added as the first value as fields
-        # are not strictly grouped like in regular queries.
-        columns = super().get_columns()
-        if self._use_querying_properties_marker:
-            columns.insert(0, QUERYING_PROPERTIES_MARKER)
-        return columns
-
     def get_compiler(self, *args, **kwargs):
         use_marker = self._use_querying_properties_marker
         self._use_querying_properties_marker = False
@@ -285,7 +312,7 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
         query_path = QueryPath(name)
         if self._queryable_property_stack:
             query_path = self._queryable_property_stack[-1].relation_path + query_path
-        property_annotation = self._auto_annotate(query_path, full_group_by=False)
+        property_annotation = self._auto_annotate(query_path, full_group_by=False)[0]
         if property_annotation:
             if summarize:
                 # Outer queries for aggregations need refs to annotations of
@@ -293,8 +320,44 @@ class QueryablePropertiesQueryMixin(InjectableMixin):
                 from django.db.models.expressions import Ref
                 return Ref(name, property_annotation)
             return property_annotation
-        return super().resolve_ref(name, allow_joins, reuse, summarize, *args, **kwargs)
+        return super().resolve_ref(name, allow_joins, reuse, summarize,*args, **kwargs)
 
-    def chain(self, *args, **kwargs):
-        obj = super().chain(*args, **kwargs)
-        return self._postprocess_clone(obj)
+
+class QueryablePropertiesRawQueryMixin(QueryablePropertiesBaseQueryMixin):
+    """
+    A mixin for :class:`django.db.models.sql.RawQuery` objects that allows to
+    populate queryable properties in raw queries by using their names as column
+    names.
+    """
+
+    def __iter__(self):
+        # See QueryablePropertiesCompilerMixin.results_iter, but for raw
+        # queries. The marker can simply be added as the first value as fields
+        # are not strictly grouped like in regular queries.
+        for row in super().__iter__():
+            if self._use_querying_properties_marker:
+                row = row.__class__((True,)) + row
+            yield row
+
+    def get_columns(self):
+        # Like QueryablePropertiesCompilerMixin.setup_query, but for raw
+        # queries. The marker can simply be added as the first value as fields
+        # are not strictly grouped like in regular queries.
+        columns = super().get_columns()
+        if self._use_querying_properties_marker:
+            columns.insert(0, QUERYING_PROPERTIES_MARKER)
+        return columns
+
+
+def inject_query_mixin(query):
+    """
+    Inject the correct query mixin into the given query.
+
+    :param query: The query to inject queryable properties functionality into.
+    :type query: django.db.models.sql.Query | django.db.models.sql.RawQuery
+    :return: The extended query object.
+    """
+    mixin = QueryablePropertiesQueryMixin
+    if isinstance(query, RawQuery):
+        mixin = QueryablePropertiesRawQueryMixin
+    return mixin.inject_into_object(query, 'QueryableProperties' + query.__class__.__name__)

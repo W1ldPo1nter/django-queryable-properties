@@ -8,7 +8,6 @@ jobs:
     strategy:
       matrix:
         image:
-          - 'python:3.4-stretch'
           - 'python:3.5-buster'
           - 'python:3.6-bullseye'
           - 'python:3.7-bookworm'
@@ -17,18 +16,23 @@ jobs:
           - 'python:3.10-bookworm'
           - 'python:3.11-bookworm'
           - 'python:3.12-bookworm'
+          - 'python:3.13-bookworm'
     container:
       image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set environment variables
         run: |
           echo "PYTHON=$(echo '${{ matrix.image }}' | sed -r 's/^python:([0-9]+)\.([0-9]+).*$/\1.\2/g')" >> $GITHUB_ENV
           echo "TOXFACTOR=$(echo '${{ matrix.image }}' | sed -r 's/^python:([0-9]+)\.([0-9]+).*$/py\1\2/g')" >> $GITHUB_ENV
+      - name: Install distutils via setuptools for new Python versions
+        run: pip install -U setuptools
+        if: >-
+          matrix.image == 'python:3.12-bookworm' ||
+          matrix.image == 'python:3.13-bookworm'
       - name: Install importlib-metadata for older Python versions
         run: pip install "importlib-metadata<3"
         if: >-
-          matrix.image == 'python:3.4-stretch' ||
           matrix.image == 'python:3.5-buster' ||
           matrix.image == 'python:3.6-bullseye' ||
           matrix.image == 'python:3.7-bookworm'
@@ -36,17 +40,18 @@ jobs:
         run: pip install "tox<4" tox-factor "coverage<5"
       - name: Lint with flake8
         run: tox -e flake8
-        if: matrix.image == 'python:3.12-bookworm'
+        if: matrix.image == 'python:3.13-bookworm'
       - name: Test via tox
         run: tox -- -p no:warnings
       - name: Generate coverage report
         run: coverage xml
         if: ${{ success() }}
       - name: Upload coverage report
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           env_vars: PYTHON
           files: coverage.xml
           flags: unittests
+          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
         if: ${{ success() }}
