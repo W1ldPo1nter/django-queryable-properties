@@ -4,6 +4,8 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Python 3.13
+
 1.9.3 (2024-08-08)
 ------------------
 

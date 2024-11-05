@@ -17,6 +17,7 @@ jobs:
           - 'python:3.10-bookworm'
           - 'python:3.11-bookworm'
           - 'python:3.12-bookworm'
+          - 'python:3.13-bookworm'
     container:
       image: ${{ matrix.image }}
     steps:
@@ -27,7 +28,9 @@ jobs:
           echo "TOXFACTOR=$(echo '${{ matrix.image }}' | sed -r 's/^python:([0-9]+)\.([0-9]+).*$/py\1\2/g')" >> $GITHUB_ENV
       - name: Install distutils via setuptools for new Python versions
         run: pip install -U setuptools
-        if: matrix.image == 'python:3.12-bookworm'
+        if: >-
+          matrix.image == 'python:3.12-bookworm' ||
+          matrix.image == 'python:3.13-bookworm'
       - name: Install importlib-metadata for older Python versions
         run: pip install "importlib-metadata<3"
         if: >-
@@ -39,7 +42,7 @@ jobs:
         run: pip install "tox<4" tox-factor "coverage<5"
       - name: Lint with flake8
         run: tox -e flake8
-        if: matrix.image == 'python:3.12-bookworm'
+        if: matrix.image == 'python:3.13-bookworm'
       - name: Test via tox
         run: tox -- -p no:warnings
       - name: Generate coverage report
