@@ -1,8 +1,8 @@
-# encoding: utf-8
-
 import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db import connection, models
+from django.db.models import Value
+from django.db.models.functions import Concat
 
 from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.utils.internal import get_queryable_property_descriptor
@@ -10,12 +10,11 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
     VersionWithDecoratorBasedProperties,
 )
-from ..conftest import Concat, Value
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestAggregateAnnotations(object):
+class TestAggregateAnnotations:
 
     @pytest.mark.parametrize('model, filters', [
         (ApplicationWithClassBasedProperties, {}),
@@ -56,7 +55,6 @@ class TestAggregateAnnotations(object):
         result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum('application__version_count'))
         assert result['total_version_count'] == expected_total
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, annotation', [
         (VersionWithClassBasedProperties, models.F('application__version_count')),
         (VersionWithDecoratorBasedProperties, models.F('application__version_count')),
@@ -102,7 +100,6 @@ class TestAggregateAnnotations(object):
         assert bool(queryset)
         assert all(not model.version_count.has_cached_value(obj) for obj in queryset)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 7), reason="Raw queries didn't exist before Django 1.7")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_raw_query(self, model):
         pks, names = zip(*model.objects.values_list('pk', 'name'))
@@ -118,8 +115,7 @@ class TestAggregateAnnotations(object):
         assert counter == 2
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-class TestExpressionAnnotations(object):
+class TestExpressionAnnotations:
 
     @pytest.mark.parametrize('model, filters', [
         (VersionWithClassBasedProperties, {}),

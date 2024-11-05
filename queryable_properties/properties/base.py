@@ -1,13 +1,9 @@
-# encoding: utf-8
-
-from __future__ import unicode_literals
-
 from copy import deepcopy
 from functools import partial
 
-import six
+from django.db.models.constants import LOOKUP_SEP
+from django.forms.utils import pretty_name
 
-from ..compat import LOOKUP_SEP, pretty_name
 from ..exceptions import QueryablePropertyError
 from ..query import QUERYING_PROPERTIES_MARKER
 from ..utils import get_queryable_property, reset_queryable_property
@@ -18,7 +14,6 @@ from .mixins import AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin
 RESET_METHOD_NAME = 'reset_property'
 
 
-@six.python_2_unicode_compatible
 class QueryablePropertyDescriptor(property):
     """
     Descriptor class for queryable properties that allows the actual attribute
@@ -37,7 +32,7 @@ class QueryablePropertyDescriptor(property):
         :param prop: The queryable property to allow attribute access for.
         :type prop: QueryableProperty
         """
-        descriptor = super(QueryablePropertyDescriptor, cls).__new__(cls, doc=prop.__doc__)
+        descriptor = super().__new__(cls, doc=prop.__doc__)
         descriptor.prop = prop
         return descriptor
 
@@ -72,10 +67,10 @@ class QueryablePropertyDescriptor(property):
             self.prop.setter_cache_behavior(self, obj, value, return_value)
 
     def __str__(self):
-        return six.text_type(self.prop)
+        return str(self.prop)
 
     def __repr__(self):
-        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
+        return '<{}: {}>'.format(self.__class__.__name__, str(self))
 
     def get_cached_value(self, obj):
         """
@@ -123,8 +118,7 @@ class QueryablePropertyDescriptor(property):
         obj.__dict__.pop(self.prop.name, None)
 
 
-@six.python_2_unicode_compatible
-class QueryableProperty(object):
+class QueryableProperty:
     """
     Base class for all queryable property definitions, which provide methods
     for single object as well as queryset interaction.
@@ -150,7 +144,7 @@ class QueryableProperty(object):
         """
         self.model = None
         self.name = None
-        self.setter_cache_behavior = six.get_method_function(self.setter_cache_behavior)
+        self.setter_cache_behavior = self.setter_cache_behavior.__func__
         self.verbose_name = verbose_name
 
     def __reduce__(self):
@@ -165,7 +159,7 @@ class QueryableProperty(object):
         return '.'.join((self.model.__module__, self.model.__name__, self.name))
 
     def __repr__(self):
-        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
+        return '<{}: {}>'.format(self.__class__.__name__, str(self))
 
     @property
     def short_description(self):
@@ -247,7 +241,7 @@ class queryable_property(QueryableProperty):
                                  expected to decorate the getter method.
         :type annotation_based: bool
         """
-        super(queryable_property, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.__doc__ = None
         if getter:
             self(getter, force_getter=True)

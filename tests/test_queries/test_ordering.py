@@ -1,18 +1,16 @@
-# encoding: utf-8
-
 import pytest
-from django import VERSION as DJANGO_VERSION
+from django.db.models import Value
+from django.db.models.functions import Concat
 
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, VersionWithClassBasedProperties,
     VersionWithDecoratorBasedProperties,
 )
-from ..conftest import Concat, Value
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestAggregateAnnotations(object):
+class TestAggregateAnnotations:
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
@@ -59,8 +57,7 @@ class TestAggregateAnnotations(object):
         assert results == sorted(results, key=lambda version: version.application.version_count, reverse=reverse)
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-class TestExpressionAnnotations(object):
+class TestExpressionAnnotations:
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
@@ -155,8 +152,7 @@ class TestExpressionAnnotations(object):
             '1.3.0', '1.3.0', '1.2.3', '1.2.3', '1.3.1', '1.3.1', '2.0.0', '2.0.0']
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
-class TestSubqueryAnnotations(object):
+class TestSubqueryAnnotations:
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the

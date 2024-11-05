@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import pytest
 from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import site
@@ -7,7 +5,7 @@ from django.contrib.admin.filters import ChoicesFieldListFilter, FieldListFilter
 from django.db.models.query import QuerySet
 from mock import patch
 
-from queryable_properties.compat import ADMIN_QUERYSET_METHOD_NAME, nullcontext
+from queryable_properties.compat import nullcontext
 from queryable_properties.managers import QueryablePropertiesQuerySetMixin
 from queryable_properties.utils import get_queryable_property
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
@@ -15,7 +13,7 @@ from ..app_management.models import ApplicationWithClassBasedProperties, Version
 from .test_checks import DummyListFilter
 
 
-class TestQueryablePropertiesAdminMixin(object):
+class TestQueryablePropertiesAdminMixin:
 
     @pytest.mark.parametrize('admin_class, model, expected_value', [
         (VersionAdmin, VersionWithClassBasedProperties, ()),
@@ -38,8 +36,7 @@ class TestQueryablePropertiesAdminMixin(object):
         admin = admin_class(model, site)
         qs_patch = nullcontext()
         if apply_patch:
-            qs_patch = patch('django.contrib.admin.options.ModelAdmin.{}'.format(ADMIN_QUERYSET_METHOD_NAME),
-                             return_value=QuerySet(model))
+            qs_patch = patch('django.contrib.admin.options.ModelAdmin.get_queryset', return_value=QuerySet(model))
 
         with qs_patch:
             queryset = admin.get_queryset(rf.get('/'))
@@ -58,9 +55,7 @@ class TestQueryablePropertiesAdminMixin(object):
     def test_get_list_filter(self, monkeypatch, rf, list_filter_item, property_name):
         monkeypatch.setattr(ApplicationAdmin, 'list_filter', ('common_data', list_filter_item))
         admin = ApplicationAdmin(ApplicationWithClassBasedProperties, site)
-        list_filter = admin.list_filter
-        if DJANGO_VERSION >= (1, 5):
-            list_filter = admin.get_list_filter(rf.get('/'))
+        list_filter = admin.get_list_filter(rf.get('/'))
         assert list_filter[0] == 'common_data'
         assert (list_filter[1] == list_filter_item) is (not property_name)
         if property_name:

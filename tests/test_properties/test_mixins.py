@@ -1,6 +1,4 @@
-# encoding: utf-8
 import pytest
-from django import VERSION as DJANGO_VERSION
 from django.db.models import Q
 from mock import patch
 
@@ -57,7 +55,7 @@ class MethodRemainingLookupFilterProperty(ParentRemainingLookupFilterProperty):
         return Q(remaining=value)
 
 
-class TestLookupFilterMixin(object):
+class TestLookupFilterMixin:
 
     def test_registration(self):
         base = BaseLookupFilterProperty()
@@ -93,9 +91,6 @@ class TestLookupFilterMixin(object):
     def test_filter_call(self, cls, lookup, value, expected_q_value, expected_q_negation):
         prop = cls()
         q = prop.get_filter(None, lookup, value)
-        if DJANGO_VERSION < (1, 6) and expected_q_negation:
-            # In very old Django versions, negating adds another layer.
-            q = q.children[0]
         assert len(q.children) == 1
         assert q.children[0] == expected_q_value
         assert q.negated is expected_q_negation
@@ -132,7 +127,7 @@ class TestLookupFilterMixin(object):
             prop.get_filter(None, lookup, value)
 
 
-class TestAnnotationMixin(object):
+class TestAnnotationMixin:
 
     @pytest.fixture
     def prop(self):
@@ -156,7 +151,7 @@ class TestAnnotationMixin(object):
         assert q.children[0] == ('test__{}'.format(lookup), value)
 
 
-class TestAnnotationGetterMixin(object):
+class TestAnnotationGetterMixin:
 
     @pytest.fixture
     def prop(self):
@@ -196,7 +191,6 @@ class TestAnnotationGetterMixin(object):
         for application in applications[:2]:
             assert prop.get_value(application) == 4
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 10), reason="The Cast() expression didn't exist before Django 1.10")
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
     def test_get_value_nested_properties(self, nested_prop, applications):
@@ -210,8 +204,7 @@ class TestAnnotationGetterMixin(object):
             prop.get_value(application)
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
-class TestSubqueryMixin(object):
+class TestSubqueryMixin:
 
     @pytest.mark.parametrize('kwargs', [
         {'queryset': ApplicationWithClassBasedProperties.objects.filter(name='test')},

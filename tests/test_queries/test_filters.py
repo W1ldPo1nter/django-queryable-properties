@@ -1,7 +1,4 @@
-# encoding: utf-8
-
 import pytest
-import six
 from django import VERSION as DJANGO_VERSION
 from django.db import models
 
@@ -15,7 +12,7 @@ from ..app_management.models import (
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestFilterWithoutAnnotations(object):
+class TestFilterWithoutAnnotations:
 
     @pytest.mark.parametrize('model, filters, expected_count, expected_major_minor', [
         # Test that filter that don't involve queryable properties still work
@@ -98,7 +95,6 @@ class TestFilterWithoutAnnotations(object):
         for version in version_model.objects.filter(application__in=apps).select_related('application'):
             assert version.application.name == 'My cool App'
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
     @pytest.mark.parametrize('model, property_name, condition', [
         (VersionWithClassBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
         (VersionWithDecoratorBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
@@ -114,7 +110,6 @@ class TestFilterWithoutAnnotations(object):
         assert property_name not in queryset.query.annotations
         assert all(bool(version.is_13) is (version.major_minor == '1.3') for version in queryset)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Per-aggregate filters didn't exist before Django 2.0")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_filter_in_aggregate(self, model):
         queryset = model.objects.annotate(
@@ -140,7 +135,7 @@ class TestFilterWithoutAnnotations(object):
         assert applications[0].versions.filter(version='2.0.0').exists()
 
 
-class TestFilterWithAggregateAnnotation(object):
+class TestFilterWithAggregateAnnotation:
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count', [
         (ApplicationWithClassBasedProperties, 'version_count', models.Q(version_count__gt=3), 2),
@@ -205,10 +200,9 @@ class TestFilterWithAggregateAnnotation(object):
         prop = get_queryable_property(model, 'version_count')
         monkeypatch.setattr(prop, 'get_filter', lambda cls, lookup, value: models.Q(pk__gt=0))
         queryset = model.objects.select_properties('version_count').filter(version_count__gt=5)
-        assert '"id" > 0' in six.text_type(queryset.query)
+        assert '"id" > 0' in str(queryset.query)
         assert queryset.count() == len(queryset) == 2
 
-    @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Filtered aggregates didn't exist before Django 2.0")
     def test_aggregate_with_filter_on_related_model(self, categories, applications):
         applications[1].versions.filter(version='1.3.0').delete()
         assert CategoryWithClassBasedProperties.objects.get(has_multiple_stable_versions=True) == categories[0]
@@ -217,8 +211,7 @@ class TestFilterWithAggregateAnnotation(object):
         assert categories[1].has_multiple_stable_versions is False
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-class TestFilterWithExpressionAnnotation(object):
+class TestFilterWithExpressionAnnotation:
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count, expected_distinct_count, record_checker', [
         (VersionWithClassBasedProperties, 'changes_or_default', models.Q(changes_or_default='(No data)'), 6, 6,
@@ -277,15 +270,14 @@ class TestFilterWithExpressionAnnotation(object):
     @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
     def test_filter_implementation_used_despite_present_annotation(self, model):
         queryset = model.objects.select_properties('version').filter(version='2.0.0')
-        pseudo_sql = six.text_type(queryset.query)
+        pseudo_sql = str(queryset.query)
         assert '"major" = 2' in pseudo_sql
         assert '"minor" = 0' in pseudo_sql
         assert '"patch" = 0' in pseudo_sql
         assert queryset.count() == len(queryset) == 2
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
-class TestFilterWithSubqueryAnnotation(object):
+class TestFilterWithSubqueryAnnotation:
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count, record_checker', [
         (ApplicationWithClassBasedProperties, 'highest_version', models.Q(highest_version='2.0.0'), 1,

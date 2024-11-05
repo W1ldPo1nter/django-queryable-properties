@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
-
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 
-from ..compat import ADMIN_QUERYSET_METHOD_NAME, admin_validation
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import QueryPath
@@ -17,7 +14,7 @@ __all__ = [
 ]
 
 
-class QueryablePropertiesAdminMixin(object):
+class QueryablePropertiesAdminMixin:
     """
     A mixin for admin classes including inlines that allows to use queryable
     properties in various admin features.
@@ -26,22 +23,9 @@ class QueryablePropertiesAdminMixin(object):
     list_select_properties = ()
     """A sequence of queryable property names that should be selected."""
 
-    def __init__(self, *args, **kwargs):
-        super(QueryablePropertiesAdminMixin, self).__init__(*args, **kwargs)
-        if hasattr(self, 'list_filter') and not hasattr(ModelAdmin, 'get_list_filter'):  # pragma: no cover
-            # In very old Django versions, there was no get_list_filter method,
-            # therefore the processed queryable property filters must be stored
-            # directly in the list_filter attribute.
-            self.list_filter = self.process_queryable_property_filters(self.list_filter)
-
-    @classmethod
-    def validate(cls, model):  # pragma: no cover
-        cls._ensure_queryable_property_checks()
-        return super(QueryablePropertiesAdminMixin, cls).validate(model)
-
     def check(self, *args, **kwargs):
         self._ensure_queryable_property_checks(self)
-        return super(QueryablePropertiesAdminMixin, self).check(*args, **kwargs)
+        return super().check(*args, **kwargs)
 
     if getattr(getattr(ModelAdmin, 'check', None), '__self__', None):  # pragma: no cover
         # In old Django versions, check was a classmethod.
@@ -69,23 +53,13 @@ class QueryablePropertiesAdminMixin(object):
                 setattr(obj, attr_name, QueryablePropertiesChecksMixin.mix_with_class(checks_class, class_name))
 
     def get_queryset(self, request):
-        # The base method has different names in different Django versions (see
-        # comment on the constant definition).
-        base_method = getattr(super(QueryablePropertiesAdminMixin, self), ADMIN_QUERYSET_METHOD_NAME)
         # Make sure to use a queryset with queryable properties features.
-        queryset = QueryablePropertiesQuerySetMixin.apply_to(base_method(request))
+        queryset = QueryablePropertiesQuerySetMixin.apply_to(super().get_queryset(request))
         # Apply list_select_properties.
         list_select_properties = self.get_list_select_properties(request)
         if list_select_properties:
             queryset = queryset.select_properties(*list_select_properties)
         return queryset
-
-    def queryset(self, request):  # pragma: no cover
-        # Same as get_queryset, but for very old Django versions. Simply
-        # delegate to get_queryset, which is aware of the different methods in
-        # different versions and therefore calls the correct super methods if
-        # necessary.
-        return self.get_queryset(request)
 
     def get_list_select_properties(self, request):
         """
@@ -100,7 +74,7 @@ class QueryablePropertiesAdminMixin(object):
         return self.list_select_properties
 
     def get_list_filter(self, request):
-        list_filter = super(QueryablePropertiesAdminMixin, self).get_list_filter(request)
+        list_filter = super().get_list_filter(request)
         return self.process_queryable_property_filters(list_filter)
 
     def process_queryable_property_filters(self, list_filter):
@@ -155,25 +129,5 @@ class QueryablePropertiesTabularInline(QueryablePropertiesAdminMixin, TabularInl
     """
 
 
-# In very old django versions, the admin validation happens in one big function
-# that cannot really be extended well. Therefore, the Django module will be
-# monkeypatched in order to allow the queryable properties validation to take
-# effect.
-django_validate = getattr(admin_validation, 'validate', None)
-django_validate_inline = getattr(admin_validation, 'validate_inline', None)
-
-if django_validate:  # pragma: no cover
-    def validate(cls, model):
-        if issubclass(cls, QueryablePropertiesAdminMixin):
-            cls = QueryablePropertiesChecksMixin()._validate_queryable_properties(cls, model)
-        django_validate(cls, model)
-
-    admin_validation.validate = validate
-
-if django_validate_inline:  # pragma: no cover
-    def validate_inline(cls, parent, parent_model):
-        if issubclass(cls, QueryablePropertiesAdminMixin):
-            cls = QueryablePropertiesChecksMixin()._validate_queryable_properties(cls, cls.model)
-        django_validate_inline(cls, parent, parent_model)
-
-    admin_validation.validate_inline = validate_inline
+django_validate = None
+django_validate_inline = None

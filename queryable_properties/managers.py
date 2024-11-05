@@ -1,29 +1,21 @@
-# encoding: utf-8
-
-from __future__ import unicode_literals
-
 from copy import copy
 
-import six
 from django.db.models import Manager
-from django.db.models.query import QuerySet
+from django.db.models.query import ModelIterable, QuerySet
+from django.db.models.sql.query import RawQuery
 from django.utils.functional import cached_property
 
-from .compat import (
-    ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, MANAGER_QUERYSET_METHOD_NAME, DateQuerySet,
-    DateTimeQuerySet, ModelIterable, RawModelIterable, RawQuery, ValuesListQuerySet, ValuesQuerySet, chain_query,
-    chain_queryset,
-)
+from .compat import RawModelIterable
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QUERYING_PROPERTIES_MARKER, inject_query_mixin
 from .utils import get_queryable_property
 from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPath
 
 
-class LegacyIterable(object):
+class LegacyIterable:
     """
     Base class for queryset iterables for old Django versions to mimic the
-    iterable classes of new Django versions.
+    iterable classes of new Django versions (4.1).
     """
 
     def __init__(self, queryset):
@@ -36,11 +28,10 @@ class LegacyIterable(object):
         self.queryset = queryset
 
     def __iter__(self):
-        original = super(QueryablePropertiesBaseQuerySetMixin, self.queryset)
-        return getattr(original, 'iterator', original.__iter__)()
+        return getattr(super(), 'iterator', super().__iter__)()
 
 
-class QueryablePropertiesIterableMixin(object):
+class QueryablePropertiesIterableMixin:
     """
     Base class for iterable mixins that handle queryable properties logic.
 
@@ -49,12 +40,11 @@ class QueryablePropertiesIterableMixin(object):
     """
 
     def __init__(self, queryset, *args, **kwargs):
-        super(QueryablePropertiesIterableMixin, self).__init__(chain_queryset(queryset), *args, **kwargs)
+        super().__init__(queryset._chain(), *args, **kwargs)
 
     def __iter__(self):
         self._setup_queryable_properties()
-        for obj in super(QueryablePropertiesIterableMixin, self).__iter__():
-            yield self._postprocess_queryable_properties(obj)
+        yield from super().__iter__()
 
     def _setup_queryable_properties(self):  # pragma: no cover
         """
@@ -100,7 +90,7 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):  # pragma: no cover
         query = self.queryset.query
         occurrences = {}
         for ref in query._queryable_property_annotations:
-            annotation_name = six.text_type(ref.full_path)
+            annotation_name = str(ref.full_path)
             indexes = [index for index, field_name in enumerate(query.order_by)
                        if field_name in (annotation_name, '-{}'.format(annotation_name))]
             if indexes:
@@ -119,21 +109,22 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):  # pragma: no cover
         """
         query = self.queryset.query
         select = set()
-        for ref, occurrences in six.iteritems(self._order_by_occurrences):
-            annotation_name = six.text_type(ref.full_path)
+        for ref, occurrences in self._order_by_occurrences.items():
+            annotation_name = str(ref.full_path)
             if annotation_name not in query.annotation_select and annotation_name in query.annotations:
                 select.add(ref)
         return select
 
     def _setup_queryable_properties(self):
-        super(LegacyOrderingMixin, self)._setup_queryable_properties()
+        super()._setup_queryable_properties()
         query = self.queryset.query
         select = dict(query.annotation_select)
 
         for property_ref in self._order_by_select:
-            annotation_name = six.text_type(property_ref.full_path)
+            annotation_name = str(property_ref.full_path)
             select[annotation_name] = query.annotations[annotation_name]
-        setattr(query, ANNOTATION_SELECT_CACHE_NAME, select)
+
+        query._annotation_select_cache = select
 
 
 class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryablePropertiesIterableMixin):
@@ -145,11 +136,11 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
     """
 
     def _setup_queryable_properties(self):
-        super(QueryablePropertiesModelIterableMixin, self)._setup_queryable_properties()
+        super()._setup_queryable_properties()
         self.queryset.query._use_querying_properties_marker = True
 
     def _postprocess_queryable_properties(self, obj):
-        obj = super(QueryablePropertiesModelIterableMixin, self)._postprocess_queryable_properties(obj)
+        obj = super()._postprocess_queryable_properties(obj)
         delattr(obj, QUERYING_PROPERTIES_MARKER)
         return obj
 
@@ -170,7 +161,7 @@ class LegacyOrderingModelIterable(QueryablePropertiesModelIterableMixin, LegacyO
     def _postprocess_queryable_properties(self, obj):
         for ref in self._order_by_select:
             ref.descriptor.clear_cached_value(obj)
-        return super(LegacyOrderingModelIterable, self)._postprocess_queryable_properties(obj)
+        return super()._postprocess_queryable_properties(obj)
 
 
 class LegacyValuesIterable(LegacyOrderingMixin, LegacyIterable):
@@ -179,9 +170,9 @@ class LegacyValuesIterable(LegacyOrderingMixin, LegacyIterable):
     """
 
     def _postprocess_queryable_properties(self, obj):
-        obj = super(LegacyValuesIterable, self)._postprocess_queryable_properties(obj)
+        obj = super()._postprocess_queryable_properties(obj)
         for ref in self._order_by_select:
-            obj.pop(six.text_type(ref.full_path), None)
+            obj.pop(str(ref.full_path), None)
         return obj
 
 
@@ -191,7 +182,7 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
     """
 
     def __init__(self, queryset, *args, **kwargs):
-        super(LegacyValuesListIterable, self).__init__(queryset, *args, **kwargs)
+        super().__init__(queryset, *args, **kwargs)
         self.flat = queryset.flat
         self.queryset.flat = False
 
@@ -207,16 +198,18 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
         :return: A set containing the field indexes to discard.
         :rtype: set[int]
         """
-        aggregate_names = list(self.queryset.query.aggregate_select)
-        if self.queryset._fields:
-            aggregate_names = [name for name in aggregate_names if name not in self.queryset._fields]
+        aggregate_names = list(self.queryset.query.annotation_select)
+        queryset_fields = self.queryset._fields
+        if queryset_fields:
+            aggregate_names = [name for name in aggregate_names if name not in queryset_fields]
         aggregate_names.reverse()
-        forced_names = set(six.text_type(ref.full_path) for ref in self._order_by_select)
+        forced_names = set(str(ref.full_path) for ref in self._order_by_select)
         return {-i for i, name in enumerate(aggregate_names, start=1) if name in forced_names}
 
     def _postprocess_queryable_properties(self, obj):
-        obj = super(LegacyValuesListIterable, self)._postprocess_queryable_properties(obj)
-        obj = tuple(value for i, value in enumerate(obj, start=-len(obj)) if i not in self._discarded_indexes)
+        obj = super()._postprocess_queryable_properties(obj)
+        discarded_indexes = self._discarded_indexes
+        obj = tuple(value for i, value in enumerate(obj, start=-len(obj)) if i not in discarded_indexes)
         if self.flat and len(self.queryset._fields) == 1:
             return obj[0]
         return obj
@@ -238,7 +231,7 @@ class QueryablePropertiesBaseQuerySetMixin(InjectableMixin):
         query_attr_name = '_query' if hasattr(self, '_query') else 'query'
         query = getattr(self, query_attr_name)
         chain_kwargs = {}
-        if RawQuery and isinstance(query, RawQuery):
+        if isinstance(query, RawQuery):
             chain_kwargs['using'] = self.db
         setattr(self, query_attr_name, inject_query_mixin(chain_query(query, **chain_kwargs)))
 
@@ -250,16 +243,13 @@ class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
     """
 
     def __iter__(self):
-        original = super(QueryablePropertiesRawQuerySetMixin, self)
+        original = super()
         # Only recent Django versions (>= 2.1) have the iterator method.
-        iterator = original.__iter__ if hasattr(original, 'iterator') else self.iterator
-        for obj in iterator():
-            yield obj
+        yield from original.__iter__() if hasattr(original, 'iterator') else self.iterator()
 
     def iterator(self):
         iterable_class = RawModelIterable or LegacyIterable
-        for obj in QueryablePropertiesModelIterableMixin.mix_with_class(iterable_class)(self):
-            yield obj
+        yield from QueryablePropertiesModelIterableMixin.mix_with_class(iterable_class)(self)
 
 
 class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
@@ -288,21 +278,10 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
         self.__dict__['_iterable_class'] = value
 
     def _clone(self, klass=None, *args, **kwargs):
-        has_iterable_class = '_iterable_class' in self.__dict__
-        if not has_iterable_class:  # pragma: no cover
-            # In older Django versions, the class of the queryset may be
-            # replaced with a dynamically created class based on the current
-            # class and the value of klass while cloning (e.g when using
-            # .values()). Therefore this needs to be re-injected to be on top
-            # of the MRO again to enable queryable properties functionality.
-            if klass:
-                klass = QueryablePropertiesQuerySetMixin.mix_with_class(klass, 'QueryableProperties' + klass.__name__)
-            args = (klass,) + args
-        clone = super(QueryablePropertiesQuerySetMixin, self)._clone(*args, **kwargs)
+        clone = super()._clone(*args, **kwargs)
         # Since the _iterable_class property may return a dynamically created
         # class, the value of a clone must be reset to the base class.
-        if has_iterable_class:
-            clone._iterable_class = self.__dict__['_iterable_class']
+        clone._iterable_class = self.__dict__['_iterable_class']
         return clone
 
     def _resolve_update_kwargs(self, **kwargs):
@@ -331,7 +310,7 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
                 **prop.get_update_kwargs(self.model, kwargs.pop(original_name)))
             # Make sure that there are no conflicting values after resolving
             # the update keyword arguments of the queryable properties.
-            for additional_name, value in six.iteritems(additional_kwargs):
+            for additional_name, value in additional_kwargs.items():
                 if additional_name in kwargs and kwargs[additional_name] != value:
                     raise QueryablePropertyError(
                         'Updating queryable property "{prop}" would change field "{field}", but a conflicting value '
@@ -353,7 +332,7 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
         :return: A copy of this queryset with the added annotations.
         :rtype: QuerySet
         """
-        queryset = chain_queryset(self)
+        queryset = self._chain()
         for name in names:
             property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, QueryPath())
             # A full GROUP BY is required if the query is not limited to
@@ -366,37 +345,19 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
         return queryset
 
     def iterator(self, *args, **kwargs):
-        # Recent Django versions use their own iterable classes, where the
-        # QueryablePropertiesModelIterableMixin will be already mixed in. In
-        # older Django versions, the standalone legacy iterables are used
-        # instead to perform the queryable properties processing. Exceptions
-        # are legacy Date(Time)QuerySets, which don't support annotations
-        # and override the ordering anyway as well as querysets that don't
-        # yield model instances in Django 1.8, which doesn't require the
-        # legacy ordering setup.
-        if ('_iterable_class' not in self.__dict__ and
-                not (isinstance(self, ValuesQuerySet) and not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and
-                not (DateQuerySet and isinstance(self, DateQuerySet)) and
-                not (DateTimeQuerySet and isinstance(self, DateTimeQuerySet))):  # pragma: no cover
-            iterable_class = LegacyOrderingModelIterable
-            if not ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP:
-                iterable_class = LegacyModelIterable
-            elif isinstance(self, ValuesListQuerySet):
-                iterable_class = LegacyValuesListIterable
-            elif isinstance(self, ValuesQuerySet):
-                iterable_class = LegacyValuesIterable
-            return iter(iterable_class(self))
-        return super(QueryablePropertiesQuerySetMixin, self).iterator(*args, **kwargs)
+        if '_iterable_class' not in self.__dict__:
+            return iter(LegacyModelIterable(self))
+        return super().iterator(*args, **kwargs)
 
     def raw(self, *args, **kwargs):
-        queryset = super(QueryablePropertiesQuerySetMixin, self).raw(*args, **kwargs)
+        queryset = super().raw(*args, **kwargs)
         return QueryablePropertiesRawQuerySetMixin.inject_into_object(queryset)
 
     def update(self, **kwargs):
         # Resolve any queryable properties into their actual update kwargs
         # before calling the base update method.
         kwargs = self._resolve_update_kwargs(**kwargs)
-        return super(QueryablePropertiesQuerySetMixin, self).update(**kwargs)
+        return super().update(**kwargs)
 
     @classmethod
     def apply_to(cls, queryset):
@@ -410,7 +371,7 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
                  functionality.
         :rtype: QueryablePropertiesQuerySet
         """
-        return cls.inject_into_object(chain_queryset(queryset))
+        return cls.inject_into_object(queryset._chain())
 
 
 class QueryablePropertiesQuerySet(QueryablePropertiesQuerySetMixin, QuerySet):
@@ -440,10 +401,8 @@ class QueryablePropertiesManagerMixin(InjectableMixin):
     """
 
     def get_queryset(self):
-        queryset = getattr(super(QueryablePropertiesManagerMixin, self), MANAGER_QUERYSET_METHOD_NAME)()
+        queryset = super().get_queryset()
         return QueryablePropertiesQuerySetMixin.inject_into_object(queryset)
-
-    get_query_set = get_queryset
 
     def select_properties(self, *names):
         """

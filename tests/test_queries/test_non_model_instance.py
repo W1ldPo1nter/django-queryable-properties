@@ -1,9 +1,6 @@
-# encoding: utf-8
-
 from datetime import date
 
 import pytest
-from django import VERSION as DJANGO_VERSION
 
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
@@ -13,7 +10,7 @@ from ..app_management.models import (
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
-class TestAggregateAnnotations(object):
+class TestAggregateAnnotations:
 
     @pytest.mark.parametrize('model, filters, expected_version_counts', [
         (ApplicationWithClassBasedProperties, {}, {3, 4}),
@@ -63,9 +60,6 @@ class TestAggregateAnnotations(object):
         (CategoryWithDecoratorBasedProperties, ('pk', 'applications__pk'), 'applications__version_count', False, 3),
     ])
     def test_values_with_order_by_property(self, model, values, property_name, select, expected_count):
-        # In Django versions below 1.8, annotations used for ordering MUST be
-        # selected, which expectedly tinkers with the GROUPING.
-        expected_count += int(DJANGO_VERSION < (1, 8) and not select and property_name == 'version_count')
         queryset = model.objects.order_by(property_name)
         if select:
             queryset = queryset.select_properties(property_name)
@@ -106,9 +100,6 @@ class TestAggregateAnnotations(object):
         (('major_sum',), ('-version_count',), ('common_data', 'name', 'major_sum'), 2),
     ])
     def test_values_list_with_order_by_property(self, model, select, order_by, values_list, expected_count):
-        # In Django versions below 1.8, annotations used for ordering MUST be
-        # selected, which expectedly tinkers with the GROUPing.
-        expected_count += int(DJANGO_VERSION < (1, 8) and bool(values_list) and not select)
         expected_tuple_len = len(values_list) if values_list else (3 + len(select))
         queryset = model.objects.order_by(*order_by)
         if select:
@@ -130,7 +121,6 @@ class TestAggregateAnnotations(object):
             queryset = queryset.select_properties(*select)
         assert list(queryset.values_list(name, flat=True)) == expected_results
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="dates() couldn't be used with annotations before Django 1.8")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_dates(self, model):
         model.objects.all()[0].versions.filter(version='1.3.0').delete()
@@ -138,8 +128,7 @@ class TestAggregateAnnotations(object):
         assert list(queryset) == [date(2017, 1, 1), date(2018, 1, 1)]
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
-class TestExpressionAnnotations(object):
+class TestExpressionAnnotations:
 
     @pytest.mark.parametrize('model, filters, expected_versions', [
         (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
@@ -156,7 +145,6 @@ class TestExpressionAnnotations(object):
         versions = set(obj_dict['version'] for obj_dict in queryset)
         assert versions == expected_versions
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_group_by_property(self, model):
         queryset = model.objects.select_properties('highest_version').values('highest_version')

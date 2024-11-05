@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
-
 from collections import OrderedDict
 
-import six
 from django.contrib.admin.filters import (
     BooleanFieldListFilter, ChoicesFieldListFilter, DateFieldListFilter, FieldListFilter,
 )
@@ -15,7 +12,7 @@ from ..properties import MappingProperty
 from ..utils.internal import QueryPath, get_output_field, resolve_queryable_property
 
 
-class QueryablePropertyField(object):
+class QueryablePropertyField:
     """
     Wrapper class for queryable property that offers an attribute interface
     similar to Django fields. This allows to reuse Django's existing list
@@ -81,14 +78,13 @@ class QueryablePropertyField(object):
         if isinstance(self.property, MappingProperty):
             options = OrderedDict((to_value, to_value) for from_value, to_value in self.property.mappings)
             options.setdefault(self.property.default, self.empty_value_display)
-            for value, label in six.iteritems(options):
-                yield value, label
+            yield from options.items()
         elif not isinstance(self.output_field, BooleanField):
-            name = six.text_type(QueryPath(('', 'value')))
+            name = str(QueryPath(('', 'value')))
             queryset = QueryablePropertiesQuerySet.get_for_model(self.property_ref.model)
             queryset = queryset.annotate(**{name: self.property_ref.get_annotation()}).order_by(name).distinct()
             for value in queryset.values_list(name, flat=True):
-                yield value, six.text_type(value) if value is not None else self.empty_value_display
+                yield value, str(value) if value is not None else self.empty_value_display
 
     def get_filter_creator(self, list_filter_class=None):
         """
@@ -105,7 +101,7 @@ class QueryablePropertyField(object):
         list_filter_class = list_filter_class or QueryablePropertyListFilter.get_class(self)
 
         def creator(request, params, model, model_admin):
-            return list_filter_class(self, request, params, model, model_admin, six.text_type(self.property_path))
+            return list_filter_class(self, request, params, model, model_admin, str(self.property_path))
         return creator
 
 

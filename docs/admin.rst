@@ -84,7 +84,7 @@ using a ``super`` call:
     class MyAdmin(QueryablePropertiesAdmin):
 
         def get_list_filter(self, request):
-            list_filter = super(MyAdmin, self).get_list_filter(request)
+            list_filter = super().get_list_filter(request)
             # ... process the list filter sequence ...
             # Note: queryable property entries have been replaced with custom callables at this point.
             return list_filter

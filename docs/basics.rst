@@ -49,7 +49,7 @@ To do this, the individual methods that should make up the property can be passe
 
 .. code-block:: python
 
-    class MyClass(object):
+    class MyClass:
 
         def get_x(self):
             return self._x
