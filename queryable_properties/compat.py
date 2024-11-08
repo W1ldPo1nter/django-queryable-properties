@@ -12,7 +12,6 @@ except ImportError:  # pragma: no cover
     def nullcontext(enter_result=None):
         yield enter_result
 
-import six
 from django.contrib.admin.options import ModelAdmin
 from django.db.models import Manager
 from django.db.models.sql.query import Query
@@ -63,19 +62,6 @@ try:  # pragma: no cover
     from django.forms.utils import pretty_name  # noqa: F401
 except ImportError:  # pragma: no cover
     from django.forms.forms import pretty_name  # noqa: F401
-
-# A dictionary mapping names of build_filter/add_filter keyword arguments to
-# keyword arguments for an _add_q/add_q call. It contains kwargs names for
-# all Django versions (some do not use all of these). If a keyword argument
-# is not part of this dictionary, it will not be passed through.
-BUILD_FILTER_TO_ADD_Q_KWARGS_MAP = {
-    'can_reuse': 'used_aliases',
-    'branch_negated': 'branch_negated',
-    'current_negated': 'current_negated',
-    'allow_joins': 'allow_joins',
-    'split_subq': 'split_subq',
-    'force_having': 'force_having',
-}
 
 # Very old django versions (<1.6) had different names for the methods
 # containing the build_filter and _add_q logic, which are needed as the core
@@ -138,8 +124,17 @@ def convert_build_filter_to_add_q_kwargs(**build_filter_kwargs):
     :return: The keywords argument to use for :meth:`Query._add_q`.
     :rtype: dict
     """
-    return {BUILD_FILTER_TO_ADD_Q_KWARGS_MAP[key]: value for key, value in six.iteritems(build_filter_kwargs)
-            if key in BUILD_FILTER_TO_ADD_Q_KWARGS_MAP}
+    return {add_key: build_filter_kwargs[build_key] for build_key, add_key in (
+        ('can_reuse', 'used_aliases'),
+        ('branch_negated', 'branch_negated'),
+        ('current_negated', 'current_negated'),
+        ('allow_joins', 'allow_joins'),
+        ('split_subq', 'split_subq'),
+        ('force_having', 'force_having'),
+        ('check_filterable', 'check_filterable'),
+        ('summarize', 'summarize'),
+        ('update_join_types', 'update_join_types'),
+    ) if build_key in build_filter_kwargs}
 
 
 def chain_queryset(queryset, *args, **kwargs):
@@ -206,7 +201,7 @@ def get_related_model(model, relation_field_name):
         # Older Django versions (<1.8) only allowed to find reverse relation
         # objects as well as fields via the get_field_by_name method, which
         # doesn't exist in recent versions anymore.
-        field_or_rel, _, direct, _ = model._meta.get_field_by_name(relation_field_name)
+        field_or_rel, direct = model._meta.get_field_by_name(relation_field_name)[::2]
         # Unlike in recent Django versions, the reverse relation objects and
         # fields also didn't provide the same attributes, which is why they
         # need to be treated differently.
