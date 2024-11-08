@@ -38,8 +38,8 @@ class SubqueryFieldProperty(SubqueryMixin, QueryableProperty):
 
 class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
     """
-    A property that checks whether or not certain objects exist in the database
-    using a custom subquery.
+    A property that checks whether certain objects exist in the database using
+    a custom subquery.
     """
 
     def __init__(self, queryset, negated=False, **kwargs):
@@ -51,9 +51,9 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
                          callable without arguments that generates the internal
                          queryset.
         :type queryset: django.db.models.QuerySet | function
-        :param bool negated: Whether or not to negate the ``EXISTS`` subquery
-                             (i.e. the property will return ``True`` if no
-                             objects exist when using ``negated=True``).
+        :param bool negated: Whether to negate the ``EXISTS`` subquery (i.e.
+                             the property will return ``True`` if no objects
+                             exist when using ``negated=True``).
         """
         self.negated = negated
         super(SubqueryExistenceCheckProperty, self).__init__(queryset, **kwargs)

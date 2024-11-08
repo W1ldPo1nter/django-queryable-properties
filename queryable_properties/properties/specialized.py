@@ -76,19 +76,19 @@ class RangeCheckProperty(BooleanMixin, AnnotationMixin, QueryableProperty):
         :param value: The value which is tested against the boundary. May be a
                       callable which can be called without any arguments, whose
                       return value will then be used as the test value.
-        :param bool include_boundaries: Whether or not the value is considered
-                                        a part of the range if it is exactly
-                                        equal to one of the boundaries.
+        :param bool include_boundaries: Whether the value is considered a part
+                                        of the range if it is exactly equal to
+                                        one of the boundaries.
         :param bool in_range: Configures whether the property should return
                               ``True`` if the value is in range
                               (``in_range=True``) or if it is out of the range
                               (``in_range=False``). This also affects the
                               impact of the ``include_boundaries`` and
                               ``include_missing`` parameters.
-        :param bool include_missing: Whether or not a missing value is
-                                     considered a part of the range (see the
-                                     description of ``min_attribute_path``).
-                                     Useful e.g. for nullable fields.
+        :param bool include_missing: Whether a missing value is considered a
+                                     part of the range (see the description of
+                                     ``min_attribute_path``). Useful e.g. for
+                                     nullable fields.
         """
         self.min_attribute_getter = ModelAttributeGetter(min_attribute_path)
         self.max_attribute_getter = ModelAttributeGetter(max_attribute_path)

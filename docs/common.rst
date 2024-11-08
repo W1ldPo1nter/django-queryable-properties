@@ -527,12 +527,12 @@ For a quick overview, the ``AggregateProperty`` offers the following queryable p
 | Updating   | No        |
 +------------+-----------+
 
-``RelatedExistenceCheckProperty``: Checking whether or not certain related objects exist
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``RelatedExistenceCheckProperty``: Checking whether certain related objects exist
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A common use case for properties is checking whether or not at least one related object exists.
-For example, both the ``Application`` as well the ``Category`` models could define a property that checks whether or
-not any corresponding applications versions exist in the database.
+A common use case for properties is checking whether at least one related object exists.
+For example, both the ``Application`` as well the ``Category`` models could define a property that checks whether any
+corresponding applications versions exist in the database.
 
 Without *django-queryable-properties*, the implementation could look similar to this:
 
@@ -580,8 +580,7 @@ Instances of this property class take the query path to the related objects, whi
 using the ``__`` separator, as their first parameter.
 Additionally, the optional ``negated`` parameter can be used to set up the property to check for the *non-existence*
 of related objects instead.
-In queries, the given query path is extended with the ``__isnull`` lookup,  to determine whether or not related objects
-exist.
+In queries, the given query path is extended with the ``__isnull`` lookup,  to determine whether related objects exist.
 The path may also lead to a nullable field, which would allow to check for the existence of related objects that
 have a value for a certain field.
 
@@ -708,8 +707,8 @@ For a quick overview, the ``SubqueryFieldProperty`` offers the following queryab
 | Updating   | No        |
 +------------+-----------+
 
-``SubqueryExistenceCheckProperty``: Checking whether or not certain objects exist via a subquery
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``SubqueryExistenceCheckProperty``: Checking whether certain objects exist via a subquery
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The property class :class:`queryable_properties.properties.SubqueryExistenceCheckProperty` is similar to the
 :class:`queryable_properties.properties.RelatedExistenceCheckProperty` mentioned above, but can be used to perform
@@ -722,7 +721,7 @@ property's ``negated`` argument.
 
 For an example use case, certain applications may be so popular that they receive their own category with the same
 name as the application.
-To determine whether or not an application has its own category, a ``SubqueryExistenceCheckProperty`` could be used:
+To determine whether an application has its own category, a ``SubqueryExistenceCheckProperty`` could be used:
 
 .. code-block:: python
 

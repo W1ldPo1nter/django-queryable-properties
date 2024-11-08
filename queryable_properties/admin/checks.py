@@ -128,11 +128,11 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         :param model: The model the admin class is used for.
         :param QueryPath query_path: The query path to the queryable property.
         :param str label: A label to use for error messages.
-        :param bool allow_relation: Whether or not the queryable property
-                                    should be considered valid if it is
-                                    reached via relations.
-        :param bool allow_lookups: Whether or not the reference to the
-                                   queryable property may contain lookups.
+        :param bool allow_relation: Whether the queryable property should be
+                                    considered valid if it is reached via
+                                    relations.
+        :param bool allow_lookups: Whether the reference to the queryable
+                                   property may contain lookups.
         :return: A 2-tuple containing the resolved queryable property (if any)
                  as well as a list of check errors.
         :rtype: (queryable_properties.properties.QueryableProperty, list[Error])

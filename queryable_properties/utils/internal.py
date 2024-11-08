@@ -116,7 +116,7 @@ class NodeChecker(NodeProcessor):
     """
     A utility to test tree nodes against a condition specified by the
     configured function, which therefore must return a boolean value indicating
-    whether or not the condition was met.
+    whether the condition was met.
     """
 
     def check_leaves(self, node, **context):
@@ -318,9 +318,8 @@ class InjectableMixin(object):
                                name of the dynamically created class will be
                                the one of the object's original class. Will
                                be applied if a new class is created.
-        :param bool init: Whether or not to perform the initialization of
-                          injected attributes if the object's class was
-                          changed.
+        :param bool init: Whether to perform the initialization of injected
+                          attributes if the object's class was changed.
         :return: The (potentially) modified object.
         """
         new_class = cls.mix_with_class(obj.__class__, class_name)
