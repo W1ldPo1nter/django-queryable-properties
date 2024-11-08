@@ -67,8 +67,10 @@ inheritance scenarios) and must return an annotation - anything that would norma
 ``QuerySet.annotate`` call, like simple ``F`` objects, aggregates, ``Case`` expressions, ``Subquery`` expressions, etc.
 
 .. note::
-   The returned annotation object may reference the names of other annotatable queryable properties on the same model,
-   which will be resolved accordingly.
+   The returned annotation object may reference the names of other annotatable queryable properties on the same model
+   or related models, which will be resolved accordingly.
+   This means that queryable property annotations can be used inside of other queryable property annotations and thus
+   build upon each other.
 
 The ``AnnotationMixin`` and custom filter implementations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -92,7 +94,7 @@ bit more than just define the stub for the ``get_annotation`` method:
    when using other mixins (most notably the ``LookupFilterMixin`` - see
    :ref:`filters:Lookup-based filter functions/methods`) that override this method as well (the implementations
    override each other).
-   
+
    This is also relevant for the decorator-based approach as these mixins are automatically added to such properties
    when they use annotations or lookup-based filters.
    The order of the mixins for the class-based approach or the used decorators for the decorator-based approach is
@@ -303,14 +305,14 @@ Depending on which of the conditions is processed first, the results will be dif
   1. apply the ``major`` filter
   2. automatically add the ``version_str`` annotation
   3. apply the ``version_str`` filter
-  
+
   This will lead to only joining the ``ApplicationVersion`` table once and therefore correctly resulting in the filter
   combined with ``AND`` that was most likely intended.
 - If the ``version_str`` filter is applied first, the actions will be performed in this order:
   1. automatically add the ``version_str`` annotation
   2. apply the ``version_str`` filter
   3. apply the ``major`` filter
-  
+
   This will lead to two independent ``JOIN``s of the ``ApplicationVersion`` table, where each condition will only be
   applied to one of the joined tables, leading to more duplicate results and essentially an ``OR`` conjunction of the
   filter conditions.
