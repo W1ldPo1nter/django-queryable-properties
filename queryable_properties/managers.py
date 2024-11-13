@@ -11,7 +11,7 @@ from django.utils.functional import cached_property
 
 from .compat import (
     ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, DateQuerySet, DateTimeQuerySet, ModelIterable, RawModelIterable, RawQuery,
-    ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset, compat_call, compat_setattr,
+    ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset, compat_call,
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QUERYING_PROPERTIES_MARKER, inject_query_mixin
@@ -132,7 +132,7 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):  # pragma: no cover
         for property_ref in self._order_by_select:
             annotation_name = six.text_type(property_ref.full_path)
             select[annotation_name] = query.annotations[annotation_name]
-        compat_setattr(query, select, '_annotation_select_cache', '_aggregate_select_cache')
+        query._annotation_select_cache = select
 
 
 class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryablePropertiesIterableMixin):

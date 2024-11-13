@@ -150,6 +150,11 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             return getattr(self, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP[name])
         raise AttributeError()
 
+    def __setattr__(self, name, value):
+        # See __getattr__.
+        name = ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP.get(name, name)
+        super(QueryablePropertiesQueryMixin, self).__setattr__(name, value)
+
     @contextmanager
     def _add_queryable_property_annotation(self, property_ref, full_group_by, select=False):
         """
