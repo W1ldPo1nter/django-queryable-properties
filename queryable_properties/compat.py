@@ -2,6 +2,7 @@
 """A stable import interface for Django classes that were moved in between versions and compatibility constants."""
 
 from copy import deepcopy
+from operator import attrgetter
 
 try:  # pragma: no cover
     from contextlib import nullcontext  # noqa: F401
@@ -111,6 +112,53 @@ MANAGER_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(Manager, 'get_queryset'
 # The `get_queryset` method of ModelAdmins was called `queryset` in very old
 # Django versions.
 ADMIN_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
+
+
+def compat_getattr(obj, *attr_names):
+    """
+    Get an attribute value from an object while taking multiple attributes into account to allow compatibility with
+    multiple Python/Django versions.
+
+    :param obj: The object to get the attribute value from.
+    :param str attr_names: The attribute names to take into account in the given order. Names may use dot notation.
+    :return: The attribute value, taken from the first attribute in `attr_names` that exists on the given object.
+    """
+    for attr_name in attr_names:
+        try:
+            return attrgetter(attr_name)(obj)
+        except AttributeError:
+            continue
+    raise AttributeError()
+
+
+def compat_setattr(obj, value, *attr_names):
+    """
+    Set an attribute value on an object while taking multiple attributes into account to allow compatibility with
+    multiple Python/Django versions.
+
+    :param obj: The object to set the attribute value on.
+    :param value: The value to set.
+    :param str attr_names: The attribute names to take into account in the given order. The first attribute that exists
+                           will be set.
+    """
+    for attr_name in attr_names:
+        if hasattr(obj, attr_name):
+            setattr(obj, attr_name, value)
+            return
+    raise AttributeError()
+
+
+def compat_call(obj, method_names, *args, **kwargs):
+    """
+    Perform a method call on an object while taking multiple methods into account to allow compatibility with multiple
+    Python/Django versions.
+
+    :param obj: The object to call the method on.
+    :param collections.Sequence[str] method_names: The method names to take into account in the given order.
+    :return: The return value of the call of the first method that exists.
+    """
+    method = compat_getattr(obj, *method_names)
+    return method(*args, **kwargs)
 
 
 def convert_build_filter_to_add_q_kwargs(**build_filter_kwargs):
