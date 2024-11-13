@@ -88,7 +88,6 @@ elif hasattr(Query, 'need_force_having'):  # pragma: no cover
 # name instead of "annotation" in old django versions (<1.8), because
 # annotations were strongly tied to aggregates.
 ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP = {}
-ANNOTATION_SELECT_CACHE_NAME = '_annotation_select_cache'
 if not hasattr(Query, 'annotation_select'):  # pragma: no cover
     ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP = {
         'add_annotation': 'add_aggregate',
@@ -99,7 +98,6 @@ if not hasattr(Query, 'annotation_select'):  # pragma: no cover
         'annotation_select_mask': 'aggregate_select_mask',
         'set_annotation_mask': 'set_aggregate_mask',
     }
-    ANNOTATION_SELECT_CACHE_NAME = '_aggregate_select_cache'
 
 # Recent Django versions (>=2.0) have separate methods for cloning and chaining
 # while older versions only have the clone method.
