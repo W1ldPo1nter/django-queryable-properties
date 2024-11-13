@@ -15,7 +15,6 @@ except ImportError:  # pragma: no cover
     def nullcontext(enter_result=None):
         yield enter_result
 
-from django.contrib.admin.options import ModelAdmin
 from django.db.models.sql.query import Query
 
 try:  # pragma: no cover
@@ -96,10 +95,6 @@ QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
 # Very old django versions (<1.6) didn't have the names_to_path method yet;
 # its implementation was part of setup_joins instead.
 NAMES_TO_PATH_METHOD_NAME = 'names_to_path' if hasattr(Query, 'names_to_path') else 'setup_joins'
-
-# The `get_queryset` method of ModelAdmins was called `queryset` in very old
-# Django versions.
-ADMIN_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
 
 
 def compat_getattr(obj, *attr_names):
