@@ -1,5 +1,7 @@
 # encoding: utf-8
-"""A stable import interface for Django classes that were moved in between versions and compatibility constants."""
+"""
+A stable import interface for Python/Django entities across versions as well as compatibility constants and functions.
+"""
 
 from copy import deepcopy
 from operator import attrgetter
@@ -14,7 +16,6 @@ except ImportError:  # pragma: no cover
         yield enter_result
 
 from django.contrib.admin.options import ModelAdmin
-from django.db.models import Manager
 from django.db.models.sql.query import Query
 
 try:  # pragma: no cover
@@ -108,7 +109,6 @@ QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
 # its implementation was part of setup_joins instead.
 NAMES_TO_PATH_METHOD_NAME = 'names_to_path' if hasattr(Query, 'names_to_path') else 'setup_joins'
 
-MANAGER_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(Manager, 'get_queryset') else 'get_query_set'
 # The `get_queryset` method of ModelAdmins was called `queryset` in very old
 # Django versions.
 ADMIN_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'

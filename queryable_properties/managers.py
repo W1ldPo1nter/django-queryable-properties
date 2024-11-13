@@ -10,9 +10,8 @@ from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
 
 from .compat import (
-    ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, MANAGER_QUERYSET_METHOD_NAME, DateQuerySet,
-    DateTimeQuerySet, ModelIterable, RawModelIterable, RawQuery, ValuesListQuerySet, ValuesQuerySet, chain_query,
-    chain_queryset,
+    ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, DateQuerySet, DateTimeQuerySet, ModelIterable,
+    RawModelIterable, RawQuery, ValuesListQuerySet, ValuesQuerySet, chain_query, chain_queryset, compat_call,
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QUERYING_PROPERTIES_MARKER, inject_query_mixin
@@ -440,7 +439,7 @@ class QueryablePropertiesManagerMixin(InjectableMixin):
     """
 
     def get_queryset(self):
-        queryset = getattr(super(QueryablePropertiesManagerMixin, self), MANAGER_QUERYSET_METHOD_NAME)()
+        queryset = compat_call(super(QueryablePropertiesManagerMixin, self), ('get_queryset', 'get_query_set'))
         return QueryablePropertiesQuerySetMixin.inject_into_object(queryset)
 
     get_query_set = get_queryset
