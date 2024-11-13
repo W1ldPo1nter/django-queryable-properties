@@ -12,8 +12,8 @@ from django.utils.tree import Node
 
 from .compat import (
     ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, NAMES_TO_PATH_METHOD_NAME,
-    NEED_HAVING_METHOD_NAME, QUERY_CHAIN_METHOD_NAME, ValuesQuerySet, contains_aggregate,
-    convert_build_filter_to_add_q_kwargs, nullcontext,
+    QUERY_CHAIN_METHOD_NAME, ValuesQuerySet, compat_call, contains_aggregate, convert_build_filter_to_add_q_kwargs,
+    nullcontext,
 )
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
@@ -393,10 +393,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         node = obj if isinstance(obj, Node) else Node([obj])
         if aggregate_property_checker.check_leaves(node, model=self.model):
             return True
-        # The base method has different names in different Django versions (see
-        # comment on the constant definition).
-        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NEED_HAVING_METHOD_NAME)
-        return base_method(obj)
+        return compat_call(super(QueryablePropertiesQueryMixin, self), ('need_having', 'need_force_having'), obj)
 
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
         # This method is used to resolve field names in complex expressions. If
