@@ -92,10 +92,6 @@ if not hasattr(Query, 'annotation_select'):  # pragma: no cover
 # while older versions only have the clone method.
 QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
 
-# Very old django versions (<1.6) didn't have the names_to_path method yet;
-# its implementation was part of setup_joins instead.
-NAMES_TO_PATH_METHOD_NAME = 'names_to_path' if hasattr(Query, 'names_to_path') else 'setup_joins'
-
 
 def compat_getattr(obj, *attr_names):
     """

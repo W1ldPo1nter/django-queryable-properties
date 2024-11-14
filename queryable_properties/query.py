@@ -11,9 +11,8 @@ from django.db.models.sql.query import RawQuery
 from django.utils.tree import Node
 
 from .compat import (
-    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, NAMES_TO_PATH_METHOD_NAME,
-    QUERY_CHAIN_METHOD_NAME, ValuesQuerySet, compat_call, contains_aggregate, convert_build_filter_to_add_q_kwargs,
-    nullcontext,
+    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, QUERY_CHAIN_METHOD_NAME,
+    ValuesQuerySet, compat_call, contains_aggregate, convert_build_filter_to_add_q_kwargs, nullcontext,
 )
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
@@ -380,8 +379,13 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # correctly.
         if self._queryable_property_stack:
             names = self._queryable_property_stack[-1].relation_path + names
-        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NAMES_TO_PATH_METHOD_NAME)
-        return base_method(names, *args, **kwargs)
+        return compat_call(
+            super(QueryablePropertiesQueryMixin, self),
+            ('names_to_path', 'setup_joins'),
+            names,
+            *args,
+            **kwargs
+        )
 
     def need_force_having(self, q_object):  # pragma: no cover
         # Same as need_having, but for even older versions. Simply delegate to
@@ -423,9 +427,10 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # versions. Simply delegate to the overridden names_to_path in this
         # case, which is aware of the different methods in different versions
         # and therefore calls the correct super method.
-        if NAMES_TO_PATH_METHOD_NAME == 'setup_joins':  # pragma: no cover
+        base = super(QueryablePropertiesQueryMixin, self)
+        if not hasattr(base, 'names_to_path'):  # pragma: no cover
             return self.names_to_path(names, *args, **kwargs)
-        return super(QueryablePropertiesQueryMixin, self).setup_joins(names, *args, **kwargs)
+        return base.setup_joins(names, *args, **kwargs)
 
 
 class QueryablePropertiesRawQueryMixin(QueryablePropertiesBaseQueryMixin):
