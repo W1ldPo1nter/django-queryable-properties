@@ -203,7 +203,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
                     # In old versions, the fields must be added to the selected
                     # fields manually and set_group_by must be called after.
                     opts = self.model._meta
-                    self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
+                    self.add_fields([f.attname for f in compat_getattr(opts, 'concrete_fields', 'fields')], False)
                 self.set_group_by()
 
     def _auto_annotate(self, query_path, full_group_by=None):
@@ -351,7 +351,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             # dynamically to pass the given arguments through properly.
             add_q = compat_getattr(self, '_add_q', 'add_q')
             final_kwargs = {arg_name: kwargs[arg_name] for arg_name in get_arg_names(add_q)[2:] if arg_name in kwargs}
-            final_kwargs['used_aliases'] = kwargs.get('can_reuse')
+            final_kwargs.setdefault('used_aliases', kwargs.get('can_reuse'))
             return add_q(q_obj, **final_kwargs)
 
     def get_aggregation(self, *args, **kwargs):

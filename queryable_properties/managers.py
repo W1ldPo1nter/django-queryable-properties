@@ -35,8 +35,7 @@ class LegacyIterable(object):
         self.queryset = queryset
 
     def __iter__(self):
-        original = super(InjectableMixin, self.queryset)
-        return getattr(original, 'iterator', original.__iter__)()
+        return compat_call(super(InjectableMixin, self.queryset), ('iterator', '__iter__'))
 
 
 class QueryablePropertiesIterableMixin(object):
@@ -360,7 +359,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
             # certain fields. Since only certain types of queries had the
             # _fields attribute in old Django versions, fall back to checking
             # for existing selection, on which the GROUP BY would be based.
-            full_group_by = not getattr(self, '_fields', self.query.select)
+            full_group_by = not compat_getattr(self, '_fields', 'query.select')
             with queryset.query._add_queryable_property_annotation(property_ref, full_group_by, select=True):
                 pass
         return queryset
