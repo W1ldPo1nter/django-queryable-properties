@@ -7,12 +7,11 @@ from contextlib import contextmanager
 
 import six
 from django.db.models import F
-from django.db.models.sql.query import RawQuery
 from django.utils.tree import Node
 
 from .compat import (
-    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, QUERY_CHAIN_METHOD_NAME,
-    ValuesQuerySet, compat_call, contains_aggregate, convert_build_filter_to_add_q_kwargs, nullcontext,
+    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, ValuesQuerySet, compat_call,
+    contains_aggregate, convert_build_filter_to_add_q_kwargs, nullcontext,
 )
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
@@ -106,31 +105,26 @@ class QueryablePropertiesBaseQueryMixin(InjectableMixin):
         # Determines whether to inject the QUERYING_PROPERTIES_MARKER.
         self._use_querying_properties_marker = False
 
-    def _postprocess_clone(self, clone):
-        """
-        Postprocess a query that was the result of cloning this query. This
-        ensures that the cloned query also uses the correct mixin and that the
-        queryable property attributes are initialized correctly.
-
-        :param django.db.models.sql.Query clone: The cloned query.
-        :return: The postprocessed cloned query.
-        :rtype: django.db.models.sql.Query
-        """
-        inject_query_mixin(clone)
-        clone.init_injected_attrs()
-        clone._queryable_property_annotations.update(self._queryable_property_annotations)
-        return clone
-
     def clone(self, *args, **kwargs):
-        obj = super(QueryablePropertiesBaseQueryMixin, self).clone(*args, **kwargs)
-        if QUERY_CHAIN_METHOD_NAME == 'clone':  # pragma: no cover
-            obj = self._postprocess_clone(obj)
-        return obj
+        # Very old Django versions didn't have the chain method yet. Simply
+        # delegate to the overridden chain in this case, which is aware of the
+        # different methods in different versions and therefore calls the
+        # correct super method.
+        original = super(QueryablePropertiesBaseQueryMixin, self)
+        if not hasattr(original, 'chain'):  # pragma: no cover
+            return self.chain(*args, **kwargs)
+        return original.clone(*args, **kwargs)
 
     def chain(self, *args, **kwargs):
-        obj = super(QueryablePropertiesBaseQueryMixin, self).chain(*args, **kwargs)
-        if QUERY_CHAIN_METHOD_NAME == 'chain':
-            obj = self._postprocess_clone(obj)
+        obj = compat_call(super(QueryablePropertiesBaseQueryMixin, self), ('chain', 'clone'), *args, **kwargs)
+        # Ensure that the proper mixin is added to the cloned object as
+        # chaining may change the clone's class.
+        for mixin in QueryablePropertiesBaseQueryMixin.__subclasses__():
+            if isinstance(self, mixin):
+                mixin.inject_into_object(obj, 'QueryableProperties' + obj.__class__.__name__)
+                break
+        obj.init_injected_attrs()
+        obj._queryable_property_annotations.update(self._queryable_property_annotations)
         return obj
 
 
@@ -427,10 +421,10 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # versions. Simply delegate to the overridden names_to_path in this
         # case, which is aware of the different methods in different versions
         # and therefore calls the correct super method.
-        base = super(QueryablePropertiesQueryMixin, self)
-        if not hasattr(base, 'names_to_path'):  # pragma: no cover
+        original = super(QueryablePropertiesQueryMixin, self)
+        if not hasattr(original, 'names_to_path'):  # pragma: no cover
             return self.names_to_path(names, *args, **kwargs)
-        return base.setup_joins(names, *args, **kwargs)
+        return original.setup_joins(names, *args, **kwargs)
 
 
 class QueryablePropertiesRawQueryMixin(QueryablePropertiesBaseQueryMixin):
@@ -457,17 +451,3 @@ class QueryablePropertiesRawQueryMixin(QueryablePropertiesBaseQueryMixin):
         if self._use_querying_properties_marker:
             columns.insert(0, QUERYING_PROPERTIES_MARKER)
         return columns
-
-
-def inject_query_mixin(query):
-    """
-    Inject the correct query mixin into the given query.
-
-    :param query: The query to inject queryable properties functionality into.
-    :type query: django.db.models.sql.Query | django.db.models.sql.RawQuery
-    :return: The extended query object.
-    """
-    mixin = QueryablePropertiesQueryMixin
-    if isinstance(query, RawQuery):
-        mixin = QueryablePropertiesRawQueryMixin
-    return mixin.inject_into_object(query, 'QueryableProperties' + query.__class__.__name__)

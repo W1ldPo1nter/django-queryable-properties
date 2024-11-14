@@ -40,9 +40,9 @@ except ImportError:  # pragma: no cover
     ModelIterable = None
 
 try:  # pragma: no cover
-    from django.db.models.query import RawModelIterable
+    from django.db.models.query import RawModelIterable  # noqa: F401
 except ImportError:  # pragma: no cover
-    RawModelIterable = None
+    RawModelIterable = None  # noqa: F401
 
 try:  # pragma: no cover
     from django.db.models.query import DateQuerySet  # noqa: F401
@@ -53,11 +53,6 @@ try:  # pragma: no cover
     from django.db.models.query import DateTimeQuerySet  # noqa: F401
 except ImportError:  # pragma: no cover
     DateTimeQuerySet = None  # noqa: F401
-
-try:  # pragma: no cover
-    from django.db.models.sql.query import RawQuery
-except ImportError:  # pragma: no cover
-    RawQuery = None
 
 try:  # pragma: no cover
     from django.forms.utils import pretty_name  # noqa: F401
@@ -87,10 +82,6 @@ if not hasattr(Query, 'annotation_select'):  # pragma: no cover
         'annotation_select_mask': 'aggregate_select_mask',
         'set_annotation_mask': 'set_aggregate_mask',
     }
-
-# Recent Django versions (>=2.0) have separate methods for cloning and chaining
-# while older versions only have the clone method.
-QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
 
 
 def compat_getattr(obj, *attr_names):
@@ -180,21 +171,6 @@ def chain_queryset(queryset, *args, **kwargs):
     if hasattr(queryset, '_clone'):
         return queryset._clone(*args, **kwargs)
     return deepcopy(queryset)  # pragma: no cover
-
-
-def chain_query(query, *args, **kwargs):
-    """
-    Create a copy of the given query to chain a new query method call by
-    calling the appropriate chain/clone method for the current Django version.
-
-    :param Query query: The query to chain.
-    :param args: Positional arguments passed through to the method call.
-    :param kwargs: Keyword arguments passed through to the method call.
-    :return: A copy of given query.
-    :rtype: Query
-    """
-    method = getattr(query, QUERY_CHAIN_METHOD_NAME)
-    return method(*args, **kwargs)
 
 
 def contains_aggregate(annotation):
