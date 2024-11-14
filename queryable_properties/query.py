@@ -10,8 +10,8 @@ from django.db.models import F
 from django.utils.tree import Node
 
 from .compat import (
-    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, ValuesQuerySet, compat_call,
-    contains_aggregate, convert_build_filter_to_add_q_kwargs, nullcontext,
+    ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, ValuesQuerySet, compat_call, compat_getattr, contains_aggregate,
+    get_arg_names, nullcontext,
 )
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
@@ -261,13 +261,14 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # versions. Since recent versions still have an add_filter method (for
         # different purposes), the queryable properties customizations should
         # only occur in old versions.
-        if BUILD_FILTER_METHOD_NAME == 'add_filter':
+        original = super(QueryablePropertiesQueryMixin, self)
+        if not hasattr(original, 'build_filter'):
             # Simply use the build_filter implementation that does all the
             # heavy lifting and is aware of the different methods in different
             # versions and therefore calls the correct super methods if
             # necessary.
             return self.build_filter(*args, **kwargs)
-        return super(QueryablePropertiesQueryMixin, self).add_filter(*args, **kwargs)
+        return original.add_filter(*args, **kwargs)
 
     def add_ordering(self, *ordering, **kwargs):
         ordering = list(ordering)
@@ -324,10 +325,13 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # exception. Act the same way if the current top of the stack is used
         # to avoid infinite recursions.
         if not property_ref or (self._queryable_property_stack and self._queryable_property_stack[-1] == property_ref):
-            # The base method has different names in different Django versions
-            # (see comment on the constant definition).
-            base_method = getattr(super(QueryablePropertiesQueryMixin, self), BUILD_FILTER_METHOD_NAME)
-            return base_method(filter_expr, *args, **kwargs)
+            return compat_call(
+                super(QueryablePropertiesQueryMixin, self),
+                ('build_filter', 'add_filter'),
+                filter_expr,
+                *args,
+                **kwargs
+            )
 
         q_obj = property_ref.get_filter(lookups, value)
         # Before applying the filter implemented by the property, check if
@@ -341,12 +345,14 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
 
         with context:
             # Luckily, build_filter and _add_q use the same return value
-            # structure, so an _add_q call can be used to actually create the
-            # return value for the current call. The (_)add_q method has
-            # different names in different Django versions (see comment on the
-            # constant definition).
-            method = getattr(self, ADD_Q_METHOD_NAME)
-            return method(q_obj, **convert_build_filter_to_add_q_kwargs(**kwargs))
+            # structure, so an (_)add_q call can be used to actually create the
+            # return value for the current call. (_)add_q arguments differ
+            # between Django versions, so its arguments are inspected
+            # dynamically to pass the given arguments through properly.
+            add_q = compat_getattr(self, '_add_q', 'add_q')
+            final_kwargs = {arg_name: kwargs[arg_name] for arg_name in get_arg_names(add_q)[2:] if arg_name in kwargs}
+            final_kwargs['used_aliases'] = kwargs.get('can_reuse')
+            return add_q(q_obj, **final_kwargs)
 
     def get_aggregation(self, *args, **kwargs):
         # If the query is to be used as a pure aggregate query (which might use

@@ -15,6 +15,11 @@ except ImportError:  # pragma: no cover
     def nullcontext(enter_result=None):
         yield enter_result
 
+try:  # pragma: no cover
+    from inspect import getfullargspec
+except ImportError:  # pragma: no cover
+    from inspect import getargspec as getfullargspec
+
 from django.db.models.sql.query import Query
 
 try:  # pragma: no cover
@@ -58,15 +63,6 @@ try:  # pragma: no cover
     from django.forms.utils import pretty_name  # noqa: F401
 except ImportError:  # pragma: no cover
     from django.forms.forms import pretty_name  # noqa: F401
-
-# Very old django versions (<1.6) had different names for the methods
-# containing the build_filter and _add_q logic, which are needed as the core
-# for filters based on queryable properties.
-BUILD_FILTER_METHOD_NAME = 'build_filter'
-ADD_Q_METHOD_NAME = '_add_q'
-if not hasattr(Query, 'build_filter'):  # pragma: no cover
-    BUILD_FILTER_METHOD_NAME = 'add_filter'
-    ADD_Q_METHOD_NAME = 'add_q'
 
 # The annotation-related attributes of Query objects had "aggregate" in their
 # name instead of "annotation" in old django versions (<1.8), because
@@ -131,28 +127,17 @@ def compat_call(obj, method_names, *args, **kwargs):
     return method(*args, **kwargs)
 
 
-def convert_build_filter_to_add_q_kwargs(**build_filter_kwargs):
+def get_arg_names(func):
     """
-    Transform the keyword arguments of a :meth:`Query.build_filter` call into
-    keyword arguments for an appropriate :meth:`Query._add_q` call (or their
-    respective counterparts in older Django versions).
+    Get a list of all non-variadic argument names (including keyword-only arguments in newer Python versions) of the
+    given function.
 
-    :param build_filter_kwargs: The keyword arguments passed to
-                                :meth:`Query.build_filter`.
-    :return: The keywords argument to use for :meth:`Query._add_q`.
-    :rtype: dict
+    :param function func: The function to get the argument names from.
+    :return: The argument names of all non-variadic arguments.
+    :rtype: list[str]
     """
-    return {add_key: build_filter_kwargs[build_key] for build_key, add_key in (
-        ('can_reuse', 'used_aliases'),
-        ('branch_negated', 'branch_negated'),
-        ('current_negated', 'current_negated'),
-        ('allow_joins', 'allow_joins'),
-        ('split_subq', 'split_subq'),
-        ('force_having', 'force_having'),
-        ('check_filterable', 'check_filterable'),
-        ('summarize', 'summarize'),
-        ('update_join_types', 'update_join_types'),
-    ) if build_key in build_filter_kwargs}
+    spec = getfullargspec(func)
+    return spec.args + getattr(spec, 'kwonlyargs', [])
 
 
 def chain_queryset(queryset, *args, **kwargs):
