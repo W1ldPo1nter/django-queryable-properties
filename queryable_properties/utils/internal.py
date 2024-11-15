@@ -239,7 +239,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
 
 class InjectableMixin(object):
     """
-    A base class for mixin classes that are used to dynamically created classes
+    A base class for mixin classes that are used to dynamically create classes
     based on a base class and the mixin class.
     """
 

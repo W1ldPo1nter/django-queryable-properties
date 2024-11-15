@@ -212,7 +212,7 @@ class TestDecorators(object):
         cls_method = classmethod(func)
 
         prop = queryable_property()
-        # Test both regular functions as well as class methods
+        # Test both regular functions and class methods
         assert prop._extract_function(func) is func
         assert prop._extract_function(cls_method) is func
 
