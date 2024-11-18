@@ -2,7 +2,6 @@
 import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Q
-from mock import patch
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (
@@ -220,14 +219,12 @@ class TestSubqueryMixin(object):
     def test_initializer(self, kwargs):
         cls = SubqueryMixin.mix_with_class(QueryableProperty)
         prop = cls(**kwargs)
-        assert prop.queryset is kwargs['queryset']
+        assert prop._queryset is kwargs['queryset']
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
 
     @pytest.mark.parametrize('use_function', [False, True])
-    def test_get_annotation(self, use_function):
+    def test_queryset(self, use_function):
         cls = SubqueryMixin.mix_with_class(QueryableProperty)
         queryset = ApplicationWithClassBasedProperties.objects.all()
         prop = cls((lambda: queryset) if use_function else queryset)
-        with patch.object(prop, '_build_subquery') as mock_build_queryset:
-            assert prop.get_annotation(ApplicationWithClassBasedProperties) == mock_build_queryset.return_value
-            mock_build_queryset.assert_called_once_with(queryset)
+        assert prop.queryset is queryset

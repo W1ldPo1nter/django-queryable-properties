@@ -30,10 +30,10 @@ class SubqueryFieldProperty(SubqueryMixin, QueryableProperty):
         self.output_field = output_field
         super(SubqueryFieldProperty, self).__init__(queryset, **kwargs)
 
-    def _build_subquery(self, queryset):
+    def get_annotation(self, cls):
         from django.db.models import Subquery
 
-        return Subquery(queryset.values(self.field_name)[:1], output_field=self.output_field)
+        return Subquery(self.queryset.values(self.field_name)[:1], output_field=self.output_field)
 
 
 class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
@@ -58,10 +58,10 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
         self.negated = negated
         super(SubqueryExistenceCheckProperty, self).__init__(queryset, **kwargs)
 
-    def _build_subquery(self, queryset):
+    def get_annotation(self, cls):
         from django.db.models import Exists
 
-        subquery = Exists(queryset)
+        subquery = Exists(self.queryset)
         if self.negated:
             subquery = ~subquery
         return subquery
