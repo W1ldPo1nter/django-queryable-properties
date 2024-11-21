@@ -50,13 +50,15 @@ class TestQueryablePropertyDescriptor(object):
         assert isinstance(descriptor, QueryablePropertyDescriptor)
         assert descriptor.prop is dummy_property
 
-    @pytest.mark.parametrize('cached, clear_cache, expected_values', [
-        (False, False, [1, 2, 3, 4, 5]),  # The implementation of the dummy property returns increasing values ...
-        (False, True, [1, 2, 3, 4, 5]),  # ... and cache clears shoudn't matter if caching was disabled all along
-        (True, False, [1, 1, 1, 1, 1]),  # Caching is enabled (and never cleared); first value should always be returned
-        (True, True, [1, 2, 3, 4, 5]),  # Cache is cleared every time; expect the same result like without caching
+    @pytest.mark.parametrize('ignore, cached, clear_cache, expected_values', [
+        (False, False, False, [1, 2, 3, 4, 5]),  # The implementation of the dummy property returns increasing values
+        (False, True, False, [1, 1, 1, 1, 1]),  # Values are cached and never cleared, resulting in the first value
+        (False, True, True, [1, 2, 3, 4, 5]),  # Cache is cleared every time; expect the same result as without caching
+        (True, True, False, [1, 2, 3, 4, 5]),  # Values are cached and never cleared, but cached values are ignored
     ])
-    def test_get(self, monkeypatch, dummy_property, model_instance, cached, clear_cache, expected_values):
+    def test_get(self, monkeypatch, dummy_property, model_instance, ignore, cached, clear_cache, expected_values):
+        descriptor = getattr(dummy_property.model, dummy_property.name)
+        monkeypatch.setattr(descriptor, '_ignore_cached_value', ignore)
         monkeypatch.setattr(dummy_property, 'cached', cached)
         for expected_value in expected_values:
             assert getattr(model_instance, dummy_property.name) == expected_value

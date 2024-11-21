@@ -29,6 +29,8 @@ class QueryablePropertyDescriptor(property):
     be used in the initializer kwargs of models.
     """
 
+    _ignore_cached_value = False  #: Internal flag that allows to ignore cached values in getter/setter interactions.
+
     def __new__(cls, prop):
         """
         Construct a new QueryablePropertyDescriptor for the given queryable
@@ -48,7 +50,7 @@ class QueryablePropertyDescriptor(property):
         # Always check for cached values first regardless of the associated
         # property being configured as cached since values will also be cached
         # through annotation selections.
-        if self.has_cached_value(obj):
+        if not self._ignore_cached_value and self.has_cached_value(obj):
             return self.get_cached_value(obj)
         if not self.prop.get_value:
             raise AttributeError('Unreadable queryable property.')
@@ -68,7 +70,7 @@ class QueryablePropertyDescriptor(property):
         return_value = self.prop.set_value(obj, value)
         # If a value is set and the property is set up to cache values or has
         # a current cached value, invoke the configured setter cache behavior.
-        if self.prop.cached or self.has_cached_value(obj):
+        if self.prop.cached or (not self._ignore_cached_value and self.has_cached_value(obj)):
             self.prop.setter_cache_behavior(self, obj, value, return_value)
 
     def __str__(self):
