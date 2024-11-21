@@ -91,13 +91,10 @@ class TestQueryPath(object):
         assert isinstance(result, expected_result.__class__)
         assert result == expected_result
 
-    def test_string_representation(self):
+    def test_str_repr(self):
         query_path = QueryPath(('a', 'b', 'c'))
-        assert six.text_type(query_path) == 'a__b__c'
-
-    def test_representation(self):
-        query_path = QueryPath(('a', 'b'))
-        assert repr(query_path) == '<QueryPath: a__b>'
+        assert six.text_type(query_path) == query_path.as_str() == 'a__b__c'
+        assert repr(query_path) == '<QueryPath: a__b__c>'
 
     def test_build_filter(self):
         path = 'a__b__c'

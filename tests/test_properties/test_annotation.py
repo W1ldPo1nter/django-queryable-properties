@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import pytest
-import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Avg, Q
 
@@ -73,7 +72,7 @@ class TestRelatedExistenceCheckProperty(object):
         condition = prop._base_condition
         assert isinstance(condition, Q)
         assert len(condition.children) == 1
-        assert condition.children[0] == (six.text_type(QueryPath(path) + 'isnull'), False)
+        assert condition.children[0] == ((QueryPath(path) + 'isnull').as_str(), False)
 
     @pytest.mark.parametrize('negated', [False, True])
     def test_getter(self, monkeypatch, categories, applications, negated):

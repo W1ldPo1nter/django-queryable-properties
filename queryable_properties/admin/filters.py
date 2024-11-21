@@ -84,7 +84,7 @@ class QueryablePropertyField(object):
             for value, label in six.iteritems(options):
                 yield value, label
         elif not isinstance(self.output_field, BooleanField):
-            name = six.text_type(QueryPath(('', 'value')))
+            name = QueryPath(('', 'value')).as_str()
             queryset = QueryablePropertiesQuerySet.get_for_model(self.property_ref.model)
             queryset = queryset.annotate(**{name: self.property_ref.get_annotation()}).order_by(name).distinct()
             for value in queryset.values_list(name, flat=True):
@@ -105,7 +105,7 @@ class QueryablePropertyField(object):
         list_filter_class = list_filter_class or QueryablePropertyListFilter.get_class(self)
 
         def creator(request, params, model, model_admin):
-            return list_filter_class(self, request, params, model, model_admin, six.text_type(self.property_path))
+            return list_filter_class(self, request, params, model, model_admin, self.property_path.as_str())
         return creator
 
 

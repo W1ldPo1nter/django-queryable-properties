@@ -171,7 +171,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
                                          .format(property_ref.property))
 
-        annotation_name = six.text_type(property_ref.full_path)
+        annotation_name = property_ref.full_path.as_str()
         annotation_mask = set(self.annotations if self.annotation_select_mask is None else self.annotation_select_mask)
         was_present = property_ref in self._queryable_property_annotations
         was_selected = was_present and (self.annotation_select_mask is None or
@@ -246,7 +246,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             # If it is based on a queryable property annotation, annotating the
             # current aggregate cannot be delegated to Django as it couldn't
             # deal with annotations containing the lookup separator.
-            aggregate.add_to_query(self, alias, six.text_type(query_path), property_annotation, is_summary)
+            aggregate.add_to_query(self, alias, query_path.as_str(), property_annotation, is_summary)
         else:
             # The overridden method also allows to set a default value for the
             # model parameter, which will be missing if add_annotation calls are
@@ -285,7 +285,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
                 item, transforms = self._auto_annotate(query_path)
                 if item and hasattr(F, 'resolve_expression'):
                     if not transforms:
-                        item = F(six.text_type(query_path))
+                        item = F(query_path.as_str())
                     for transform in transforms:
                         item = self.try_transform(item, transform)
                     ordering[index] = item.desc() if descending else item.asc()
@@ -359,8 +359,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # a subquery), all queryable property annotations must be added to the
         # select mask to avoid potentially empty SELECT clauses.
         if self.annotation_select_mask is not None and self._queryable_property_annotations:
-            annotation_names = (six.text_type(property_ref.full_path) for property_ref
-                                in self._queryable_property_annotations)
+            annotation_names = (ref.full_path.as_str() for ref in self._queryable_property_annotations)
             self.set_annotation_mask(set(self.annotation_select_mask).union(annotation_names))
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
 

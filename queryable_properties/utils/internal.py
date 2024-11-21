@@ -59,10 +59,19 @@ class QueryPath(tuple):
         return self.__class__(super(QueryPath, self).__getslice__(i, j))
 
     def __str__(self):
-        return LOOKUP_SEP.join(self)
+        return self.as_str()
 
     def __repr__(self):
-        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
+        return '<{}: {}>'.format(self.__class__.__name__, self.as_str())
+
+    def as_str(self):
+        """
+        Return this query path in string form.
+
+        :return: The query path as a string.
+        :rtype: str
+        """
+        return LOOKUP_SEP.join(self)
 
     def build_filter(self, value):
         """
@@ -72,7 +81,7 @@ class QueryPath(tuple):
         :return: The filter condition as a Q object.
         :rtype: django.db.models.Q
         """
-        return Q(**{six.text_type(self): value})
+        return Q(**{self.as_str(): value})
 
 
 class NodeProcessor(object):
@@ -170,7 +179,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
     property across relations.
     """
     __slots__ = ()
-    node_modifier = NodeModifier(lambda item, ref: (six.text_type(ref.relation_path + item[0]), item[1]))
+    node_modifier = NodeModifier(lambda item, ref: ((ref.relation_path + item[0]).as_str(), item[1]))
 
     @property
     def full_path(self):
@@ -212,7 +221,7 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         # Use the model stored on this reference instead of the one on the
         # property since the query may be happening from a subclass of the
         # model the property is defined on.
-        q_obj = self.property.get_filter(self.model, six.text_type(lookups) or 'exact', value)
+        q_obj = self.property.get_filter(self.model, lookups.as_str() or 'exact', value)
         if self.relation_path:
             # If the resolved property belongs to a related model, all actual
             # conditions in the returned Q object must be modified to use the
