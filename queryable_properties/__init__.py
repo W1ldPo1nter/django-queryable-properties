@@ -3,6 +3,11 @@
 
 from __future__ import unicode_literals
 
+from .compat import apps_config
+
+if not hasattr(apps_config, 'APPS_MODULE_NAME'):
+    default_app_config = 'queryable_properties.apps.QueryablePropertiesConfig'
+
 __version__ = '1.9.3'
 __author__ = 'Marcus Klöpfel'
 __copyright__ = 'Copyright 2024, Marcus Klöpfel'
