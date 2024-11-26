@@ -23,9 +23,9 @@ except ImportError:  # pragma: no cover
 from django.db.models.sql.query import Query
 
 try:  # pragma: no cover
-    from django.apps import config as apps_config  # noqa: F401
+    from django.apps import AppConfig  # noqa: F401
 except ImportError:  # pragma: no cover
-    apps_config = None  # noqa: F401
+    AppConfig = None  # noqa: F401
 
 try:  # pragma: no cover
     from django.contrib.admin import validation as admin_validation  # noqa: F401

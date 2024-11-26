@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-from .compat import apps_config
+from .compat import AppConfig
 
 
-class QueryablePropertiesConfig(getattr(apps_config, 'AppConfig', object)):
+class QueryablePropertiesConfig(AppConfig or object):
     name = 'queryable_properties'
     ready_callbacks = []  #: Callbacks to run when the app registry is ready.
 
