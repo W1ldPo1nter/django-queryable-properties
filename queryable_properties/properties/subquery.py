@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import six
 
+from ..apps import QueryablePropertiesConfig
+from ..utils.internal import QueryPath, QueryablePropertyReference
 from .base import QueryableProperty
 from .mixins import SubqueryMixin
 
@@ -65,3 +68,83 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
         if self.negated:
             subquery = ~subquery
         return subquery
+
+
+class SubqueryObjectProperty(SubqueryFieldProperty):
+    """
+    A property that allows to fetch an entire model object from the first row
+    of a given subquery.
+
+    Each field value of the subquery object is queried using a
+    :class:`SubqueryFieldProperty`. A model instance is reconstructed from the
+    individual field values.
+    """
+
+    def __init__(self, queryset, field_names=None, **kwargs):
+        """
+        Initialize a new property that allows to fetch an entire model object
+        from the first row of a given subquery.
+
+        :param queryset: The internal queryset to use as the subquery or a
+                         callable without arguments that generates the internal
+                         queryset.
+        :type queryset: django.db.models.QuerySet | function
+        :param field_names: The names of the fields that should be queried for
+                            the subquery object. Fields not present in this
+                            sequence will be deferred. If not provided, all
+                            concrete fields of the object will be queried.
+        :type field_names: collections.Sequence[str] | None
+        """
+        super(SubqueryObjectProperty, self).__init__(queryset, 'pk', **kwargs)
+        self._descriptor = None
+        self._field_names = field_names
+        self._field_property_refs = {}
+
+    def _build_sub_properties(self):
+        """
+        Construct the sub-properties this property builds on, attach them to
+        the model class and store references to them in attributes.
+        """
+        for field in self.queryset.model._meta.concrete_fields:
+            if field.primary_key or (self._field_names is not None and field.name not in self._field_names):
+                continue
+            prop = SubqueryFieldProperty(self._queryset, field.attname, cached=self.cached)
+            prop.contribute_to_class(self.model, '-'.join((self.name, field.attname)))
+            self._field_property_refs[field.attname] = QueryablePropertyReference(prop, self.model, QueryPath())
+
+    def contribute_to_class(self, cls, name):
+        super(SubqueryObjectProperty, self).contribute_to_class(cls, name)
+        self._descriptor = getattr(cls, name)
+        self._descriptor._ignore_cached_value = True
+        # Build SubqueryFieldProperty objects for each field after Django is
+        # done initializing.
+        QueryablePropertiesConfig.add_ready_callback(self._build_sub_properties)
+
+    def get_value(self, obj):
+        if not self._descriptor.has_cached_value(obj):
+            # No value is cached at all: perform a single query to fetch the
+            # values for all fields and populate the cache for this property
+            # and all sub-properties.
+            names = [ref.property.name for ref in six.itervalues(self._field_property_refs)]
+            names.append(self.name)
+            values = self.get_queryset_for_object(obj).select_properties(*names).values(*names).get()
+            self._descriptor.set_cached_value(obj, values[self.name])
+            for ref in six.itervalues(self._field_property_refs):
+                ref.descriptor.set_cached_value(obj, values[ref.property.name])
+
+        value = self._descriptor.get_cached_value(obj)
+        if not isinstance(value, self.queryset.model):
+            # The cached value is a raw primary key. Use this value and the
+            # present cache values of all sub-properties to construct the final
+            # model instance.
+            names, values = [], []
+            for field in self.queryset.model._meta.concrete_fields:
+                if field.primary_key:
+                    names.append(field.attname)
+                    values.append(value)
+                elif (field.attname in self._field_property_refs and
+                        self._field_property_refs[field.attname].descriptor.has_cached_value(obj)):
+                    names.append(field.attname)
+                    values.append(self._field_property_refs[field.attname].descriptor.get_cached_value(obj))
+            value = self.queryset.model.from_db(self.queryset.db, names, values)
+        return value

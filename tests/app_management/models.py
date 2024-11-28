@@ -9,7 +9,7 @@ from queryable_properties.managers import QueryablePropertiesManager
 from queryable_properties.properties import (
     AggregateProperty, AnnotationGetterMixin, AnnotationMixin, AnnotationProperty, LookupFilterMixin, QueryableProperty,
     RangeCheckProperty, RelatedExistenceCheckProperty, SetterMixin, SubqueryExistenceCheckProperty,
-    SubqueryFieldProperty, UpdateMixin, ValueCheckProperty, queryable_property,
+    SubqueryFieldProperty, SubqueryObjectProperty, UpdateMixin, ValueCheckProperty, queryable_property,
 )
 from ..dummy_lib.models import ReleaseTypeModel
 
@@ -184,8 +184,13 @@ class ApplicationWithClassBasedProperties(Application):
                                                         .filter(application=models.OuterRef('pk'))
                                                         .order_by('-major', '-minor', '-patch')),
         field_name='version',
-        output_field=models.CharField()
+        output_field=models.CharField(),
     )
+    if DJANGO_VERSION >= (1, 11):
+        highest_version_object = SubqueryObjectProperty(
+            lambda: (VersionWithClassBasedProperties.objects.filter(application=models.OuterRef('pk'))
+                                                            .order_by('-major', '-minor', '-patch')),
+        )
     version_count = VersionCountProperty()
     stable_version_count = AggregateProperty(models.Count('versions', filter=models.Q(versions__release_type='s')))
     major_sum = AggregateProperty(models.Sum('versions__major'))
