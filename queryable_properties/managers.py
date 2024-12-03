@@ -16,7 +16,7 @@ from .compat import (
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin, QueryablePropertiesRawQueryMixin
 from .utils import get_queryable_property
-from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPath
+from .utils.internal import InjectableMixin
 
 
 class LegacyIterable(object):
@@ -354,7 +354,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         """
         queryset = chain_queryset(self)
         for name in names:
-            property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, QueryPath())
+            property_ref = get_queryable_property(self.model, name)._get_ref(self.model)
             # A full GROUP BY is required if the query is not limited to
             # certain fields. Since only certain types of queries had the
             # _fields attribute in old Django versions, fall back to checking

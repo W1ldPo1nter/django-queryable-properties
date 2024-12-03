@@ -2,7 +2,6 @@
 import six
 
 from ..apps import QueryablePropertiesConfig
-from ..utils.internal import QueryPath, QueryablePropertyReference
 from .base import QueryableProperty
 from .mixins import SubqueryMixin
 
@@ -110,7 +109,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                 continue
             prop = SubqueryFieldProperty(self._queryset, field.attname, cached=self.cached)
             prop.contribute_to_class(self.model, '-'.join((self.name, field.attname)))
-            self._field_property_refs[field.attname] = QueryablePropertyReference(prop, self.model, QueryPath())
+            self._field_property_refs[field.attname] = prop._get_ref()
 
     def contribute_to_class(self, cls, name):
         super(SubqueryObjectProperty, self).contribute_to_class(cls, name)
@@ -140,11 +139,12 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             names, values = [], []
             for field in self.queryset.model._meta.concrete_fields:
                 if field.primary_key:
-                    names.append(field.attname)
                     values.append(value)
                 elif (field.attname in self._field_property_refs and
                         self._field_property_refs[field.attname].descriptor.has_cached_value(obj)):
-                    names.append(field.attname)
                     values.append(self._field_property_refs[field.attname].descriptor.get_cached_value(obj))
+                else:
+                    continue
+                names.append(field.attname)
             value = self.queryset.model.from_db(self.queryset.db, names, values)
         return value

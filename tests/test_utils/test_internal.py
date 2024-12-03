@@ -4,16 +4,16 @@ from collections import Counter
 import pytest
 import six
 from django import VERSION as DJANGO_VERSION
-from django.db.models import CharField, Count, IntegerField, Q, Sum
+from django.db.models import CharField, IntegerField, Q, Sum
 from six.moves import cPickle
 
-from queryable_properties.exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from queryable_properties.properties.base import QueryablePropertyDescriptor
+from queryable_properties.exceptions import QueryablePropertyDoesNotExist
+from queryable_properties.properties.base import QueryablePropertyDescriptor, QueryablePropertyReference
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import (
     MISSING_OBJECT, InjectableMixin, ModelAttributeGetter, NodeChecker, NodeModifier, NodeProcessor,
-    QueryablePropertyReference, QueryPath, get_output_field, get_queryable_property_descriptor,
-    parametrizable_decorator, resolve_queryable_property,
+    QueryPath, get_output_field, get_queryable_property_descriptor, parametrizable_decorator,
+    resolve_queryable_property,
 )
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
@@ -371,52 +371,6 @@ class TestGetQueryablePropertyDescriptor(object):
     def test_exception(self, model, property_name):
         with pytest.raises(QueryablePropertyDoesNotExist):
             get_queryable_property_descriptor(model, property_name)
-
-
-class TestQueryablePropertyReference(object):
-
-    @pytest.mark.parametrize('relation_path, expected_result', [
-        (QueryPath(), QueryPath('dummy')),
-        (QueryPath('application'), QueryPath('application__dummy')),
-    ])
-    def test_full_path(self, relation_path, expected_result):
-        prop = get_queryable_property(ApplicationWithClassBasedProperties, 'dummy')
-        ref = QueryablePropertyReference(prop, prop.model, relation_path)
-        assert ref.full_path == expected_result
-
-    def test_descriptor(self):
-        prop = get_queryable_property(ApplicationWithClassBasedProperties, 'dummy')
-        ref = QueryablePropertyReference(prop, prop.model, QueryPath())
-        assert ref.descriptor == ApplicationWithClassBasedProperties.dummy
-
-    @pytest.mark.parametrize('lookups, relation_path, expected_filter', [
-        (QueryPath(), QueryPath(), 'version_count__exact'),
-        (QueryPath('lt'), QueryPath(), 'version_count__lt'),
-        (QueryPath('date__year'), QueryPath('application'), 'application__version_count__date__year'),
-    ])
-    def test_get_filter(self, lookups, relation_path, expected_filter):
-        prop = get_queryable_property(ApplicationWithClassBasedProperties, 'version_count')
-        ref = QueryablePropertyReference(prop, prop.model, relation_path)
-        q = ref.get_filter(lookups, 1337)
-        assert isinstance(q, Q)
-        assert q.children == [(expected_filter, 1337)]
-
-    def test_get_filter_exception(self):
-        prop = get_queryable_property(ApplicationWithClassBasedProperties, 'dummy')
-        ref = QueryablePropertyReference(prop, prop.model, QueryPath())
-        with pytest.raises(QueryablePropertyError):
-            ref.get_filter(QueryPath(), None)
-
-    def test_get_annotation(self):
-        prop = get_queryable_property(ApplicationWithClassBasedProperties, 'version_count')
-        ref = QueryablePropertyReference(prop, prop.model, QueryPath())
-        assert isinstance(ref.get_annotation(), Count)
-
-    def test_get_annotation_exception(self):
-        prop = get_queryable_property(ApplicationWithClassBasedProperties, 'dummy')
-        ref = QueryablePropertyReference(prop, prop.model, QueryPath())
-        with pytest.raises(QueryablePropertyError):
-            ref.get_annotation()
 
 
 class TestResolveQueryableProperty(object):
