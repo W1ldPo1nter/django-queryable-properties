@@ -360,8 +360,7 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
             # _fields attribute in old Django versions, fall back to checking
             # for existing selection, on which the GROUP BY would be based.
             full_group_by = not compat_getattr(self, '_fields', 'query.select')
-            with queryset.query._add_queryable_property_annotation(property_ref, full_group_by, select=True):
-                pass
+            property_ref.annotate_query(queryset.query, full_group_by, select=True)
         return queryset
 
     def iterator(self, *args, **kwargs):

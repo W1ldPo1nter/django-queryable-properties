@@ -152,20 +152,19 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
     def _add_queryable_property_annotation(self, property_ref, full_group_by, select=False):
         """
         A context manager that adds a queryable property annotation to this
-        query and performs management tasks around the annotation (stores the
-        information if the queryable property annotation should be selected
-        and populates the queryable property stack correctly). The context
-        manager yields the actual resolved and applied annotation while the
-        stack is still populated.
+        query and performs management tasks around the annotation (stores
+        whether the queryable property annotation should be selected and
+        populates the queryable property stack correctly). The context manager
+        yields the actual resolved and applied annotation while the stack is
+        still populated.
 
         :param property_ref: A reference containing the queryable property
                              to annotate.
         :type property_ref: queryable_properties.utils.internal.QueryablePropertyReference
         :param bool full_group_by: Signals whether to use all fields of the
                                    query for the GROUP BY clause when dealing
-                                   with an aggregate-based annotation or not.
-        :param bool select: Signals whether the annotation should be selected
-                            or not.
+                                   with an aggregate-based annotation.
+        :param bool select: Signals whether the annotation should be selected.
         """
         if property_ref in self._queryable_property_stack:
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
@@ -231,8 +230,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             return None, lookups
         if full_group_by is None:
             full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
-        with self._add_queryable_property_annotation(property_ref, full_group_by) as annotation:
-            return annotation, lookups
+        return property_ref.annotate_query(self, full_group_by, remaining_path=lookups)
 
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
         # This method is called in older versions to add an aggregate, which
@@ -333,7 +331,6 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
                 **kwargs
             )
 
-        q_obj = property_ref.get_filter(lookups, value)
         # Before applying the filter implemented by the property, check if
         # the property signals the need of its own annotation to function.
         # If so, add the annotation first to avoid endless recursion, since
@@ -352,7 +349,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             add_q = compat_getattr(self, '_add_q', 'add_q')
             final_kwargs = {arg_name: kwargs[arg_name] for arg_name in get_arg_names(add_q)[2:] if arg_name in kwargs}
             final_kwargs.setdefault('used_aliases', kwargs.get('can_reuse'))
-            return add_q(q_obj, **final_kwargs)
+            return add_q(property_ref.get_filter(lookups, value), **final_kwargs)
 
     def get_aggregation(self, *args, **kwargs):
         # If the query is to be used as a pure aggregate query (which might use

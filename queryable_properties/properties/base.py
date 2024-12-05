@@ -530,3 +530,24 @@ class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'prope
         # property since the query may be happening from a subclass of the
         # model the property is defined on.
         return self.property.get_annotation(self.model)
+
+    def annotate_query(self, query, full_group_by, select=False, remaining_path=QueryPath()):
+        """
+        Add the annotation represented by the referenced property to the given
+        query.
+
+        :param django.db.models.sql.query.Query query: The query to add the
+                                                       annotation to.
+        :param bool full_group_by: Signals whether to use all fields of the
+                                   query for the GROUP BY clause when dealing
+                                   with an aggregate-based annotation.
+        :param bool select: Signals whether the annotation should be selected.
+        :param QueryPath remaining_path: The remaining query path of the
+                                         expression that referenced the
+                                         property.
+        :return: A 2-tuple containing the added annotation as well as the
+                 remaining query path (i.e. lookups/transforms).
+        :rtype: (django.db.models.expressions.BaseExpression, QueryPath)
+        """
+        with query._add_queryable_property_annotation(self, full_group_by, select=select) as annotation:
+            return annotation, remaining_path
