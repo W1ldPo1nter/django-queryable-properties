@@ -39,7 +39,9 @@ class AggregatePropertyChecker(NodeChecker):
         :param ignored_refs: Queryable property references that should not be
                              checked.
         :type ignored_refs: frozenset[queryable_properties.utils.internal.QueryablePropertyReference]
-        :return:
+        :return: True if the node or a subnode reference an aggregate property;
+                 otherwise False.
+        :rtype: bool
         """
         property_ref, lookups = resolve_queryable_property(model, QueryPath(item[0]))
         if not property_ref or property_ref in ignored_refs:
