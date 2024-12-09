@@ -2,8 +2,9 @@
 import six
 
 from ..apps import QueryablePropertiesConfig
-from .base import QueryableProperty
+from .base import QueryableProperty, QueryablePropertyReference
 from .mixins import SubqueryMixin
+from ..utils import QueryPath
 
 
 class SubqueryFieldProperty(SubqueryMixin, QueryableProperty):
@@ -111,6 +112,9 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             prop.contribute_to_class(self.model, '-'.join((self.name, field.attname)))
             self._field_property_refs[field.attname] = prop._get_ref()
 
+    def _get_ref(self, model=None, relation_path=QueryPath()):
+        return SubqueryObjectPropertyReference(self, model or self.model, relation_path)
+
     def contribute_to_class(self, cls, name):
         super(SubqueryObjectProperty, self).contribute_to_class(cls, name)
         self._descriptor = getattr(cls, name)
@@ -148,3 +152,27 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                 names.append(field.attname)
             value = self.queryset.model.from_db(self.queryset.db, names, values)
         return value
+
+
+class SubqueryObjectPropertyReference(QueryablePropertyReference):
+    """
+    A specialized property reference that allows the parts of a
+    :class:`SubqueryObjectProperty` to be annotated properly.
+    """
+    __slots__ = ()
+
+    def annotate_query(self, query, full_group_by, select=False, remaining_path=QueryPath()):
+        # TODO: allow both name and attname for FKs
+        if remaining_path and remaining_path[0] in self.property._field_property_refs:
+            # Direct reference to one of the fields represented by the
+            # sub-properties, which can be annotated on its own.
+            return self.property._field_property_refs[remaining_path[0]].annotate_query(query, full_group_by, select,
+                                                                                        remaining_path[1:])
+
+        if select and not remaining_path:
+            # A selection of the main property via .select_properties()
+            # should lead to the selection of all sub-properties to be able to
+            # populate the subquery object with all values.
+            for ref in six.itervalues(self.property._field_property_refs):
+                ref.annotate_query(query, full_group_by, select)
+        return super(SubqueryObjectPropertyReference, self).annotate_query(query, full_group_by, select, remaining_path)
