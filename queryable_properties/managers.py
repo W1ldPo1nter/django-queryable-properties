@@ -15,8 +15,8 @@ from .compat import (
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
 from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin, QueryablePropertiesRawQueryMixin
-from .utils import get_queryable_property
-from .utils.internal import InjectableMixin
+from .utils import get_queryable_property, QueryPath
+from .utils.internal import InjectableMixin, resolve_queryable_property
 
 
 class LegacyIterable(object):
@@ -354,13 +354,18 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
         """
         queryset = chain_queryset(self)
         for name in names:
-            property_ref = get_queryable_property(self.model, name)._get_ref(self.model)
+            property_ref, lookups = resolve_queryable_property(self.model, QueryPath(name))
+            if not property_ref:
+                raise QueryablePropertyDoesNotExist(name)
+            if property_ref.relation_path:
+                raise QueryablePropertyError('Cannot select properties on related models.')
             # A full GROUP BY is required if the query is not limited to
             # certain fields. Since only certain types of queries had the
             # _fields attribute in old Django versions, fall back to checking
             # for existing selection, on which the GROUP BY would be based.
             full_group_by = not compat_getattr(self, '_fields', 'query.select')
-            property_ref.annotate_query(queryset.query, full_group_by, select=True)
+            if property_ref.annotate_query(queryset.query, full_group_by, select=True, remaining_path=lookups)[1]:
+                raise QueryablePropertyError('Cannot select properties with lookups/transforms.')
         return queryset
 
     def iterator(self, *args, **kwargs):
