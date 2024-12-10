@@ -151,6 +151,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                     continue
                 names.append(field.attname)
             value = self.queryset.model.from_db(self.queryset.db, names, values)
+            self._descriptor.set_cached_value(obj, value)
         return value
 
 
@@ -175,4 +176,5 @@ class SubqueryObjectPropertyReference(QueryablePropertyReference):
             # populate the subquery object with all values.
             for ref in six.itervalues(self.property._field_property_refs):
                 ref.annotate_query(query, full_group_by, select)
+        # TODO: allow remaining_path[0] == pk
         return super(SubqueryObjectPropertyReference, self).annotate_query(query, full_group_by, select, remaining_path)
