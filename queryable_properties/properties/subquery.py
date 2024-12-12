@@ -112,6 +112,31 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             prop.contribute_to_class(self.model, '-'.join((self.name, field.attname)))
             self._field_property_refs[field.attname] = prop._get_ref()
 
+    def _determine_ref_by_path(self, path, model=None, relation_path=QueryPath()):
+        """
+        Determine the correct property reference to use for the given path.
+
+        The result may be a reference to one of the sub-properties or a
+        reference to this property as a regular
+        :class:`QueryablePropertyReference`.
+
+        :param QueryPath path: The query path to determine the reference by.
+        :param type | None model: The model class the property is being
+                                  referenced on. If not provided, this defaults
+                                  to the model the property is defined on.
+        :param QueryPath relation_path: The path representing the relation the
+                                        property is being referenced across.
+        :return: A 2-tuple containing the final reference as well as the
+                 remaining path.
+        :rtype: (QueryablePropertyReference, QueryPath)
+        """
+        if path and path[0] in self._field_property_refs:  # TODO: allow both name and attname for FKs
+            ref = self._field_property_refs[path[0]]._replace(model=model or self.model, relation_path=relation_path)
+            return ref, path[1:]
+        if path and path[0] in ('pk', self.queryset.model._meta.pk.name, self.queryset.model._meta.pk.attname):
+            path = path[1:]
+        return super(SubqueryObjectProperty, self)._get_ref(model, relation_path), path
+
     def _get_ref(self, model=None, relation_path=QueryPath()):
         return SubqueryObjectPropertyReference(self, model or self.model, relation_path)
 
@@ -163,18 +188,12 @@ class SubqueryObjectPropertyReference(QueryablePropertyReference):
     __slots__ = ()
 
     def annotate_query(self, query, full_group_by, select=False, remaining_path=QueryPath()):
-        # TODO: allow both name and attname for FKs
-        if remaining_path and remaining_path[0] in self.property._field_property_refs:
-            # Direct reference to one of the fields represented by the
-            # sub-properties, which can be annotated on its own.
-            return self.property._field_property_refs[remaining_path[0]].annotate_query(query, full_group_by, select,
-                                                                                        remaining_path[1:])
-
         if select and not remaining_path:
             # A selection of the main property via .select_properties()
             # should lead to the selection of all sub-properties to be able to
             # populate the subquery object with all values.
             for ref in six.itervalues(self.property._field_property_refs):
+                ref = ref._replace(model=self.model, relation_path=self.relation_path)
                 ref.annotate_query(query, full_group_by, select)
-        # TODO: allow remaining_path[0] == pk
-        return super(SubqueryObjectPropertyReference, self).annotate_query(query, full_group_by, select, remaining_path)
+        final_ref, remaining_path = self.property._determine_ref_by_path(remaining_path, self.model, self.relation_path)
+        return final_ref.annotate_query(query, full_group_by, select, remaining_path)

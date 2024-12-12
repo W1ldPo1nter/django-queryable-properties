@@ -6,6 +6,7 @@ from django.db import models
 
 from queryable_properties.properties import QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty
 from queryable_properties.utils import get_queryable_property
+from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
 )
@@ -27,7 +28,7 @@ class TestSubqueryFieldProperty(object):
             'field_name': 'common_data',
             'output_field': models.IntegerField(),
             'cached': True,
-        }
+        },
     ])
     def test_initializer(self, kwargs):
         prop = SubqueryFieldProperty(**kwargs)
@@ -58,7 +59,7 @@ class TestSubqueryExistenceCheckProperty(object):
             'queryset': ApplicationWithClassBasedProperties.objects.all(),
             'negated': True,
             'cached': True,
-        }
+        },
     ])
     def test_initializer(self, kwargs):
         prop = SubqueryExistenceCheckProperty(**kwargs)
@@ -138,3 +139,59 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
 
         with django_assert_num_queries(0):
             assert application.highest_version_object is version
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    @pytest.mark.parametrize('select, expected_properties', [
+        (('highest_version_object',), None),
+        (
+            ('highest_version_object__major', 'highest_version_object__minor'),
+            {'highest_version_object-major', 'highest_version_object-minor'},
+        ),
+        (('highest_version_object__pk',), {'highest_version_object'}),
+        (('highest_version_object__id',), {'highest_version_object'}),
+        (('highest_version_object__major', 'highest_version_object'), None),
+    ])
+    def test_annotation_select(self, django_assert_num_queries, applications, ref, select, expected_properties):
+        version = VersionWithClassBasedProperties.objects.filter(major=2)[0]
+        if not expected_properties:
+            expected_properties = {sub_ref.property.name for sub_ref in
+                                   six.itervalues(ref.property._field_property_refs)}
+            expected_properties.add(ref.property.name)
+        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select)
+
+        assert {r.property.name for r in queryset.query._queryable_property_annotations} == expected_properties
+        with django_assert_num_queries(1):
+            for application in queryset:
+                if 'highest_version_object' in expected_properties:
+                    assert ref.descriptor.has_cached_value(application)
+                expected_properties.discard('highest_version_object')
+                expected_properties.discard('highest_version_object-application_id')
+                for name in expected_properties:
+                    descriptor = get_queryable_property_descriptor(ApplicationWithClassBasedProperties, name)
+                    assert descriptor.get_cached_value(application) == getattr(version, descriptor.prop.field_name)
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('order_by, expected_property, expect_app2_first', [
+        ('highest_version_object', 'highest_version_object', False),
+        ('highest_version_object__pk', 'highest_version_object', False),
+        ('highest_version_object__id', 'highest_version_object', False),
+        ('highest_version_object__major', 'highest_version_object-major', True),
+    ])
+    def test_annotation_implicit(self, applications, versions, order_by, expected_property, expect_app2_first):
+        versions[7].delete()
+        expected_apps = [applications[1], applications[0]] if expect_app2_first else applications[:2]
+        expected_versions = versions[:7]
+        if expect_app2_first:
+            while expected_versions[-1].application == expected_apps[0]:
+                expected_versions.insert(0, expected_versions.pop())
+
+        for queryset, expected_results in (
+            (ApplicationWithClassBasedProperties.objects.order_by(order_by), expected_apps),
+            (
+                VersionWithClassBasedProperties.objects.order_by('application__{}'.format(order_by), 'pk'),
+                expected_versions,
+            ),
+        ):
+            assert {r.property.name for r in queryset.query._queryable_property_annotations} == {expected_property}
+            assert list(queryset) == expected_results
