@@ -131,9 +131,11 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         :rtype: (QueryablePropertyReference, QueryPath)
         """
         if path and path[0] in self._field_property_refs:  # TODO: allow both name and attname for FKs
+            # Reference to one of the fields represented by the sub-properties.
             ref = self._field_property_refs[path[0]]._replace(model=model or self.model, relation_path=relation_path)
             return ref, path[1:]
         if path and path[0] in ('pk', self.queryset.model._meta.pk.name, self.queryset.model._meta.pk.attname):
+            # Reference to the primary key field represented by this property.
             path = path[1:]
         return super(SubqueryObjectProperty, self)._get_ref(model, relation_path), path
 
@@ -178,6 +180,12 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             value = self.queryset.model.from_db(self.queryset.db, names, values)
             self._descriptor.set_cached_value(obj, value)
         return value
+
+    def get_filter(self, cls, lookup, value):
+        if isinstance(value, self.queryset.model):
+            value = value.pk
+        ref, lookup = self._determine_ref_by_path(QueryPath(lookup))
+        return (ref.full_path + lookup).build_filter(value)
 
 
 class SubqueryObjectPropertyReference(QueryablePropertyReference):

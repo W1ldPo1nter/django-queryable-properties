@@ -142,6 +142,37 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
+    @pytest.mark.parametrize('field_name, value, expected_properties, expect_v2_match', [
+        ('highest_version_object', 'pk', {'highest_version_object'}, True),
+        ('highest_version_object', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__pk', 'pk', {'highest_version_object'}, True),
+        ('highest_version_object__pk', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__id', 'pk', {'highest_version_object'}, True),
+        ('highest_version_object__id', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__major', 2, {'highest_version_object', 'highest_version_object-major'}, True),
+        ('highest_version_object__major', 1, {'highest_version_object', 'highest_version_object-major'}, False),
+    ])
+    def test_filter(self, categories, applications, field_name, value, expected_properties, expect_v2_match):
+        applications[1].versions.filter(major=2).delete()
+        expected_apps = {applications[int(not expect_v2_match)]}
+        expected_categories = {categories[0]} if expect_v2_match else set(categories[:2])
+        if value == 'pk':
+            value = applications[0].versions.values_list(flat=True).get(major=2)
+        elif value == 'obj':
+            value = applications[0].versions.get(major=2)
+
+        for queryset, expected_results in (
+            (ApplicationWithClassBasedProperties.objects.filter(**{field_name: value}), expected_apps),
+            (
+                CategoryWithClassBasedProperties.objects.filter(**{'applications__{}'.format(field_name): value}),
+                expected_categories,
+            ),
+        ):
+            assert {ref.property.name for ref in queryset.query._queryable_property_annotations} == expected_properties
+            assert set(queryset) == expected_results
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
     @pytest.mark.parametrize('select, expected_properties', [
         (('highest_version_object',), None),
         (
@@ -193,5 +224,5 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
                 expected_versions,
             ),
         ):
-            assert {r.property.name for r in queryset.query._queryable_property_annotations} == {expected_property}
+            assert {ref.property.name for ref in queryset.query._queryable_property_annotations} == {expected_property}
             assert list(queryset) == expected_results
