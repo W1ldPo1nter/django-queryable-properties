@@ -152,6 +152,10 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
         ('highest_version_object__id', 'pk', {'highest_version_object'}, True),
         ('highest_version_object__id', 'obj', {'highest_version_object'}, True),
         ('highest_version_object__id__gt', 'obj', {'highest_version_object'}, False),
+        ('highest_version_object__application', 'application_id',
+         {'highest_version_object', 'highest_version_object-application_id'}, True),
+        ('highest_version_object__application_id', 'application_id',
+         {'highest_version_object', 'highest_version_object-application_id'}, True),
         ('highest_version_object__major', 2, {'highest_version_object', 'highest_version_object-major'}, True),
         ('highest_version_object__major__gt', 1, {'highest_version_object', 'highest_version_object-major'}, True),
         ('highest_version_object__major', 1, {'highest_version_object', 'highest_version_object-major'}, False),
@@ -161,8 +165,8 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
         applications[1].versions.filter(major=2).delete()
         expected_apps = {applications[int(not expect_v2_match)]}
         expected_categories = {categories[0]} if expect_v2_match else set(categories[:2])
-        if value == 'pk':
-            value = applications[0].versions.values_list(flat=True).get(major=2)
+        if value in ('pk', 'application_id'):
+            value = applications[0].versions.values_list(value, flat=True).get(major=2)
         elif value == 'obj':
             value = applications[0].versions.get(major=2)
 
@@ -212,6 +216,8 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
         ('highest_version_object', 'highest_version_object', False),
         ('highest_version_object__pk', 'highest_version_object', False),
         ('highest_version_object__id', 'highest_version_object', False),
+        ('highest_version_object__application', 'highest_version_object-application_id', False),
+        ('highest_version_object__application_id', 'highest_version_object-application_id', False),
         ('highest_version_object__major', 'highest_version_object-major', True),
     ])
     def test_annotation_implicit(self, applications, versions, order_by, expected_property, expect_app2_first):

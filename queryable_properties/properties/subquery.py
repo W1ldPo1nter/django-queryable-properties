@@ -99,6 +99,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         self._descriptor = None
         self._field_names = field_names
         self._field_property_refs = {}
+        self._field_aliases = {}
 
     def _build_sub_properties(self):
         """
@@ -111,6 +112,8 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             prop = SubqueryFieldProperty(self._queryset, field.attname, cached=self.cached)
             prop.contribute_to_class(self.model, '-'.join((self.name, field.attname)))
             self._field_property_refs[field.attname] = prop._get_ref()
+            if field.name != field.attname:
+                self._field_aliases[field.name] = field.attname
 
     def _determine_ref_by_path(self, path, model=None, relation_path=QueryPath()):
         """
@@ -130,13 +133,15 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                  remaining path.
         :rtype: (QueryablePropertyReference, QueryPath)
         """
-        if path and path[0] in self._field_property_refs:  # TODO: allow both name and attname for FKs
-            # Reference to one of the fields represented by the sub-properties.
-            ref = self._field_property_refs[path[0]]._replace(model=model or self.model, relation_path=relation_path)
-            return ref, path[1:]
-        if path and path[0] in ('pk', self.queryset.model._meta.pk.name, self.queryset.model._meta.pk.attname):
-            # Reference to the primary key field represented by this property.
-            path = path[1:]
+        if path:
+            first = self._field_aliases.get(path[0], path[0])
+            if first in self._field_property_refs:
+                # Reference to one of the fields represented by the sub-properties.
+                ref = self._field_property_refs[first]._replace(model=model or self.model, relation_path=relation_path)
+                return ref, path[1:]
+            if first in ('pk', self.queryset.model._meta.pk.name, self.queryset.model._meta.pk.attname):
+                # Reference to the primary key field represented by this property.
+                path = path[1:]
         return super(SubqueryObjectProperty, self)._get_ref(model, relation_path), path
 
     def _get_ref(self, model=None, relation_path=QueryPath()):
