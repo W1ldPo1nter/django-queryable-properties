@@ -145,12 +145,17 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
     @pytest.mark.parametrize('field_name, value, expected_properties, expect_v2_match', [
         ('highest_version_object', 'pk', {'highest_version_object'}, True),
         ('highest_version_object', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__gt', 'pk', {'highest_version_object'}, False),
         ('highest_version_object__pk', 'pk', {'highest_version_object'}, True),
         ('highest_version_object__pk', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__pk__gt', 'obj', {'highest_version_object'}, False),
         ('highest_version_object__id', 'pk', {'highest_version_object'}, True),
         ('highest_version_object__id', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__id__gt', 'obj', {'highest_version_object'}, False),
         ('highest_version_object__major', 2, {'highest_version_object', 'highest_version_object-major'}, True),
+        ('highest_version_object__major__gt', 1, {'highest_version_object', 'highest_version_object-major'}, True),
         ('highest_version_object__major', 1, {'highest_version_object', 'highest_version_object-major'}, False),
+        ('highest_version_object__major__lt', 2, {'highest_version_object', 'highest_version_object-major'}, False),
     ])
     def test_filter(self, categories, applications, field_name, value, expected_properties, expect_v2_match):
         applications[1].versions.filter(major=2).delete()
