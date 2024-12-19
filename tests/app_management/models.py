@@ -190,6 +190,7 @@ class ApplicationWithClassBasedProperties(Application):
         highest_version_object = SubqueryObjectProperty(
             lambda: (VersionWithClassBasedProperties.objects.filter(application=models.OuterRef('pk'))
                                                             .order_by('-major', '-minor', '-patch')),
+            property_names=('version',),
         )
     version_count = VersionCountProperty()
     stable_version_count = AggregateProperty(models.Count('versions', filter=models.Q(versions__release_type='s')))

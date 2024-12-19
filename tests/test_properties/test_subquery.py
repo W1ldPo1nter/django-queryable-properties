@@ -96,38 +96,41 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
         version = application.versions.get(major=2)
 
         assert not ref.descriptor.has_cached_value(application)
-        for sub_ref in six.itervalues(ref.property._field_property_refs):
+        for sub_ref in six.itervalues(ref.property._sub_property_refs):
             assert not sub_ref.descriptor.has_cached_value(application)
 
         with django_assert_num_queries(1):
             assert application.highest_version_object == version
             assert ref.descriptor.get_cached_value(application) == version
+            assert get_queryable_property_descriptor(VersionWithClassBasedProperties, 'version').get_cached_value(
+                application.highest_version_object) == version.version
+            assert application.highest_version_object.version == version.version
             for field in VersionWithClassBasedProperties._meta.concrete_fields:
                 assert getattr(version, field.attname) == getattr(application.highest_version_object, field.attname)
-            for name, sub_ref in six.iteritems(ref.property._field_property_refs):
+            for name, sub_ref in six.iteritems(ref.property._sub_property_refs):
                 assert sub_ref.descriptor.get_cached_value(application) == getattr(version, name)
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
-    @pytest.mark.parametrize('cached_fields', [
+    @pytest.mark.parametrize('cached', [
         set(),
-        {'major', 'minor', 'patch', 'application_id'},
+        {'major', 'minor', 'patch', 'application_id', 'version'},
     ])
-    def test_cached_raw_values(self, django_assert_num_queries, applications, ref, cached_fields):
+    def test_cached_raw_values(self, django_assert_num_queries, applications, ref, cached):
         application = applications[0]
         version = application.versions.get(major=2)
         ref.descriptor.set_cached_value(application, version.pk)
-        for name in cached_fields:
-            ref.property._field_property_refs[name].descriptor.set_cached_value(application, getattr(version, name))
+        for name in cached:
+            ref.property._sub_property_refs[name].descriptor.set_cached_value(application, getattr(version, name))
 
         with django_assert_num_queries(0):
             assert application.highest_version_object == version
             assert ref.descriptor.get_cached_value(application) == version
-            for name in cached_fields:
+            for name in cached:
                 assert getattr(application.highest_version_object, name) == getattr(version, name)
             deferred_fields = set(field.attname for field in VersionWithClassBasedProperties._meta.concrete_fields)
             deferred_fields.discard(VersionWithClassBasedProperties._meta.pk.attname)
-            deferred_fields.difference_update(cached_fields)
+            deferred_fields.difference_update(cached)
             assert application.highest_version_object.get_deferred_fields() == deferred_fields
 
     @pytest.mark.django_db
@@ -160,6 +163,10 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
         ('highest_version_object__major__gt', 1, {'highest_version_object', 'highest_version_object-major'}, True),
         ('highest_version_object__major', 1, {'highest_version_object', 'highest_version_object-major'}, False),
         ('highest_version_object__major__lt', 2, {'highest_version_object', 'highest_version_object-major'}, False),
+        ('highest_version_object__version', '2.0.0',
+         {'highest_version_object', 'highest_version_object-version'}, True),
+        ('highest_version_object__version__iexact', '1.3.1',
+         {'highest_version_object', 'highest_version_object-version'}, False),
     ])
     def test_filter(self, categories, applications, field_name, value, expected_properties, expect_v2_match):
         applications[1].versions.filter(major=2).delete()
@@ -185,8 +192,8 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
     @pytest.mark.parametrize('select, expected_properties', [
         (('highest_version_object',), None),
         (
-            ('highest_version_object__major', 'highest_version_object__minor'),
-            {'highest_version_object-major', 'highest_version_object-minor'},
+            ('highest_version_object__major', 'highest_version_object__minor', 'highest_version_object__version'),
+            {'highest_version_object-major', 'highest_version_object-minor', 'highest_version_object-version'},
         ),
         (('highest_version_object__pk',), {'highest_version_object'}),
         (('highest_version_object__id',), {'highest_version_object'}),
@@ -196,7 +203,7 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
         version = VersionWithClassBasedProperties.objects.filter(major=2)[0]
         if not expected_properties:
             expected_properties = {sub_ref.property.name for sub_ref in
-                                   six.itervalues(ref.property._field_property_refs)}
+                                   six.itervalues(ref.property._sub_property_refs)}
             expected_properties.add(ref.property.name)
         queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select)
 
@@ -215,12 +222,14 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
     @pytest.mark.parametrize('order_by, expected_property, expect_app2_first', [
         ('highest_version_object', 'highest_version_object', False),
         ('highest_version_object__pk', 'highest_version_object', False),
-        ('highest_version_object__id', 'highest_version_object', False),
+        ('-highest_version_object__id', 'highest_version_object', True),
         ('highest_version_object__application', 'highest_version_object-application_id', False),
-        ('highest_version_object__application_id', 'highest_version_object-application_id', False),
+        ('-highest_version_object__application_id', 'highest_version_object-application_id', True),
         ('highest_version_object__major', 'highest_version_object-major', True),
+        ('-highest_version_object__version', 'highest_version_object-version', False),
     ])
     def test_annotation_implicit(self, applications, versions, order_by, expected_property, expect_app2_first):
+        app_order_by = '{}application__{}'.format('-' if order_by.startswith('-') else '', order_by.replace('-', ''))
         versions[7].delete()
         expected_apps = [applications[1], applications[0]] if expect_app2_first else applications[:2]
         expected_versions = versions[:7]
@@ -230,10 +239,7 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
 
         for queryset, expected_results in (
             (ApplicationWithClassBasedProperties.objects.order_by(order_by), expected_apps),
-            (
-                VersionWithClassBasedProperties.objects.order_by('application__{}'.format(order_by), 'pk'),
-                expected_versions,
-            ),
+            (VersionWithClassBasedProperties.objects.order_by(app_order_by, 'pk'), expected_versions),
         ):
             assert {ref.property.name for ref in queryset.query._queryable_property_annotations} == {expected_property}
             assert list(queryset) == expected_results
