@@ -4,7 +4,8 @@ import six
 from ..apps import QueryablePropertiesConfig
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..query import QUERYING_PROPERTIES_MARKER
-from ..utils import QueryPath
+from ..utils import get_queryable_property
+from ..utils.internal import QueryPath, get_output_field
 from .base import QueryableProperty, QueryablePropertyReference
 from .mixins import SubqueryMixin
 
@@ -114,8 +115,8 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         Construct the sub-properties this property builds on, attach them to
         the model class and store references to them in attributes.
         """
-        def add_sub_property(name, queryset):
-            prop = SubqueryFieldProperty(queryset, name, cached=self.cached)
+        def add_sub_property(name, queryset, output_field=None):
+            prop = SubqueryFieldProperty(queryset, name, output_field=output_field, cached=self.cached)
             prop.contribute_to_class(self.model, '-'.join((self.name, name)))
             self._sub_property_refs[name] = prop._get_ref()
 
@@ -126,8 +127,12 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             if field.name != field.attname:
                 self._field_aliases[field.name] = field.attname
         for property_name in self._property_names:
-            add_sub_property(property_name,
-                             QueryablePropertiesQuerySetMixin.apply_to(self.queryset).select_properties(property_name))
+            remote_ref = get_queryable_property(self.queryset.model, property_name)._get_ref(self.queryset.model)
+            add_sub_property(
+                property_name,
+                QueryablePropertiesQuerySetMixin.apply_to(self.queryset).select_properties(property_name),
+                get_output_field(remote_ref.get_annotation()),
+            )
 
     def _determine_ref_by_path(self, path, model=None, relation_path=QueryPath()):
         """
