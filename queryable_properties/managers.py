@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 from copy import copy
 
 import six
-from django.db.models import Manager
+from django.db.models import F, Manager
 from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
 
@@ -340,6 +340,21 @@ class QueryablePropertiesQuerySetMixin(InjectableMixin):
                 kwargs[additional_name] = value
 
         return kwargs
+
+    def _values(self, *fields, **expressions):
+        for field in fields:
+            if isinstance(field, six.string_types):
+                # Properties may be resolved using a path that differs from
+                # their actual name. To keep the name that was provided to the
+                # .values/.values_list call, an F expression is used to alias
+                # the property in such cases.
+                query_path = QueryPath(field)
+                ref, remaining_path = resolve_queryable_property(self.model, query_path)
+                if ref and ref.full_path.as_str() != field:
+                    if remaining_path:
+                        field = query_path[:-len(remaining_path)].as_str()
+                    expressions[field] = F(ref.full_path.as_str())
+        return super(QueryablePropertiesQuerySetMixin, self)._values(*fields, **expressions)
 
     def select_properties(self, *names):
         """

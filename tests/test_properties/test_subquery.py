@@ -3,6 +3,12 @@ import pytest
 import six
 from django import VERSION as DJANGO_VERSION
 from django.db import models
+from mock import Mock
+
+try:
+    from django.db.models.functions import Substr
+except ImportError:
+    Substr = Mock()
 
 from queryable_properties.properties import QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty
 from queryable_properties.utils import get_queryable_property
@@ -239,3 +245,65 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
         ):
             assert {ref.property.name for ref in queryset.query._queryable_property_annotations} == {expected_property}
             assert list(queryset) == expected_results
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('select, names, expected_values', [
+        (('highest_version_object',), ('name', 'highest_version_object'), [
+            ['My cool App', 'pk3'],
+            ['Another App', 'pk6'],
+        ]),
+        (('highest_version_object',), ('name', 'highest_version_object__pk'), [
+            ['My cool App', 'pk3'],
+            ['Another App', 'pk6'],
+        ]),
+        (('highest_version_object',), ('highest_version_object__id', 'name'), [
+            ['pk3', 'My cool App'],
+            ['pk6', 'Another App'],
+        ]),
+        (('highest_version_object__pk',), ('highest_version_object__pk', 'name'), [
+            ['pk3', 'My cool App'],
+            ['pk6', 'Another App'],
+        ]),
+        (('highest_version_object__id',), ('name', 'highest_version_object__id'), [
+            ['My cool App', 'pk3'],
+            ['Another App', 'pk6'],
+        ]),
+        (('highest_version_object',), ('name', 'highest_version_object__major', 'highest_version_object__minor'), [
+            ['My cool App', 2, 0],
+            ['Another App', 1, 3],
+        ]),
+        (('highest_version_object',), ('name', 'highest_version_object__version'), [
+            ['My cool App', '2.0.0'],
+            ['Another App', '1.3.1'],
+        ]),
+        (('highest_version_object__version',), ('name', 'highest_version_object__version'), [
+            ['My cool App', '2.0.0'],
+            ['Another App', '1.3.1'],
+        ]),
+        (('highest_version_object',), ('name', Substr('highest_version_object__version', 1, 3)), [
+            ['My cool App', '2.0'],
+            ['Another App', '1.3'],
+        ]),
+        (('highest_version_object__version',), ('name', Substr('highest_version_object__version', 1, 3)), [
+            ['My cool App', '2.0'],
+            ['Another App', '1.3'],
+        ]),
+    ])
+    def test_raw_values(self, applications, versions, select, names, expected_values):
+        versions[7].delete()
+        expressions = {}
+        values_names = list(names)
+        for name in names:
+            if not isinstance(name, six.string_types):
+                expressions['expr'] = name
+                values_names.remove(name)
+        for values in expected_values:
+            for i, value in enumerate(values):
+                if value in ('pk3', 'pk6'):
+                    values[i] = versions[int(value[-1])].pk
+
+        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select).order_by('pk')
+        for result, values in zip(queryset.values(*values_names, **expressions), expected_values):
+            assert result == dict(zip(values_names + (['expr'] if expressions else []), values))
+        for result, values in zip(queryset.values_list(*names), expected_values):
+            assert result == tuple(values)
