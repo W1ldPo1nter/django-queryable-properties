@@ -12,7 +12,7 @@ from ..app_management.models import (
 )
 
 pytestmark = [
-    pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+    pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11"),
 ]
 
 
@@ -87,7 +87,7 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
 
     @pytest.fixture
     def ref(self):
-        return get_queryable_property(ApplicationWithClassBasedProperties, 'highest_version_object')._get_ref()
+        return get_queryable_property(ApplicationWithClassBasedProperties, 'highest_version_object')._resolve()[0]
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
@@ -155,18 +155,14 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
         ('highest_version_object__id', 'pk', {'highest_version_object'}, True),
         ('highest_version_object__id', 'obj', {'highest_version_object'}, True),
         ('highest_version_object__id__gt', 'obj', {'highest_version_object'}, False),
-        ('highest_version_object__application', 'application_id',
-         {'highest_version_object', 'highest_version_object-application_id'}, True),
-        ('highest_version_object__application_id', 'application_id',
-         {'highest_version_object', 'highest_version_object-application_id'}, True),
-        ('highest_version_object__major', 2, {'highest_version_object', 'highest_version_object-major'}, True),
-        ('highest_version_object__major__gt', 1, {'highest_version_object', 'highest_version_object-major'}, True),
-        ('highest_version_object__major', 1, {'highest_version_object', 'highest_version_object-major'}, False),
-        ('highest_version_object__major__lt', 2, {'highest_version_object', 'highest_version_object-major'}, False),
-        ('highest_version_object__version', '2.0.0',
-         {'highest_version_object', 'highest_version_object-version'}, True),
-        ('highest_version_object__version__iexact', '1.3.1',
-         {'highest_version_object', 'highest_version_object-version'}, False),
+        ('highest_version_object__application', 'application_id', {'highest_version_object-application_id'}, True),
+        ('highest_version_object__application_id', 'application_id', {'highest_version_object-application_id'}, True),
+        ('highest_version_object__major', 2, {'highest_version_object-major'}, True),
+        ('highest_version_object__major__gt', 1, {'highest_version_object-major'}, True),
+        ('highest_version_object__major', 1, {'highest_version_object-major'}, False),
+        ('highest_version_object__major__lt', 2, {'highest_version_object-major'}, False),
+        ('highest_version_object__version', '2.0.0', {'highest_version_object-version'}, True),
+        ('highest_version_object__version__iexact', '1.3.1', {'highest_version_object-version'}, False),
     ])
     def test_filter(self, categories, applications, field_name, value, expected_properties, expect_v2_match):
         applications[1].versions.filter(major=2).delete()

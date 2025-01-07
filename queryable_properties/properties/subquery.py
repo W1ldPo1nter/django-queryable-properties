@@ -118,7 +118,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         def add_sub_property(name, queryset, output_field=None):
             prop = SubqueryFieldProperty(queryset, name, output_field=output_field, cached=self.cached)
             prop.contribute_to_class(self.model, '-'.join((self.name, name)))
-            self._sub_property_refs[name] = prop._get_ref()
+            self._sub_property_refs[name] = prop._resolve()[0]
 
         for field in self.queryset.model._meta.concrete_fields:
             if field.primary_key or (self._field_names is not None and field.name not in self._field_names):
@@ -127,44 +127,24 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             if field.name != field.attname:
                 self._field_aliases[field.name] = field.attname
         for property_name in self._property_names:
-            remote_ref = get_queryable_property(self.queryset.model, property_name)._get_ref(self.queryset.model)
+            remote_ref = get_queryable_property(self.queryset.model, property_name)._resolve(self.queryset.model)[0]
             add_sub_property(
                 property_name,
                 QueryablePropertiesQuerySetMixin.apply_to(self.queryset).select_properties(property_name),
                 get_output_field(remote_ref.get_annotation()),
             )
 
-    def _determine_ref_by_path(self, path, model=None, relation_path=QueryPath()):
-        """
-        Determine the correct property reference to use for the given path.
-
-        The result may be a reference to one of the sub-properties or a
-        reference to this property as a regular
-        :class:`QueryablePropertyReference`.
-
-        :param QueryPath path: The query path to determine the reference by.
-        :param type | None model: The model class the property is being
-                                  referenced on. If not provided, this defaults
-                                  to the model the property is defined on.
-        :param QueryPath relation_path: The path representing the relation the
-                                        property is being referenced across.
-        :return: A 2-tuple containing the final reference as well as the
-                 remaining path.
-        :rtype: (QueryablePropertyReference, QueryPath)
-        """
-        if path:
-            first = self._field_aliases.get(path[0], path[0])
+    def _resolve(self, model=None, relation_path=QueryPath(), remaining_path=QueryPath()):
+        if remaining_path:
+            first = self._field_aliases.get(remaining_path[0], remaining_path[0])
             if first in self._sub_property_refs:
                 # Reference to one of the fields represented by the sub-properties.
                 ref = self._sub_property_refs[first]._replace(model=model or self.model, relation_path=relation_path)
-                return ref, path[1:]
+                return ref, remaining_path[1:]
             if first in ('pk', self.queryset.model._meta.pk.name, self.queryset.model._meta.pk.attname):
                 # Reference to the primary key field represented by this property.
-                path = path[1:]
-        return super(SubqueryObjectProperty, self)._get_ref(model, relation_path), path
-
-    def _get_ref(self, model=None, relation_path=QueryPath()):
-        return SubqueryObjectPropertyReference(self, model or self.model, relation_path)
+                return super(SubqueryObjectProperty, self)._resolve(model, relation_path, remaining_path[1:])
+        return SubqueryObjectPropertyReference(self, model or self.model, relation_path), remaining_path
 
     def contribute_to_class(self, cls, name):
         super(SubqueryObjectProperty, self).contribute_to_class(cls, name)
@@ -218,8 +198,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
     def get_filter(self, cls, lookup, value):
         if isinstance(value, self.queryset.model):
             value = value.pk
-        ref, lookup = self._determine_ref_by_path(QueryPath(lookup))
-        return (ref.full_path + lookup).build_filter(value)
+        return super(SubqueryObjectProperty, self).get_filter(cls, lookup, value)
 
 
 class SubqueryObjectPropertyReference(QueryablePropertyReference):
@@ -230,12 +209,11 @@ class SubqueryObjectPropertyReference(QueryablePropertyReference):
     __slots__ = ()
 
     def annotate_query(self, query, full_group_by, select=False, remaining_path=QueryPath()):
-        if select and not remaining_path:
+        if select:
             # A selection of the main property via .select_properties()
             # should lead to the selection of all sub-properties to be able to
             # populate the subquery object with all values.
             for ref in six.itervalues(self.property._sub_property_refs):
                 ref = ref._replace(model=self.model, relation_path=self.relation_path)
                 ref.annotate_query(query, full_group_by, select)
-        final_ref, remaining_path = self.property._determine_ref_by_path(remaining_path, self.model, self.relation_path)
-        return final_ref.annotate_query(query, full_group_by, select, remaining_path)
+        return super(SubqueryObjectPropertyReference, self).annotate_query(query, full_group_by, select, remaining_path)

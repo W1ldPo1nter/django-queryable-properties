@@ -221,9 +221,14 @@ class QueryableProperty(object):
         if not getattr(cls, RESET_METHOD_NAME, None):
             setattr(cls, RESET_METHOD_NAME, reset_queryable_property)
 
-    def _get_ref(self, model=None, relation_path=QueryPath()):
+    def _resolve(self, model=None, relation_path=QueryPath(), remaining_path=QueryPath()):
         """
-        Create a reference to this queryable property.
+        Core part of resolving queryable properties that allows individual
+        properties to customize the resolving process.
+
+        Must return a reference to this or another appropriate queryable
+        property based on the given parameters as well as the (potentially
+        modified) remaining path.
 
         :param type | None model: The model class the property is being
                                   referenced on, which may be a subclass of
@@ -232,10 +237,14 @@ class QueryableProperty(object):
                                   defined on.
         :param QueryPath relation_path: The path representing the relation the
                                         property is being referenced across.
-        :return: A reference to this queryable property.
-        :rtype: QueryablePropertyReference
+        :param QueryPath remaining_path: The remaining query path of the
+                                         expression that referenced the
+                                         property.
+        :return: A 2-tuple containing a reference to a queryable property as
+                 well as the final remaining path.
+        :rtype: (QueryablePropertyReference, QueryPath)
         """
-        return QueryablePropertyReference(self, model or self.model, relation_path)
+        return QueryablePropertyReference(self, model or self.model, relation_path), remaining_path
 
 
 class queryable_property(QueryableProperty):

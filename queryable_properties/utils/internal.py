@@ -410,9 +410,9 @@ class ModelAttributeGetter(object):
 def parametrizable_decorator(function):
     """
     A decorator for functions who themselves are to be used as decorators and
-    are to support both a parameter-less decorator usage (``@my_decorator``) as
-    well as parametrized decorator usage (``@my_decorator(some_param=5)``).
-    This decorator takes care of making the distinction between both usages and
+    are to support both a parameter-less decorator usage (``@my_decorator``)
+    and parametrized decorator usage (``@my_decorator(some_param=5)``). This
+    decorator takes care of making the distinction between both usages and
     returning the correct object.
 
     :param function function: The decorator function to decorate.
@@ -468,7 +468,6 @@ def resolve_queryable_property(model, query_path):
     """
     from . import get_queryable_property
 
-    property_ref, lookups = None, QueryPath()
     # Try to follow the given path to allow to use queryable properties
     # across relations.
     for index, name in enumerate(query_path):
@@ -480,20 +479,16 @@ def resolve_queryable_property(model, query_path):
             except QueryablePropertyDoesNotExist:
                 # Neither a field nor a queryable property, so likely an
                 # invalid name. Do nothing and let Django deal with it.
-                pass
+                break
             else:
-                property_ref = prop._get_ref(model, query_path[:index])
-                lookups = query_path[index + 1:]
-            # The current name was not a field and either a queryable
-            # property or invalid. Either way, resolving ends here.
-            break
+                return prop._resolve(model, query_path[:index], query_path[index + 1:])
         else:
             if not related_model:
                 # A regular model field that doesn't represent a relation,
                 # meaning that no queryable property is involved.
                 break
             model = related_model
-    return property_ref, lookups
+    return None, QueryPath()
 
 
 def get_output_field(annotation):

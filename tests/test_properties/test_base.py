@@ -191,16 +191,17 @@ class TestQueryableProperty(object):
         with pytest.raises(QueryablePropertyError, match='must not contain the lookup separator'):
             type('Broken', (Model,), {'dummy__dummy': DummyProperty(), '__module__': 'tests.app_management.models'})
 
-    @pytest.mark.parametrize('model, relation_path', [
-        (None, QueryPath()),
-        (VersionWithClassBasedProperties, QueryPath('application')),
+    @pytest.mark.parametrize('model, relation_path, remaining_path', [
+        (None, QueryPath(), QueryPath()),
+        (VersionWithClassBasedProperties, QueryPath('application'), QueryPath('isnull')),
     ])
-    def test_get_ref(self, dummy_property, model, relation_path):
-        ref = dummy_property._get_ref(model, relation_path)
+    def test_resolve(self, dummy_property, model, relation_path, remaining_path):
+        ref, final_path = dummy_property._resolve(model, relation_path, remaining_path)
         assert isinstance(ref, QueryablePropertyReference)
         assert ref.property is dummy_property
         assert ref.model is (model or dummy_property.model)
         assert ref.relation_path == relation_path
+        assert final_path is remaining_path
 
 
 class TestDecorators(object):
