@@ -103,6 +103,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                                queryable property values will be selected.
         :type property_names: collections.Sequence[str]
         """
+        kwargs.pop('output_field', None)
         super(SubqueryObjectProperty, self).__init__(queryset, 'pk', **kwargs)
         self._descriptor = None
         self._field_names = field_names
@@ -155,45 +156,56 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         QueryablePropertiesConfig.add_ready_callback(self._build_sub_properties)
 
     def get_value(self, obj):
-        if not self._descriptor.has_cached_value(obj):
-            # No value is cached at all: perform a single query to fetch the
-            # values for all fields and populate the cache for this property
-            # and all sub-properties.
-            names = [ref.property.name for ref in six.itervalues(self._sub_property_refs)]
-            names.append(self.name)
-            values = self.get_queryset_for_object(obj).select_properties(*names).values(*names).get()
-            self._descriptor.set_cached_value(obj, values[self.name])
-            for ref in six.itervalues(self._sub_property_refs):
-                ref.descriptor.set_cached_value(obj, values[ref.property.name])
+        if self._descriptor.has_cached_value(obj):
+            cached_value = self._descriptor.get_cached_value(obj)
+            # The cached value is already the final model object, so it can
+            # be returned as-is.
+            if isinstance(cached_value, self.queryset.model):
+                return cached_value
 
-        value = self._descriptor.get_cached_value(obj)
-        if not isinstance(value, self.queryset.model):
             # The cached value is a raw primary key. Use this value and the
             # present cache values of all sub-properties to construct the final
             # model instance.
-            names, values = [], []
-            for field in self.queryset.model._meta.concrete_fields:
-                if field.primary_key:
-                    values.append(value)
-                elif (field.attname in self._sub_property_refs and
-                        self._sub_property_refs[field.attname].descriptor.has_cached_value(obj)):
-                    values.append(self._sub_property_refs[field.attname].descriptor.get_cached_value(obj))
-                else:
-                    continue
-                names.append(field.attname)
-            value = self.queryset.model.from_db(self.queryset.db, names, values)
+            values = {self.name: cached_value}
+            for ref in six.itervalues(self._sub_property_refs):
+                if ref.descriptor.has_cached_value(obj):
+                    values[ref.property.name] = ref.descriptor.get_cached_value(obj)
+        else:
+            # No value is cached at all: perform a single query to fetch the
+            # values for all fields and populate the cache for this property
+            # and all sub-properties if configured as cached.
+            names = [ref.property.name for ref in six.itervalues(self._sub_property_refs)]
+            names.append(self.name)
+            values = self.get_queryset_for_object(obj).select_properties(*names).values(*names).get()
+            if self.cached:
+                self._descriptor.set_cached_value(obj, values[self.name])
+                for ref in six.itervalues(self._sub_property_refs):
+                    ref.descriptor.set_cached_value(obj, values[ref.property.name])
 
-            # Populate any queryable properties whose values were queried for
-            # the subquery object.
-            setattr(value, QUERYING_PROPERTIES_MARKER, True)
-            for property_name in self._property_names:
-                descriptor = self._sub_property_refs[property_name].descriptor
-                if descriptor.has_cached_value(obj):
-                    setattr(value, property_name, descriptor.get_cached_value(obj))
-            delattr(value, QUERYING_PROPERTIES_MARKER)
+        field_names, field_values = [], []
+        for field in self.queryset.model._meta.concrete_fields:
+            if field.primary_key:
+                field_values.append(values[self.name])
+            elif (field.attname in self._sub_property_refs and
+                  self._sub_property_refs[field.attname].property.name in values):
+                field_values.append(values[self._sub_property_refs[field.attname].property.name])
+            else:
+                continue
+            field_names.append(field.attname)
+        subquery_obj = self.queryset.model.from_db(self.queryset.db, field_names, field_values)
 
-            self._descriptor.set_cached_value(obj, value)
-        return value
+        # Populate any queryable properties whose values were queried for
+        # the subquery object.
+        setattr(subquery_obj, QUERYING_PROPERTIES_MARKER, True)
+        for property_name in self._property_names:
+            sub_name = self._sub_property_refs[property_name].property.name
+            if sub_name in values:
+                setattr(subquery_obj, property_name, values[sub_name])
+        delattr(subquery_obj, QUERYING_PROPERTIES_MARKER)
+
+        if self.cached or self._descriptor.has_cached_value(obj):
+            self._descriptor.set_cached_value(obj, subquery_obj)
+        return subquery_obj
 
     def get_filter(self, cls, lookup, value):
         if isinstance(value, self.queryset.model):

@@ -10,7 +10,9 @@ try:
 except ImportError:
     Substr = Mock()
 
-from queryable_properties.properties import QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty
+from queryable_properties.properties import (
+    QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty, SubqueryObjectProperty,
+)
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
@@ -89,15 +91,41 @@ class TestSubqueryExistenceCheckProperty(object):
         assert categories[0].has_v2 is expected_result
 
 
-class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_properties
+class TestSubqueryObjectProperty(object):  # TODO: test _build_sub_properties
 
     @pytest.fixture
     def ref(self):
         return get_queryable_property(ApplicationWithClassBasedProperties, 'highest_version_object')._resolve()[0]
 
+    @pytest.mark.parametrize('kwargs', [
+        {
+            'queryset': ApplicationWithClassBasedProperties.objects.filter(name='test'),
+            'field_names': ('name', 'common_data'),
+        },
+        {
+            'queryset': ApplicationWithClassBasedProperties.objects.all(),
+            'property_names': ('major_sum', 'major_avg'),
+            'output_field': models.IntegerField(),
+            'cached': True,
+        },
+    ])
+    def test_initializer(self, kwargs):
+        prop = SubqueryObjectProperty(**kwargs)
+        assert prop.queryset is kwargs['queryset']
+        assert prop.field_name == 'pk'
+        assert prop.output_field is None
+        assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
+        assert prop._descriptor is None
+        assert prop._field_names == kwargs.get('field_names')
+        assert prop._property_names == kwargs.get('property_names', ())
+        assert prop._sub_property_refs == {}
+        assert prop._field_aliases == {}
+
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
-    def test_getter_no_cache(self, django_assert_num_queries, applications, ref):
+    @pytest.mark.parametrize('cached', [True, False])
+    def test_getter_no_cache(self, monkeypatch, django_assert_num_queries, applications, ref, cached):
+        monkeypatch.setattr(ref.property, 'cached', cached)
         application = applications[0]
         version = application.versions.get(major=2)
 
@@ -106,15 +134,20 @@ class TestSubqueryObjectProperty(object):  # TODO: test initializer, _build_sub_
             assert not sub_ref.descriptor.has_cached_value(application)
 
         with django_assert_num_queries(1):
-            assert application.highest_version_object == version
-            assert ref.descriptor.get_cached_value(application) == version
-            assert get_queryable_property_descriptor(VersionWithClassBasedProperties, 'version').get_cached_value(
-                application.highest_version_object) == version.version
-            assert application.highest_version_object.version == version.version
+            value = application.highest_version_object
+            assert value == version
+            assert ref.descriptor.has_cached_value(application) is cached
+            if cached:
+                assert ref.descriptor.get_cached_value(application) == version
+                assert get_queryable_property_descriptor(VersionWithClassBasedProperties, 'version').get_cached_value(
+                    value) == version.version
+            assert value.version == version.version
             for field in VersionWithClassBasedProperties._meta.concrete_fields:
-                assert getattr(version, field.attname) == getattr(application.highest_version_object, field.attname)
+                assert getattr(version, field.attname) == getattr(value, field.attname)
             for name, sub_ref in six.iteritems(ref.property._sub_property_refs):
-                assert sub_ref.descriptor.get_cached_value(application) == getattr(version, name)
+                assert sub_ref.descriptor.has_cached_value(application) is cached
+                if cached:
+                    assert sub_ref.descriptor.get_cached_value(application) == getattr(version, name)
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
