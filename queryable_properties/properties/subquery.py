@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import six
 
-from ..apps import QueryablePropertiesConfig
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..query import QUERYING_PROPERTIES_MARKER
 from ..utils import get_queryable_property
@@ -83,11 +82,15 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
     individual field values.
     """
 
-    def __init__(self, queryset, field_names=None, property_names=(), **kwargs):
+    def __init__(self, model, queryset, field_names=None, property_names=(), **kwargs):
         """
         Initialize a new property that allows to fetch an entire model object
         from the first row of a given subquery.
 
+        :param model: The model class whose instances are being queried via the
+                      subquery. Can be either a concrete model class or a lazy
+                      reference to a model class (see foreign keys).
+        :type model: type | str
         :param queryset: The internal queryset to use as the subquery or a
                          callable without arguments that generates the internal
                          queryset.
@@ -106,32 +109,33 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         kwargs.pop('output_field', None)
         super(SubqueryObjectProperty, self).__init__(queryset, 'pk', **kwargs)
         self._descriptor = None
+        self._subquery_model = model
         self._field_names = field_names
         self._property_names = property_names
         self._sub_property_refs = {}
         self._field_aliases = {}
 
-    def _build_sub_properties(self):
+    def _build_sub_properties(self, model, subquery_model):
         """
         Construct the sub-properties this property builds on, attach them to
         the model class and store references to them in attributes.
         """
         def add_sub_property(name, queryset, output_field=None):
             prop = SubqueryFieldProperty(queryset, name, output_field=output_field, cached=self.cached)
-            prop.contribute_to_class(self.model, '-'.join((self.name, name)))
+            prop.contribute_to_class(model, '-'.join((self.name, name)))
             self._sub_property_refs[name] = prop._resolve()[0]
 
-        for field in self.queryset.model._meta.concrete_fields:
+        for field in subquery_model._meta.concrete_fields:
             if field.primary_key or (self._field_names is not None and field.name not in self._field_names):
                 continue
-            add_sub_property(field.attname, self.queryset)
+            add_sub_property(field.attname, self._queryset)
             if field.name != field.attname:
                 self._field_aliases[field.name] = field.attname
         for property_name in self._property_names:
-            remote_ref = get_queryable_property(self.queryset.model, property_name)._resolve(self.queryset.model)[0]
+            remote_ref = get_queryable_property(subquery_model, property_name)._resolve(subquery_model)[0]
             add_sub_property(
                 property_name,
-                QueryablePropertiesQuerySetMixin.apply_to(self.queryset).select_properties(property_name),
+                lambda: QueryablePropertiesQuerySetMixin.apply_to(self.queryset).select_properties(property_name),
                 get_output_field(remote_ref.get_annotation()),
             )
 
@@ -148,12 +152,14 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         return SubqueryObjectPropertyReference(self, model or self.model, relation_path), remaining_path
 
     def contribute_to_class(self, cls, name):
+        from django.db.models.fields.related import lazy_related_operation
+
         super(SubqueryObjectProperty, self).contribute_to_class(cls, name)
         self._descriptor = getattr(cls, name)
         self._descriptor._ignore_cached_value = True
-        # Build SubqueryFieldProperty objects for each field after Django is
-        # done initializing.
-        QueryablePropertiesConfig.add_ready_callback(self._build_sub_properties)
+        # Build SubqueryFieldProperty objects for each field after the subquery
+        # model was constructed.
+        lazy_related_operation(self._build_sub_properties, self.model, self._subquery_model)
 
     def get_value(self, obj):
         if self._descriptor.has_cached_value(obj):

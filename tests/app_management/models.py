@@ -188,6 +188,7 @@ class ApplicationWithClassBasedProperties(Application):
     )
     if DJANGO_VERSION >= (1, 11):
         highest_version_object = SubqueryObjectProperty(
+            'VersionWithClassBasedProperties',
             lambda: (VersionWithClassBasedProperties.objects.filter(application=models.OuterRef('pk'))
                                                             .order_by('-major', '-minor', '-patch')),
             property_names=('version',),

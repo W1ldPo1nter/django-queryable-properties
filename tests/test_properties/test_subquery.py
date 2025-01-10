@@ -99,10 +99,12 @@ class TestSubqueryObjectProperty(object):  # TODO: test _build_sub_properties
 
     @pytest.mark.parametrize('kwargs', [
         {
+            'model': ApplicationWithClassBasedProperties,
             'queryset': ApplicationWithClassBasedProperties.objects.filter(name='test'),
             'field_names': ('name', 'common_data'),
         },
         {
+            'model': 'app_management.ApplicationWithClassBasedProperties',
             'queryset': ApplicationWithClassBasedProperties.objects.all(),
             'property_names': ('major_sum', 'major_avg'),
             'output_field': models.IntegerField(),
@@ -116,6 +118,7 @@ class TestSubqueryObjectProperty(object):  # TODO: test _build_sub_properties
         assert prop.output_field is None
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
         assert prop._descriptor is None
+        assert prop._subquery_model == kwargs['model']
         assert prop._field_names == kwargs.get('field_names')
         assert prop._property_names == kwargs.get('property_names', ())
         assert prop._sub_property_refs == {}
