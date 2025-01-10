@@ -24,7 +24,6 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
-    'queryable_properties',
     'tests.app_management',
 )
 if DJANGO_VERSION < (1, 9):
