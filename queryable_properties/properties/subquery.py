@@ -138,6 +138,9 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                 lambda: QueryablePropertiesQuerySetMixin.apply_to(self.queryset).select_properties(property_name),
                 get_output_field(remote_ref.get_annotation()),
             )
+        # Ensure the attribute always references the actual class after
+        # initialization.
+        self._subquery_model = subquery_model
 
     def _resolve(self, model=None, relation_path=QueryPath(), remaining_path=QueryPath()):
         if remaining_path:
@@ -146,7 +149,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                 # Reference to one of the fields represented by the sub-properties.
                 ref = self._sub_property_refs[first]._replace(model=model or self.model, relation_path=relation_path)
                 return ref, remaining_path[1:]
-            if first in ('pk', self.queryset.model._meta.pk.name, self.queryset.model._meta.pk.attname):
+            if first in ('pk', self._subquery_model._meta.pk.name, self._subquery_model._meta.pk.attname):
                 # Reference to the primary key field represented by this property.
                 return super(SubqueryObjectProperty, self)._resolve(model, relation_path, remaining_path[1:])
         return SubqueryObjectPropertyReference(self, model or self.model, relation_path), remaining_path
@@ -166,7 +169,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             cached_value = self._descriptor.get_cached_value(obj)
             # The cached value is already the final model object, so it can
             # be returned as-is.
-            if isinstance(cached_value, self.queryset.model):
+            if isinstance(cached_value, self._subquery_model):
                 return cached_value
 
             # The cached value is a raw primary key. Use this value and the
@@ -189,7 +192,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                     ref.descriptor.set_cached_value(obj, values[ref.property.name])
 
         field_names, field_values = [], []
-        for field in self.queryset.model._meta.concrete_fields:
+        for field in self._subquery_model._meta.concrete_fields:
             if field.primary_key:
                 field_values.append(values[self.name])
             elif (field.attname in self._sub_property_refs and
@@ -198,7 +201,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             else:
                 continue
             field_names.append(field.attname)
-        subquery_obj = self.queryset.model.from_db(self.queryset.db, field_names, field_values)
+        subquery_obj = self._subquery_model.from_db(self.queryset.db, field_names, field_values)
 
         # Populate any queryable properties whose values were queried for
         # the subquery object.
@@ -214,7 +217,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         return subquery_obj
 
     def get_filter(self, cls, lookup, value):
-        if isinstance(value, self.queryset.model):
+        if isinstance(value, self._subquery_model):
             value = value.pk
         return super(SubqueryObjectProperty, self).get_filter(cls, lookup, value)
 
