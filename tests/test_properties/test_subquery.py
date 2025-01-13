@@ -91,7 +91,7 @@ class TestSubqueryExistenceCheckProperty(object):
         assert categories[0].has_v2 is expected_result
 
 
-class TestSubqueryObjectProperty(object):  # TODO: test _build_sub_properties
+class TestSubqueryObjectProperty(object):
 
     @pytest.fixture
     def ref(self):
@@ -123,6 +123,36 @@ class TestSubqueryObjectProperty(object):  # TODO: test _build_sub_properties
         assert prop._property_names == kwargs.get('property_names', ())
         assert prop._sub_property_refs == {}
         assert prop._field_aliases == {}
+
+    @pytest.mark.parametrize('subquery_model, field_names, property_names, expected_aliases', [
+        (
+            VersionWithClassBasedProperties,
+            ['major', 'minor', 'patch', 'application'],
+            [],
+            {'application': 'application_id'},
+        ),
+        (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {}),
+    ])
+    def test_build_sub_properties(self, subquery_model, field_names, property_names, expected_aliases):
+        model = Mock(__name__='MockModel')
+        prop = SubqueryObjectProperty(subquery_model, None, field_names, property_names)
+        prop.name = 'test'
+        if field_names is None:
+            field_names = [field.name for field in subquery_model._meta.concrete_fields]
+            field_names.remove(subquery_model._meta.pk.name)
+        all_names = set(subquery_model._meta.get_field(field_name).attname for field_name in field_names)
+        all_names.update(property_names)
+
+        prop._build_sub_properties(model, subquery_model)
+        assert prop._subquery_model is subquery_model
+        assert prop._field_aliases == expected_aliases
+        assert set(prop._sub_property_refs) == all_names
+        for name in all_names:
+            sub_prop = prop._sub_property_refs[name].property
+            assert isinstance(sub_prop, SubqueryFieldProperty)
+            assert sub_prop.field_name == name
+            assert sub_prop.name == '-'.join((prop.name, name))
+            assert getattr(model, sub_prop.name).prop == sub_prop
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
