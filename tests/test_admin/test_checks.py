@@ -148,6 +148,8 @@ class TestQueryablePropertiesChecksMixin(object):
         (VersionInline, F('version')),
         (ApplicationAdmin, Concat(Value('V'), 'highest_version')),
         (VersionInline, Concat(Value('V'), 'version')),
+        (ApplicationAdmin, F('highest_version').desc()),
+        (VersionInline, F('version').desc()),
         (ApplicationAdmin, Concat(Value('V'), 'highest_version').desc()),
         (VersionInline, Concat(Value('V'), 'version').desc()),
     ])
