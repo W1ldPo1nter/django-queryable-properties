@@ -167,9 +167,9 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
     def get_value(self, obj):
         if self._descriptor.has_cached_value(obj):
             cached_value = self._descriptor.get_cached_value(obj)
-            # The cached value is already the final model object, so it can
-            # be returned as-is.
-            if isinstance(cached_value, self._subquery_model):
+            if cached_value is None or isinstance(cached_value, self._subquery_model):
+                # The cached value is already the final model object or None,
+                # so it can be returned as-is.
                 return cached_value
 
             # The cached value is a raw primary key. Use this value and the
@@ -190,6 +190,10 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                 self._descriptor.set_cached_value(obj, values[self.name])
                 for ref in six.itervalues(self._sub_property_refs):
                     ref.descriptor.set_cached_value(obj, values[ref.property.name])
+            if values[self.name] is None:
+                # The subquery didn't return a row, so no instance can be
+                # constructed.
+                return None
 
         field_names, field_values = [], []
         for field in self._subquery_model._meta.concrete_fields:
