@@ -25,6 +25,15 @@ class DummyListFilter(SimpleListFilter):
     parameter_name = 'dummy'
 
 
+if not hasattr(F, 'asc'):
+    class F(F):
+        def asc(self, **kwargs):
+            return self
+
+        def desc(self, **kwargs):
+            return self
+
+
 def assert_admin_validation(admin_class, model, error_id=None, exception_text=None):
     """
     Validate an admin class and compare the result to the given expectation.
@@ -148,6 +157,8 @@ class TestQueryablePropertiesChecksMixin(object):
         (VersionInline, F('version')),
         (ApplicationAdmin, Concat(Value('V'), 'highest_version')),
         (VersionInline, Concat(Value('V'), 'version')),
+        (ApplicationAdmin, F('highest_version').desc()),
+        (VersionInline, F('version').desc()),
         (ApplicationAdmin, Concat(Value('V'), 'highest_version').desc()),
         (VersionInline, Concat(Value('V'), 'version').desc()),
     ])
