@@ -28,7 +28,7 @@ if DJANGO_VERSION < (4, 1):
 
 
 @pytest.fixture(autouse=True, scope='session')
-def length_transform():
+def length_lookup():
     try:
         from django.db.models.functions import Length
     except ImportError:
@@ -39,7 +39,7 @@ def length_transform():
 
 
 @pytest.fixture(autouse=True, scope='session')
-def sha1_transform():
+def sha1_lookup():
     try:
         from django.db.models.functions import SHA1
     except ImportError:
