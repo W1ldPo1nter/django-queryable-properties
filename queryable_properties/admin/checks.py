@@ -186,10 +186,11 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                  as well as a list of check errors.
         :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
         """
-        if not isinstance(field_name, six.string_types) and hasattr(expressions, 'Combinable'):
-            if isinstance(field_name, expressions.Combinable):
+        if (not isinstance(field_name, six.string_types) and hasattr(expressions, 'Combinable') and
+                isinstance(field_name, (expressions.Combinable, expressions.OrderBy))):
+            if not isinstance(field_name, expressions.OrderBy):
                 field_name = field_name.asc()
-            if isinstance(field_name, expressions.OrderBy) and isinstance(field_name.expression, F):
+            if isinstance(field_name.expression, F):
                 field_name = field_name.expression.name
         if field_name.startswith('-') or field_name.startswith('+'):
             field_name = field_name[1:]
