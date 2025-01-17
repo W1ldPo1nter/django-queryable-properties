@@ -34,7 +34,8 @@ def length_transform():
     except ImportError:
         pass
     else:
-        CharField.register_lookup(Length)
+        if hasattr(Length, 'lookup_name'):
+            CharField.register_lookup(Length)
 
 
 @pytest.fixture(autouse=True, scope='session')
