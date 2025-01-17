@@ -2,6 +2,7 @@
 import pytest
 import six
 from django import VERSION as DJANGO_VERSION
+from django.core.exceptions import FieldError
 from django.db import models
 from mock import Mock
 
@@ -384,6 +385,14 @@ class TestSubqueryObjectProperty(object):
             assert result == dict(zip(values_names + (['expr'] if expressions else []), values))
         for result, values in zip(queryset.values_list(*names), expected_values):
             assert result == tuple(values)
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    def test_raw_values_with_transform(self):
+        # Django does not support using registered transforms on any annotation.
+        with pytest.raises(FieldError):
+            ApplicationWithClassBasedProperties.objects.select_properties('highest_version_object').values(
+                'highest_version_object__version__length')
 
     @pytest.mark.django_db
     def test_no_subquery_row(self, django_assert_num_queries, applications, versions):
