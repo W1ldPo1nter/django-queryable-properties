@@ -3,16 +3,9 @@
 
 from __future__ import unicode_literals
 
-try:  # pragma: no cover
-    from django.apps.config import APPS_MODULE_NAME
-except ImportError:  # pragma: no cover
-    default_app_config = 'queryable_properties.apps.QueryablePropertiesConfig'
-else:  # pragma: no cover
-    del APPS_MODULE_NAME
-
 __version__ = '1.9.3'
 __author__ = 'Marcus Klöpfel'
-__copyright__ = 'Copyright 2024, Marcus Klöpfel'
+__copyright__ = 'Copyright 2025, Marcus Klöpfel'
 __license__ = 'BSD'
 __maintainer__ = 'Marcus Klöpfel'
 __email__ = 'marcus.kloepfel@gmail.com'
