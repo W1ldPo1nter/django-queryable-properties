@@ -90,7 +90,33 @@ In addition to the regular configuration options for :ref:`annotation_based:Anno
 How it works
 ^^^^^^^^^^^^
 
-TODO
+Since Django can generally only retrieve one value per field or annotation, a ``SubqueryObjectProperty`` has to do some
+extra work to be able to retrieve entire model instances.
+In fact, defining a ``SubqueryObjectProperty`` will actually define multiple queryable properties at once in most cases.
+To properly work with Django's annotation system, a :class:`queryable_properties.properties.SubqueryFieldProperty` will
+be created for each field or queryable property that should be handled for subquery objects.
+The actual ``SubqueryObjectProperty`` will handle the primary key value of the subquery object internally while
+managing all created sub-properties.
+
+These additional properties are automatically named
+``<name of the object property>-<name of the represented field or property>``.
+However, these internal property names should not be relevant unless such properties are to be populated in raw queries,
+where these field names have to be used.
+This means that in the example above, the ``Application`` model doesn't just contain a single queryable property - there
+are actually five properties:
+
+* ``latest_version``: The actual ``SubqueryObjectProperty`` that handles the primary key value internally
+* ``latest_version-application``: Handles the ``application`` field of subquery objects
+* ``latest_version-major``: Handles the ``major`` field of subquery objects
+* ``latest_version-minor``: Handles the ``minor`` field of subquery objects
+* ``latest_version-version_str``: Handles the ``version_str`` property of subquery objects
+
+As a consequence, the generated SQL of queries selecting ``SubqueryObjectProperty`` can become quite large since they
+essentially select multiple ``SubqueryFieldProperty`` instances that internally use the same queryset but select a
+different field or queryable property each.
+Therefore, the SQL will contain multiple sub-``SELECT`` clauses that are almost identical.
+However, this should **not** affect the actual database performance as any DBMS will figure out that all these queries
+refer to the same object and then optimize internally.
 
 Filtering/Ordering in querysets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
