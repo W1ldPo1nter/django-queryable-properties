@@ -27,7 +27,6 @@ Let's look at a full example:
 
     class Application(models.Model):
         """Represents a named application."""
-        categories = models.ManyToManyField(Category, related_name='applications')
         name = models.CharField(max_length=255)
 
         latest_version = SubqueryObjectProperty(
@@ -85,6 +84,7 @@ In addition to the regular configuration options for :ref:`annotation_based:Anno
   If the subquery model defines its own queryable properties, a ``SubqueryObjectProperty`` can be configured to also
   populate their values when retrieving subquery objects.
   This option can be used to configure a sequence containing the property names to populate.
+  Specified properties must be annotatable.
   If it is not used, no queryable properties will be populated on submodel instances.
 
 How it works
@@ -121,7 +121,38 @@ refer to the same object and then optimize internally.
 Filtering/Ordering in querysets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-TODO
+Interacting with a ``SubqueryObjectProperty`` is designed to resemble interaction with foreign keys.
+The property itself can be used to filter against instances or primary key values of the subquery model, while all
+subquery model fields or properties can be accessed using ``__`` notation.
+The following examples should be able to convey how a ``SubqueryObjectProperty`` can be used in filtering and ordering.
+
+.. code-block:: python
+
+    # The main property can be used to filter against subquery objects or primary keys
+    some_version = ApplicationVersion.objects.get(...)
+    Application.objects.filter(latest_version=some_version)
+    Application.objects.filter(latest_version=42)
+    Application.objects.filter(latest_version__isnull=True)  # Finds applications without latest versions
+
+    # The 'pk' shortcut or the name of the subquery model's primary key field can also be used
+    Application.objects.filter(latest_version__pk=42)
+    Application.objects.filter(latest_version__id__gt=42)
+
+    # Any of the subquery model's fields or properties handled by the SubqueryObjectProperty can also be used
+    Application.objects.filter(latest_version__major__lt=3)
+    Application.objects.filter(latest_version__version_str='1.2')
+
+    # All of the field names shown above can also be used for ordering
+    Application.objects.order_by('latest_version')  # Orders by primary key values of the latest versions
+    Application.objects.order_by('-latest_version__pk')
+    Application.objects.order_by('-latest_version__major')
+    Application.objects.order_by('latest_version__version_str')
+
+.. caution::
+   If the subquery model contains foreign keys or its own ``SubqueryObjectProperty``, they are only represented by
+   raw primary key values.
+   Their sub-fields or sub-properties are not available for filtering and ordering.
+   Hence, in the example above, it wouldn't be possible to filter or order by ``latest_version__application__name``.
 
 Selection in querysets
 ^^^^^^^^^^^^^^^^^^^^^^
