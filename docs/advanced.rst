@@ -157,4 +157,60 @@ The following examples should be able to convey how a ``SubqueryObjectProperty``
 Selection in querysets
 ^^^^^^^^^^^^^^^^^^^^^^
 
-TODO
+Just like any other annotatable queryable property, ``SubqueryObjectProperty``'s values can be selected in querysets
+using the ``select_properties`` method.
+However, since there are multiple parts to a ``SubqueryObjectProperty``, there are some additional options when
+selecting.
+
+Simply selecting the ``SubqueryObjectProperty`` itself will lead to a selection of all configured fields and queryable
+properties of the subquery model:
+
+.. code-block:: python
+
+    for application in Application.objects.select_properties('latest_version')
+        # None of the next lines will trigger an additional query as all fields are already populated
+        print(application.latest_version)
+        print(application.latest_version.pk)
+        print(application.latest_version.major)
+        print(application.latest_version.version_str)
+
+It is also possible to only populate *some* of the configured fields and queryable properties.
+All fields that haven't been selected are treated as deferred and accessing them will trigger a query.
+
+.. code-block:: python
+
+    for application in Application.objects.select_properties('latest_version__pk', 'latest_version__major'):
+        # The next lines will not trigger a query since they have already been populated
+        print(application.latest_version.pk)
+        print(application.latest_version.major)
+        # The next lines will trigger a query each since they haven't been populated
+        print(application.latest_version.minor)
+        print(application.latest_version.version_str)
+
+.. caution::
+   When selecting only a subset of the configured fields and queryable properties, make sure to always include the
+   selection of the primary key value.
+   If the primary key isn't populated, a ``SubqueryObjectProperty``'s getter will assume that no fields have been
+   populated and perform a query to populate them all.
+   This would render the initial selection of the otherfields useless.
+
+In ``.values()`` or ``.values_list()`` queries, the property behaves like a foreign key again.
+If it is requested via one of these methods, only the subquery object's primary key will be retrieved.
+All other fields or queryable properties have to be requested individually.
+
+.. code-block:: python
+
+    for pk in Application.objects.select_properties('latest_version').values_list('latest_version', flat=True):
+        print(pk)  # Will output the primary key value of the latest version
+
+    for pk, major in Application.objects.select_properties('latest_version').values_list('latest_version__pk',
+                                                                                         'latest_version__major'):
+        print(pk)  # Will output the primary key value of the latest version
+        print(major)  # Will output the value of the "major" field of the latest version
+
+.. caution::
+   Due to the behavior in ``.values()`` or ``.values_list()`` queries, prefetching values for a
+   ``SubqueryObjectProperty`` via :func:`queryable_properties.utils.prefetch_queryable_properties` will also only
+   prefetch the primary key value.
+   Any of the configured fields and queryable propertie that should also be prefetched have to be stated explicitly
+   via the ``__`` syntax shown above.
