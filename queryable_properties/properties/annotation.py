@@ -31,7 +31,7 @@ class AnnotationProperty(AnnotationGetterMixin, QueryableProperty):
 class AggregateProperty(AnnotationProperty):
     """
     A property that is based on an aggregate that is used to provide both
-    queryset annotations as well as getter values.
+    queryset annotations and getter values.
     """
 
     def __init__(self, aggregate, **kwargs):

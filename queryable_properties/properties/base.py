@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 
+from collections import namedtuple
 from copy import deepcopy
 from functools import partial
 
@@ -11,7 +12,7 @@ from ..compat import LOOKUP_SEP, pretty_name
 from ..exceptions import QueryablePropertyError
 from ..query import QUERYING_PROPERTIES_MARKER
 from ..utils import get_queryable_property, reset_queryable_property
-from ..utils.internal import parametrizable_decorator_method
+from ..utils.internal import NodeModifier, QueryPath, get_queryable_property_descriptor, parametrizable_decorator_method
 from .cache_behavior import CLEAR_CACHE
 from .mixins import AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin
 
@@ -28,6 +29,8 @@ class QueryablePropertyDescriptor(property):
     properties by Django, e.g. to allow queryable properties with a setter to
     be used in the initializer kwargs of models.
     """
+
+    _ignore_cached_value = False  #: Internal flag that allows to ignore cached values in getter/setter interactions.
 
     def __new__(cls, prop):
         """
@@ -48,7 +51,7 @@ class QueryablePropertyDescriptor(property):
         # Always check for cached values first regardless of the associated
         # property being configured as cached since values will also be cached
         # through annotation selections.
-        if self.has_cached_value(obj):
+        if not self._ignore_cached_value and self.has_cached_value(obj):
             return self.get_cached_value(obj)
         if not self.prop.get_value:
             raise AttributeError('Unreadable queryable property.')
@@ -68,7 +71,7 @@ class QueryablePropertyDescriptor(property):
         return_value = self.prop.set_value(obj, value)
         # If a value is set and the property is set up to cache values or has
         # a current cached value, invoke the configured setter cache behavior.
-        if self.prop.cached or self.has_cached_value(obj):
+        if self.prop.cached or (not self._ignore_cached_value and self.has_cached_value(obj)):
             self.prop.setter_cache_behavior(self, obj, value, return_value)
 
     def __str__(self):
@@ -217,6 +220,31 @@ class QueryableProperty(object):
         # to reset the cached values of queryable properties.
         if not getattr(cls, RESET_METHOD_NAME, None):
             setattr(cls, RESET_METHOD_NAME, reset_queryable_property)
+
+    def _resolve(self, model=None, relation_path=QueryPath(), remaining_path=QueryPath()):
+        """
+        Core part of resolving queryable properties that allows individual
+        properties to customize the resolving process.
+
+        Must return a reference to this or another appropriate queryable
+        property based on the given parameters as well as the (potentially
+        modified) remaining path.
+
+        :param type | None model: The model class the property is being
+                                  referenced on, which may be a subclass of
+                                  the model it's defined on. If not provided,
+                                  this defaults to the model the property is
+                                  defined on.
+        :param QueryPath relation_path: The path representing the relation the
+                                        property is being referenced across.
+        :param QueryPath remaining_path: The remaining query path of the
+                                         expression that referenced the
+                                         property.
+        :return: A 2-tuple containing a reference to a queryable property as
+                 well as the final remaining path.
+        :rtype: (QueryablePropertyReference, QueryPath)
+        """
+        return QueryablePropertyReference(self, model or self.model, relation_path), remaining_path
 
 
 class queryable_property(QueryableProperty):
@@ -438,3 +466,97 @@ class queryable_property(QueryableProperty):
         :rtype: queryable_property
         """
         return self._clone(get_update_kwargs=self._extract_function(method))
+
+
+class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):
+    """
+    A reference to a queryable property that also holds the path to reach the
+    property across relations.
+    """
+    __slots__ = ()
+    node_modifier = NodeModifier(lambda item, ref: ((ref.relation_path + item[0]).as_str(), item[1]))
+
+    @property
+    def full_path(self):
+        """
+        Return the full query path to the queryable property (including the
+        relation prefix).
+
+        :return: The full path to the queryable property.
+        :rtype: QueryPath
+        """
+        return self.relation_path + self.property.name
+
+    @property
+    def descriptor(self):
+        """
+        Return the descriptor object associated with the queryable property
+        this reference points to.
+
+        :return: The queryable property descriptor for the referenced property.
+        :rtype: queryable_properties.properties.base.QueryablePropertyDescriptor
+        """
+        return get_queryable_property_descriptor(self.model, self.property.name)
+
+    def get_filter(self, lookups, value):
+        """
+        A wrapper for the get_filter method of the property this reference
+        points to. It checks if the property actually supports filtering and
+        applies the relation path (if any) to the returned Q object.
+
+        :param QueryPath lookups: The lookups/transforms to use for the filter.
+        :param value: The value passed to the filter condition.
+        :return: A Q object to filter using this property.
+        :rtype: django.db.models.Q
+        """
+        if not self.property.get_filter:
+            raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
+                                         'implement filtering.'.format(self.property))
+
+        # Use the model stored on this reference instead of the one on the
+        # property since the query may be happening from a subclass of the
+        # model the property is defined on.
+        q_obj = self.property.get_filter(self.model, lookups.as_str() or 'exact', value)
+        if self.relation_path:
+            # If the resolved property belongs to a related model, all actual
+            # conditions in the returned Q object must be modified to use the
+            # current relation path as prefix.
+            q_obj = self.node_modifier.modify_leaves(q_obj, ref=self)
+        return q_obj
+
+    def get_annotation(self):
+        """
+        A wrapper for the get_annotation method of the property this reference
+        points to. It checks if the property actually supports annotation
+        creation performs the internal call with the correct model class.
+
+        :return: An annotation object.
+        """
+        if not self.property.get_annotation:
+            raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
+                                         'implement annotation creation.'.format(self.property))
+        # Use the model stored on this reference instead of the one on the
+        # property since the query may be happening from a subclass of the
+        # model the property is defined on.
+        return self.property.get_annotation(self.model)
+
+    def annotate_query(self, query, full_group_by, select=False, remaining_path=QueryPath()):
+        """
+        Add the annotation represented by the referenced property to the given
+        query.
+
+        :param django.db.models.sql.query.Query query: The query to add the
+                                                       annotation to.
+        :param bool full_group_by: Signals whether to use all fields of the
+                                   query for the GROUP BY clause when dealing
+                                   with an aggregate-based annotation.
+        :param bool select: Signals whether the annotation should be selected.
+        :param QueryPath remaining_path: The remaining query path of the
+                                         expression that referenced the
+                                         property.
+        :return: A 2-tuple containing the added annotation as well as the
+                 remaining query path (i.e. lookups/transforms).
+        :rtype: (django.db.models.expressions.BaseExpression, QueryPath)
+        """
+        with query._add_queryable_property_annotation(self, full_group_by, select=select) as annotation:
+            return annotation, remaining_path

@@ -7,13 +7,11 @@ from contextlib import contextmanager
 
 import six
 from django.db.models import F
-from django.db.models.sql.query import RawQuery
 from django.utils.tree import Node
 
 from .compat import (
-    ADD_Q_METHOD_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, BUILD_FILTER_METHOD_NAME, NAMES_TO_PATH_METHOD_NAME,
-    NEED_HAVING_METHOD_NAME, QUERY_CHAIN_METHOD_NAME, ValuesQuerySet, contains_aggregate,
-    convert_build_filter_to_add_q_kwargs, nullcontext,
+    ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, ValuesQuerySet, compat_call, compat_getattr, contains_aggregate,
+    get_arg_names, nullcontext,
 )
 from .exceptions import QueryablePropertyError
 from .utils.internal import InjectableMixin, NodeChecker, QueryPath, resolve_queryable_property
@@ -41,7 +39,9 @@ class AggregatePropertyChecker(NodeChecker):
         :param ignored_refs: Queryable property references that should not be
                              checked.
         :type ignored_refs: frozenset[queryable_properties.utils.internal.QueryablePropertyReference]
-        :return:
+        :return: True if the node or a subnode reference an aggregate property;
+                 otherwise False.
+        :rtype: bool
         """
         property_ref, lookups = resolve_queryable_property(model, QueryPath(item[0]))
         if not property_ref or property_ref in ignored_refs:
@@ -107,31 +107,26 @@ class QueryablePropertiesBaseQueryMixin(InjectableMixin):
         # Determines whether to inject the QUERYING_PROPERTIES_MARKER.
         self._use_querying_properties_marker = False
 
-    def _postprocess_clone(self, clone):
-        """
-        Postprocess a query that was the result of cloning this query. This
-        ensures that the cloned query also uses the correct mixin and that the
-        queryable property attributes are initialized correctly.
-
-        :param django.db.models.sql.Query clone: The cloned query.
-        :return: The postprocessed cloned query.
-        :rtype: django.db.models.sql.Query
-        """
-        inject_query_mixin(clone)
-        clone.init_injected_attrs()
-        clone._queryable_property_annotations.update(self._queryable_property_annotations)
-        return clone
-
     def clone(self, *args, **kwargs):
-        obj = super(QueryablePropertiesBaseQueryMixin, self).clone(*args, **kwargs)
-        if QUERY_CHAIN_METHOD_NAME == 'clone':  # pragma: no cover
-            obj = self._postprocess_clone(obj)
-        return obj
+        # Very old Django versions didn't have the chain method yet. Simply
+        # delegate to the overridden chain in this case, which is aware of the
+        # different methods in different versions and therefore calls the
+        # correct super method.
+        original = super(QueryablePropertiesBaseQueryMixin, self)
+        if not hasattr(original, 'chain'):  # pragma: no cover
+            return self.chain(*args, **kwargs)
+        return original.clone(*args, **kwargs)
 
     def chain(self, *args, **kwargs):
-        obj = super(QueryablePropertiesBaseQueryMixin, self).chain(*args, **kwargs)
-        if QUERY_CHAIN_METHOD_NAME == 'chain':
-            obj = self._postprocess_clone(obj)
+        obj = compat_call(super(QueryablePropertiesBaseQueryMixin, self), ('chain', 'clone'), *args, **kwargs)
+        # Ensure that the proper mixin is added to the cloned object as
+        # chaining may change the clone's class.
+        for mixin in QueryablePropertiesBaseQueryMixin.__subclasses__():
+            if isinstance(self, mixin):
+                mixin.inject_into_object(obj, 'QueryableProperties' + obj.__class__.__name__)
+                break
+        obj.init_injected_attrs()
+        obj._queryable_property_annotations.update(self._queryable_property_annotations)
         return obj
 
 
@@ -150,30 +145,34 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             return getattr(self, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP[name])
         raise AttributeError()
 
+    def __setattr__(self, name, value):
+        # See __getattr__.
+        name = ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP.get(name, name)
+        super(QueryablePropertiesQueryMixin, self).__setattr__(name, value)
+
     @contextmanager
     def _add_queryable_property_annotation(self, property_ref, full_group_by, select=False):
         """
         A context manager that adds a queryable property annotation to this
-        query and performs management tasks around the annotation (stores the
-        information if the queryable property annotation should be selected
-        and populates the queryable property stack correctly). The context
-        manager yields the actual resolved and applied annotation while the
-        stack is still populated.
+        query and performs management tasks around the annotation (stores
+        whether the queryable property annotation should be selected and
+        populates the queryable property stack correctly). The context manager
+        yields the actual resolved and applied annotation while the stack is
+        still populated.
 
         :param property_ref: A reference containing the queryable property
                              to annotate.
         :type property_ref: queryable_properties.utils.internal.QueryablePropertyReference
         :param bool full_group_by: Signals whether to use all fields of the
                                    query for the GROUP BY clause when dealing
-                                   with an aggregate-based annotation or not.
-        :param bool select: Signals whether the annotation should be selected
-                            or not.
+                                   with an aggregate-based annotation.
+        :param bool select: Signals whether the annotation should be selected.
         """
         if property_ref in self._queryable_property_stack:
             raise QueryablePropertyError('Queryable property "{}" has a circular dependency and requires itself.'
                                          .format(property_ref.property))
 
-        annotation_name = six.text_type(property_ref.full_path)
+        annotation_name = property_ref.full_path.as_str()
         annotation_mask = set(self.annotations if self.annotation_select_mask is None else self.annotation_select_mask)
         was_present = property_ref in self._queryable_property_annotations
         was_selected = was_present and (self.annotation_select_mask is None or
@@ -205,7 +204,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
                     # In old versions, the fields must be added to the selected
                     # fields manually and set_group_by must be called after.
                     opts = self.model._meta
-                    self.add_fields([f.attname for f in getattr(opts, 'concrete_fields', opts.fields)], False)
+                    self.add_fields([f.attname for f in compat_getattr(opts, 'concrete_fields', 'fields')], False)
                 self.set_group_by()
 
     def _auto_annotate(self, query_path, full_group_by=None):
@@ -233,8 +232,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             return None, lookups
         if full_group_by is None:
             full_group_by = bool(ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP) and not self.select
-        with self._add_queryable_property_annotation(property_ref, full_group_by) as annotation:
-            return annotation, lookups
+        return property_ref.annotate_query(self, full_group_by, remaining_path=lookups)
 
     def add_aggregate(self, aggregate, model=None, alias=None, is_summary=False):  # pragma: no cover
         # This method is called in older versions to add an aggregate, which
@@ -248,7 +246,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
             # If it is based on a queryable property annotation, annotating the
             # current aggregate cannot be delegated to Django as it couldn't
             # deal with annotations containing the lookup separator.
-            aggregate.add_to_query(self, alias, six.text_type(query_path), property_annotation, is_summary)
+            aggregate.add_to_query(self, alias, query_path.as_str(), property_annotation, is_summary)
         else:
             # The overridden method also allows to set a default value for the
             # model parameter, which will be missing if add_annotation calls are
@@ -263,13 +261,14 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # versions. Since recent versions still have an add_filter method (for
         # different purposes), the queryable properties customizations should
         # only occur in old versions.
-        if BUILD_FILTER_METHOD_NAME == 'add_filter':
+        original = super(QueryablePropertiesQueryMixin, self)
+        if not hasattr(original, 'build_filter'):
             # Simply use the build_filter implementation that does all the
             # heavy lifting and is aware of the different methods in different
             # versions and therefore calls the correct super methods if
             # necessary.
             return self.build_filter(*args, **kwargs)
-        return super(QueryablePropertiesQueryMixin, self).add_filter(*args, **kwargs)
+        return original.add_filter(*args, **kwargs)
 
     def add_ordering(self, *ordering, **kwargs):
         ordering = list(ordering)
@@ -286,7 +285,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
                 item, transforms = self._auto_annotate(query_path)
                 if item and hasattr(F, 'resolve_expression'):
                     if not transforms:
-                        item = F(six.text_type(query_path))
+                        item = F(query_path.as_str())
                     for transform in transforms:
                         item = self.try_transform(item, transform)
                     ordering[index] = item.desc() if descending else item.asc()
@@ -326,12 +325,14 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # exception. Act the same way if the current top of the stack is used
         # to avoid infinite recursions.
         if not property_ref or (self._queryable_property_stack and self._queryable_property_stack[-1] == property_ref):
-            # The base method has different names in different Django versions
-            # (see comment on the constant definition).
-            base_method = getattr(super(QueryablePropertiesQueryMixin, self), BUILD_FILTER_METHOD_NAME)
-            return base_method(filter_expr, *args, **kwargs)
+            return compat_call(
+                super(QueryablePropertiesQueryMixin, self),
+                ('build_filter', 'add_filter'),
+                filter_expr,
+                *args,
+                **kwargs
+            )
 
-        q_obj = property_ref.get_filter(lookups, value)
         # Before applying the filter implemented by the property, check if
         # the property signals the need of its own annotation to function.
         # If so, add the annotation first to avoid endless recursion, since
@@ -343,20 +344,21 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
 
         with context:
             # Luckily, build_filter and _add_q use the same return value
-            # structure, so an _add_q call can be used to actually create the
-            # return value for the current call. The (_)add_q method has
-            # different names in different Django versions (see comment on the
-            # constant definition).
-            method = getattr(self, ADD_Q_METHOD_NAME)
-            return method(q_obj, **convert_build_filter_to_add_q_kwargs(**kwargs))
+            # structure, so an (_)add_q call can be used to actually create the
+            # return value for the current call. (_)add_q arguments differ
+            # between Django versions, so its arguments are inspected
+            # dynamically to pass the given arguments through properly.
+            add_q = compat_getattr(self, '_add_q', 'add_q')
+            final_kwargs = {arg_name: kwargs[arg_name] for arg_name in get_arg_names(add_q)[2:] if arg_name in kwargs}
+            final_kwargs.setdefault('used_aliases', kwargs.get('can_reuse'))
+            return add_q(property_ref.get_filter(lookups, value), **final_kwargs)
 
     def get_aggregation(self, *args, **kwargs):
         # If the query is to be used as a pure aggregate query (which might use
         # a subquery), all queryable property annotations must be added to the
         # select mask to avoid potentially empty SELECT clauses.
         if self.annotation_select_mask is not None and self._queryable_property_annotations:
-            annotation_names = (six.text_type(property_ref.full_path) for property_ref
-                                in self._queryable_property_annotations)
+            annotation_names = (ref.full_path.as_str() for ref in self._queryable_property_annotations)
             self.set_annotation_mask(set(self.annotation_select_mask).union(annotation_names))
         return super(QueryablePropertiesQueryMixin, self).get_aggregation(*args, **kwargs)
 
@@ -375,8 +377,13 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # correctly.
         if self._queryable_property_stack:
             names = self._queryable_property_stack[-1].relation_path + names
-        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NAMES_TO_PATH_METHOD_NAME)
-        return base_method(names, *args, **kwargs)
+        return compat_call(
+            super(QueryablePropertiesQueryMixin, self),
+            ('names_to_path', 'setup_joins'),
+            names,
+            *args,
+            **kwargs
+        )
 
     def need_force_having(self, q_object):  # pragma: no cover
         # Same as need_having, but for even older versions. Simply delegate to
@@ -393,10 +400,7 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         node = obj if isinstance(obj, Node) else Node([obj])
         if aggregate_property_checker.check_leaves(node, model=self.model):
             return True
-        # The base method has different names in different Django versions (see
-        # comment on the constant definition).
-        base_method = getattr(super(QueryablePropertiesQueryMixin, self), NEED_HAVING_METHOD_NAME)
-        return base_method(obj)
+        return compat_call(super(QueryablePropertiesQueryMixin, self), ('need_having', 'need_force_having'), obj)
 
     def resolve_ref(self, name, allow_joins=True, reuse=None, summarize=False, *args, **kwargs):
         # This method is used to resolve field names in complex expressions. If
@@ -421,9 +425,10 @@ class QueryablePropertiesQueryMixin(QueryablePropertiesBaseQueryMixin):
         # versions. Simply delegate to the overridden names_to_path in this
         # case, which is aware of the different methods in different versions
         # and therefore calls the correct super method.
-        if NAMES_TO_PATH_METHOD_NAME == 'setup_joins':  # pragma: no cover
+        original = super(QueryablePropertiesQueryMixin, self)
+        if not hasattr(original, 'names_to_path'):  # pragma: no cover
             return self.names_to_path(names, *args, **kwargs)
-        return super(QueryablePropertiesQueryMixin, self).setup_joins(names, *args, **kwargs)
+        return original.setup_joins(names, *args, **kwargs)
 
 
 class QueryablePropertiesRawQueryMixin(QueryablePropertiesBaseQueryMixin):
@@ -450,17 +455,3 @@ class QueryablePropertiesRawQueryMixin(QueryablePropertiesBaseQueryMixin):
         if self._use_querying_properties_marker:
             columns.insert(0, QUERYING_PROPERTIES_MARKER)
         return columns
-
-
-def inject_query_mixin(query):
-    """
-    Inject the correct query mixin into the given query.
-
-    :param query: The query to inject queryable properties functionality into.
-    :type query: django.db.models.sql.Query | django.db.models.sql.RawQuery
-    :return: The extended query object.
-    """
-    mixin = QueryablePropertiesQueryMixin
-    if isinstance(query, RawQuery):
-        mixin = QueryablePropertiesRawQueryMixin
-    return mixin.inject_into_object(query, 'QueryableProperties' + query.__class__.__name__)

@@ -5,7 +5,7 @@ Introduction
 
 #. Properties are added to a model class which are based on model field values of its instances.
    These properties may even be based on some related model objects and therefore perform additional database queries.
-#. The code base grows and needs to be able to satisfy new demands.
+#. The code base grows and needs to be able to meet new requirements.
 #. The logic of the properties from step 1 would now be useful in batch operations (read: queryset operations), making
    the current implementation less feasible, as it would likely perform additional queries per object in a queryset
    operation.

@@ -4,7 +4,6 @@ Internal utilities used by the queryable properties library, which may change
 without notice or be removed without deprecation.
 """
 
-from collections import namedtuple
 from copy import deepcopy
 from functools import wraps
 
@@ -15,7 +14,7 @@ from django.utils.decorators import method_decorator
 from django.utils.tree import Node
 
 from ..compat import LOOKUP_SEP, get_related_model
-from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist, QueryablePropertyError
+from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist
 
 MISSING_OBJECT = object()  #: Arbitrary object to represent that an object in an attribute chain is missing.
 
@@ -59,10 +58,19 @@ class QueryPath(tuple):
         return self.__class__(super(QueryPath, self).__getslice__(i, j))
 
     def __str__(self):
-        return LOOKUP_SEP.join(self)
+        return self.as_str()
 
     def __repr__(self):
-        return '<{}: {}>'.format(self.__class__.__name__, six.text_type(self))
+        return '<{}: {}>'.format(self.__class__.__name__, self.as_str())
+
+    def as_str(self):
+        """
+        Return this query path in string form.
+
+        :return: The query path as a string.
+        :rtype: str
+        """
+        return LOOKUP_SEP.join(self)
 
     def build_filter(self, value):
         """
@@ -72,7 +80,7 @@ class QueryPath(tuple):
         :return: The filter condition as a Q object.
         :rtype: django.db.models.Q
         """
-        return Q(**{six.text_type(self): value})
+        return Q(**{self.as_str(): value})
 
 
 class NodeProcessor(object):
@@ -164,82 +172,9 @@ class NodeModifier(NodeProcessor):
         return node
 
 
-class QueryablePropertyReference(namedtuple('QueryablePropertyReference', 'property model relation_path')):
-    """
-    A reference to a queryable property that also holds the path to reach the
-    property across relations.
-    """
-    __slots__ = ()
-    node_modifier = NodeModifier(lambda item, ref: (six.text_type(ref.relation_path + item[0]), item[1]))
-
-    @property
-    def full_path(self):
-        """
-        Return the full query path to the queryable property (including the
-        relation prefix).
-
-        :return: The full path to the queryable property.
-        :rtype: QueryPath
-        """
-        return self.relation_path + self.property.name
-
-    @property
-    def descriptor(self):
-        """
-        Return the descriptor object associated with the queryable property
-        this reference points to.
-
-        :return: The queryable property descriptor for the referenced property.
-        :rtype: queryable_properties.properties.base.QueryablePropertyDescriptor
-        """
-        return get_queryable_property_descriptor(self.model, self.property.name)
-
-    def get_filter(self, lookups, value):
-        """
-        A wrapper for the get_filter method of the property this reference
-        points to. It checks if the property actually supports filtering and
-        applies the relation path (if any) to the returned Q object.
-
-        :param QueryPath lookups: The lookups/transforms to use for the filter.
-        :param value: The value passed to the filter condition.
-        :return: A Q object to filter using this property.
-        :rtype: django.db.models.Q
-        """
-        if not self.property.get_filter:
-            raise QueryablePropertyError('Queryable property "{}" is supposed to be used as a filter but does not '
-                                         'implement filtering.'.format(self.property))
-
-        # Use the model stored on this reference instead of the one on the
-        # property since the query may be happening from a subclass of the
-        # model the property is defined on.
-        q_obj = self.property.get_filter(self.model, six.text_type(lookups) or 'exact', value)
-        if self.relation_path:
-            # If the resolved property belongs to a related model, all actual
-            # conditions in the returned Q object must be modified to use the
-            # current relation path as prefix.
-            q_obj = self.node_modifier.modify_leaves(q_obj, ref=self)
-        return q_obj
-
-    def get_annotation(self):
-        """
-        A wrapper for the get_annotation method of the property this reference
-        points to. It checks if the property actually supports annotation
-        creation performs the internal call with the correct model class.
-
-        :return: An annotation object.
-        """
-        if not self.property.get_annotation:
-            raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
-                                         'implement annotation creation.'.format(self.property))
-        # Use the model stored on this reference instead of the one on the
-        # property since the query may be happening from a subclass of the
-        # model the property is defined on.
-        return self.property.get_annotation(self.model)
-
-
 class InjectableMixin(object):
     """
-    A base class for mixin classes that are used to dynamically created classes
+    A base class for mixin classes that are used to dynamically create classes
     based on a base class and the mixin class.
     """
 
@@ -475,9 +410,9 @@ class ModelAttributeGetter(object):
 def parametrizable_decorator(function):
     """
     A decorator for functions who themselves are to be used as decorators and
-    are to support both a parameter-less decorator usage (``@my_decorator``) as
-    well as parametrized decorator usage (``@my_decorator(some_param=5)``).
-    This decorator takes care of making the distinction between both usages and
+    are to support both a parameter-less decorator usage (``@my_decorator``)
+    and parametrized decorator usage (``@my_decorator(some_param=5)``). This
+    decorator takes care of making the distinction between both usages and
     returning the correct object.
 
     :param function function: The decorator function to decorate.
@@ -533,7 +468,6 @@ def resolve_queryable_property(model, query_path):
     """
     from . import get_queryable_property
 
-    property_ref, lookups = None, QueryPath()
     # Try to follow the given path to allow to use queryable properties
     # across relations.
     for index, name in enumerate(query_path):
@@ -545,20 +479,16 @@ def resolve_queryable_property(model, query_path):
             except QueryablePropertyDoesNotExist:
                 # Neither a field nor a queryable property, so likely an
                 # invalid name. Do nothing and let Django deal with it.
-                pass
+                break
             else:
-                property_ref = QueryablePropertyReference(prop, model, query_path[:index])
-                lookups = query_path[index + 1:]
-            # The current name was not a field and either a queryable
-            # property or invalid. Either way, resolving ends here.
-            break
+                return prop._resolve(model, query_path[:index], query_path[index + 1:])
         else:
             if not related_model:
                 # A regular model field that doesn't represent a relation,
                 # meaning that no queryable property is involved.
                 break
             model = related_model
-    return property_ref, lookups
+    return None, QueryPath()
 
 
 def get_output_field(annotation):

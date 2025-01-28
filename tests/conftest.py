@@ -28,6 +28,17 @@ if DJANGO_VERSION < (4, 1):
 
 
 @pytest.fixture(autouse=True, scope='session')
+def length_lookup():
+    try:
+        from django.db.models.functions import Length
+    except ImportError:
+        pass
+    else:
+        if hasattr(Length, 'lookup_name'):
+            CharField.register_lookup(Length)
+
+
+@pytest.fixture(autouse=True, scope='session')
 def sha1_lookup():
     try:
         from django.db.models.functions import SHA1

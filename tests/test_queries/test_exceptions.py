@@ -52,6 +52,16 @@ class TestAnnotation(object):
         with pytest.raises(QueryablePropertyError, match='circular dependency'):
             model.objects.select_properties('circular')
 
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_selection_on_related_model(self, model):
+        with pytest.raises(QueryablePropertyError):
+            model.objects.select_properties('application__version_count')
+
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    def test_selection_with_lookups(self, model):
+        with pytest.raises(QueryablePropertyError):
+            model.objects.select_properties('version_count__abs')
+
 
 class TestUpdate(object):
 

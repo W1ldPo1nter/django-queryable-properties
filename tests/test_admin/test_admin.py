@@ -4,10 +4,11 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import site
 from django.contrib.admin.filters import ChoicesFieldListFilter, FieldListFilter
+from django.contrib.admin.options import ModelAdmin
 from django.db.models.query import QuerySet
 from mock import patch
 
-from queryable_properties.compat import ADMIN_QUERYSET_METHOD_NAME, nullcontext
+from queryable_properties.compat import nullcontext
 from queryable_properties.managers import QueryablePropertiesQuerySetMixin
 from queryable_properties.utils import get_queryable_property
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
@@ -38,7 +39,8 @@ class TestQueryablePropertiesAdminMixin(object):
         admin = admin_class(model, site)
         qs_patch = nullcontext()
         if apply_patch:
-            qs_patch = patch('django.contrib.admin.options.ModelAdmin.{}'.format(ADMIN_QUERYSET_METHOD_NAME),
+            method_name = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
+            qs_patch = patch('django.contrib.admin.options.ModelAdmin.{}'.format(method_name),
                              return_value=QuerySet(model))
 
         with qs_patch:

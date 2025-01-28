@@ -1,7 +1,10 @@
 # encoding: utf-8
-"""A stable import interface for Django classes that were moved in between versions and compatibility constants."""
+"""
+A stable import interface for Python/Django entities across versions as well as compatibility constants and functions.
+"""
 
 from copy import deepcopy
+from operator import attrgetter
 
 try:  # pragma: no cover
     from contextlib import nullcontext  # noqa: F401
@@ -12,10 +15,17 @@ except ImportError:  # pragma: no cover
     def nullcontext(enter_result=None):
         yield enter_result
 
-import six
-from django.contrib.admin.options import ModelAdmin
-from django.db.models import Manager
+try:  # pragma: no cover
+    from inspect import getfullargspec
+except ImportError:  # pragma: no cover
+    from inspect import getargspec as getfullargspec
+
 from django.db.models.sql.query import Query
+
+try:  # pragma: no cover
+    from django.apps import AppConfig  # noqa: F401
+except ImportError:  # pragma: no cover
+    AppConfig = None  # noqa: F401
 
 try:  # pragma: no cover
     from django.contrib.admin import validation as admin_validation  # noqa: F401
@@ -40,9 +50,9 @@ except ImportError:  # pragma: no cover
     ModelIterable = None
 
 try:  # pragma: no cover
-    from django.db.models.query import RawModelIterable
+    from django.db.models.query import RawModelIterable  # noqa: F401
 except ImportError:  # pragma: no cover
-    RawModelIterable = None
+    RawModelIterable = None  # noqa: F401
 
 try:  # pragma: no cover
     from django.db.models.query import DateQuerySet  # noqa: F401
@@ -55,52 +65,14 @@ except ImportError:  # pragma: no cover
     DateTimeQuerySet = None  # noqa: F401
 
 try:  # pragma: no cover
-    from django.db.models.sql.query import RawQuery
-except ImportError:  # pragma: no cover
-    RawQuery = None
-
-try:  # pragma: no cover
     from django.forms.utils import pretty_name  # noqa: F401
 except ImportError:  # pragma: no cover
     from django.forms.forms import pretty_name  # noqa: F401
-
-# A dictionary mapping names of build_filter/add_filter keyword arguments to
-# keyword arguments for an _add_q/add_q call. It contains kwargs names for
-# all Django versions (some do not use all of these). If a keyword argument
-# is not part of this dictionary, it will not be passed through.
-BUILD_FILTER_TO_ADD_Q_KWARGS_MAP = {
-    'can_reuse': 'used_aliases',
-    'branch_negated': 'branch_negated',
-    'current_negated': 'current_negated',
-    'allow_joins': 'allow_joins',
-    'split_subq': 'split_subq',
-    'force_having': 'force_having',
-}
-
-# Very old django versions (<1.6) had different names for the methods
-# containing the build_filter and _add_q logic, which are needed as the core
-# for filters based on queryable properties.
-BUILD_FILTER_METHOD_NAME = 'build_filter'
-ADD_Q_METHOD_NAME = '_add_q'
-if not hasattr(Query, 'build_filter'):  # pragma: no cover
-    BUILD_FILTER_METHOD_NAME = 'add_filter'
-    ADD_Q_METHOD_NAME = 'add_q'
-
-# Old Django versions (<1.9) had a method to check if filter conditions need
-# to be put into the HAVING clause instead of the WHERE clause. To get
-# queryable properties based on aggregates to work, these methods must be
-# intercepted if present.
-NEED_HAVING_METHOD_NAME = None
-if hasattr(Query, 'need_having'):  # pragma: no cover
-    NEED_HAVING_METHOD_NAME = 'need_having'
-elif hasattr(Query, 'need_force_having'):  # pragma: no cover
-    NEED_HAVING_METHOD_NAME = 'need_force_having'
 
 # The annotation-related attributes of Query objects had "aggregate" in their
 # name instead of "annotation" in old django versions (<1.8), because
 # annotations were strongly tied to aggregates.
 ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP = {}
-ANNOTATION_SELECT_CACHE_NAME = '_annotation_select_cache'
 if not hasattr(Query, 'annotation_select'):  # pragma: no cover
     ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP = {
         'add_annotation': 'add_aggregate',
@@ -111,35 +83,66 @@ if not hasattr(Query, 'annotation_select'):  # pragma: no cover
         'annotation_select_mask': 'aggregate_select_mask',
         'set_annotation_mask': 'set_aggregate_mask',
     }
-    ANNOTATION_SELECT_CACHE_NAME = '_aggregate_select_cache'
-
-# Recent Django versions (>=2.0) have separate methods for cloning and chaining
-# while older versions only have the clone method.
-QUERY_CHAIN_METHOD_NAME = 'chain' if hasattr(Query, 'chain') else 'clone'
-
-# Very old django versions (<1.6) didn't have the names_to_path method yet;
-# its implementation was part of setup_joins instead.
-NAMES_TO_PATH_METHOD_NAME = 'names_to_path' if hasattr(Query, 'names_to_path') else 'setup_joins'
-
-MANAGER_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(Manager, 'get_queryset') else 'get_query_set'
-# The `get_queryset` method of ModelAdmins was called `queryset` in very old
-# Django versions.
-ADMIN_QUERYSET_METHOD_NAME = 'get_queryset' if hasattr(ModelAdmin, 'get_queryset') else 'queryset'
 
 
-def convert_build_filter_to_add_q_kwargs(**build_filter_kwargs):
+def compat_getattr(obj, *attr_names):
     """
-    Transform the keyword arguments of a :meth:`Query.build_filter` call into
-    keyword arguments for an appropriate :meth:`Query._add_q` call (or their
-    respective counterparts in older Django versions).
+    Get an attribute value from an object while taking multiple attributes into account to allow compatibility with
+    multiple Python/Django versions.
 
-    :param build_filter_kwargs: The keyword arguments passed to
-                                :meth:`Query.build_filter`.
-    :return: The keywords argument to use for :meth:`Query._add_q`.
-    :rtype: dict
+    :param obj: The object to get the attribute value from.
+    :param str attr_names: The attribute names to take into account in the given order. Names may use dot notation.
+    :return: The attribute value, taken from the first attribute in `attr_names` that exists on the given object.
     """
-    return {BUILD_FILTER_TO_ADD_Q_KWARGS_MAP[key]: value for key, value in six.iteritems(build_filter_kwargs)
-            if key in BUILD_FILTER_TO_ADD_Q_KWARGS_MAP}
+    for attr_name in attr_names:
+        try:
+            return attrgetter(attr_name)(obj)
+        except AttributeError:
+            continue
+    raise AttributeError()
+
+
+def compat_setattr(obj, value, *attr_names):
+    """
+    Set an attribute value on an object while taking multiple attributes into account to allow compatibility with
+    multiple Python/Django versions.
+
+    :param obj: The object to set the attribute value on.
+    :param value: The value to set.
+    :param str attr_names: The attribute names to take into account in the given order. The first attribute that exists
+                           will be set.
+    """
+    for attr_name in attr_names:
+        if hasattr(obj, attr_name):
+            setattr(obj, attr_name, value)
+            return
+    raise AttributeError()
+
+
+def compat_call(obj, method_names, *args, **kwargs):
+    """
+    Perform a method call on an object while taking multiple methods into account to allow compatibility with multiple
+    Python/Django versions.
+
+    :param obj: The object to call the method on.
+    :param collections.Sequence[str] method_names: The method names to take into account in the given order.
+    :return: The return value of the call of the first method that exists.
+    """
+    method = compat_getattr(obj, *method_names)
+    return method(*args, **kwargs)
+
+
+def get_arg_names(func):
+    """
+    Get a list of all non-variadic argument names (including keyword-only arguments in newer Python versions) of the
+    given function.
+
+    :param function func: The function to get the argument names from.
+    :return: The argument names of all non-variadic arguments.
+    :rtype: list[str]
+    """
+    spec = getfullargspec(func)
+    return spec.args + getattr(spec, 'kwonlyargs', [])
 
 
 def chain_queryset(queryset, *args, **kwargs):
@@ -158,21 +161,6 @@ def chain_queryset(queryset, *args, **kwargs):
     if hasattr(queryset, '_clone'):
         return queryset._clone(*args, **kwargs)
     return deepcopy(queryset)  # pragma: no cover
-
-
-def chain_query(query, *args, **kwargs):
-    """
-    Create a copy of the given query to chain a new query method call by
-    calling the appropriate chain/clone method for the current Django version.
-
-    :param Query query: The query to chain.
-    :param args: Positional arguments passed through to the method call.
-    :param kwargs: Keyword arguments passed through to the method call.
-    :return: A copy of given query.
-    :rtype: Query
-    """
-    method = getattr(query, QUERY_CHAIN_METHOD_NAME)
-    return method(*args, **kwargs)
 
 
 def contains_aggregate(annotation):
@@ -206,7 +194,7 @@ def get_related_model(model, relation_field_name):
         # Older Django versions (<1.8) only allowed to find reverse relation
         # objects as well as fields via the get_field_by_name method, which
         # doesn't exist in recent versions anymore.
-        field_or_rel, _, direct, _ = model._meta.get_field_by_name(relation_field_name)
+        field_or_rel, direct = model._meta.get_field_by_name(relation_field_name)[::2]
         # Unlike in recent Django versions, the reverse relation objects and
         # fields also didn't provide the same attributes, which is why they
         # need to be treated differently.

@@ -4,7 +4,12 @@ Changelog
 master (unreleased)
 -------------------
 
+1.10.0 (2025-01-28)
+-------------------
+
 - Added support for Python 3.13
+- Added a new and advanced queryable property implementation that can load entire model objects from subqueries
+  (``SubqueryObjectProperty``)
 - Fixed admin checks for ``OrderBy`` objects in admin ordering
 
 1.9.3 (2024-08-08)

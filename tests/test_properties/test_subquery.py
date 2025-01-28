@@ -1,16 +1,27 @@
 # -*- coding: utf-8 -*-
 import pytest
+import six
 from django import VERSION as DJANGO_VERSION
+from django.core.exceptions import FieldError
 from django.db import models
+from mock import Mock
 
-from queryable_properties.properties import QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty
+try:
+    from django.db.models.functions import Substr
+except ImportError:
+    Substr = Mock()
+
+from queryable_properties.properties import (
+    QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty, SubqueryObjectProperty,
+)
 from queryable_properties.utils import get_queryable_property
+from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
 )
 
 pytestmark = [
-    pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+    pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11"),
 ]
 
 
@@ -26,7 +37,7 @@ class TestSubqueryFieldProperty(object):
             'field_name': 'common_data',
             'output_field': models.IntegerField(),
             'cached': True,
-        }
+        },
     ])
     def test_initializer(self, kwargs):
         prop = SubqueryFieldProperty(**kwargs)
@@ -57,7 +68,7 @@ class TestSubqueryExistenceCheckProperty(object):
             'queryset': ApplicationWithClassBasedProperties.objects.all(),
             'negated': True,
             'cached': True,
-        }
+        },
     ])
     def test_initializer(self, kwargs):
         prop = SubqueryExistenceCheckProperty(**kwargs)
@@ -79,3 +90,338 @@ class TestSubqueryExistenceCheckProperty(object):
         prop = get_queryable_property(CategoryWithClassBasedProperties, 'has_v2')
         monkeypatch.setattr(prop, 'negated', negated)
         assert categories[0].has_v2 is expected_result
+
+
+class TestSubqueryObjectProperty(object):
+
+    @pytest.fixture
+    def ref(self):
+        return get_queryable_property(ApplicationWithClassBasedProperties, 'highest_version_object')._resolve()[0]
+
+    @pytest.mark.parametrize('kwargs', [
+        {
+            'model': ApplicationWithClassBasedProperties,
+            'queryset': ApplicationWithClassBasedProperties.objects.filter(name='test'),
+            'field_names': ('name', 'common_data'),
+        },
+        {
+            'model': 'app_management.ApplicationWithClassBasedProperties',
+            'queryset': ApplicationWithClassBasedProperties.objects.all(),
+            'property_names': ('major_sum', 'major_avg'),
+            'output_field': models.IntegerField(),
+            'cached': True,
+        },
+    ])
+    def test_initializer(self, kwargs):
+        prop = SubqueryObjectProperty(**kwargs)
+        assert prop.queryset is kwargs['queryset']
+        assert prop.field_name == 'pk'
+        assert prop.output_field is None
+        assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
+        assert prop._descriptor is None
+        assert prop._subquery_model == kwargs['model']
+        assert prop._field_names == kwargs.get('field_names')
+        assert prop._property_names == kwargs.get('property_names', ())
+        assert prop._sub_property_refs == {}
+        assert prop._field_aliases == {}
+
+    @pytest.mark.parametrize('subquery_model, field_names, property_names, expected_aliases', [
+        (
+            VersionWithClassBasedProperties,
+            ['major', 'minor', 'patch', 'application'],
+            [],
+            {'application': 'application_id'},
+        ),
+        (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {}),
+    ])
+    def test_build_sub_properties(self, subquery_model, field_names, property_names, expected_aliases):
+        model = Mock(__name__='MockModel')
+        prop = SubqueryObjectProperty(subquery_model, None, field_names, property_names)
+        prop.name = 'test'
+        if field_names is None:
+            field_names = [field.name for field in subquery_model._meta.concrete_fields]
+            field_names.remove(subquery_model._meta.pk.name)
+        all_names = set(subquery_model._meta.get_field(field_name).attname for field_name in field_names)
+        all_names.update(property_names)
+
+        prop._build_sub_properties(model, subquery_model)
+        assert prop._subquery_model is subquery_model
+        assert prop._field_aliases == expected_aliases
+        assert set(prop._sub_property_refs) == all_names
+        for name in all_names:
+            sub_prop = prop._sub_property_refs[name].property
+            assert isinstance(sub_prop, SubqueryFieldProperty)
+            assert sub_prop.field_name == name
+            assert sub_prop.name == '-'.join((prop.name, name))
+            assert getattr(model, sub_prop.name).prop == sub_prop
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    @pytest.mark.parametrize('cached', [True, False])
+    @pytest.mark.parametrize('has_version', [True, False])
+    def test_getter_no_cache(self, monkeypatch, django_assert_num_queries, applications, ref, cached, has_version):
+        monkeypatch.setattr(ref.property, 'cached', cached)
+        application = applications[0]
+        if has_version:
+            version = application.versions.get(major=2)
+        else:
+            application.versions.all().delete()
+            version = None
+
+        assert not ref.descriptor.has_cached_value(application)
+        for sub_ref in six.itervalues(ref.property._sub_property_refs):
+            assert not sub_ref.descriptor.has_cached_value(application)
+
+        with django_assert_num_queries(1):
+            value = application.highest_version_object
+            assert value == version
+            assert ref.descriptor.has_cached_value(application) is cached
+            if cached:
+                assert ref.descriptor.get_cached_value(application) == version
+                if version:
+                    assert get_queryable_property_descriptor(VersionWithClassBasedProperties,
+                                                             'version').get_cached_value(value) == version.version
+            if version:
+                assert value.version == version.version
+                for field in VersionWithClassBasedProperties._meta.concrete_fields:
+                    assert getattr(version, field.attname) == getattr(value, field.attname)
+            for name, sub_ref in six.iteritems(ref.property._sub_property_refs):
+                assert sub_ref.descriptor.has_cached_value(application) is cached
+                if cached:
+                    assert sub_ref.descriptor.get_cached_value(application) == getattr(version, name, None)
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    @pytest.mark.parametrize('cached', [
+        set(),
+        {'major', 'minor', 'patch', 'application_id', 'version'},
+    ])
+    def test_cached_raw_values(self, django_assert_num_queries, applications, ref, cached):
+        application = applications[0]
+        version = application.versions.get(major=2)
+        ref.descriptor.set_cached_value(application, version.pk)
+        for name in cached:
+            ref.property._sub_property_refs[name].descriptor.set_cached_value(application, getattr(version, name))
+
+        with django_assert_num_queries(0):
+            assert application.highest_version_object == version
+            assert ref.descriptor.get_cached_value(application) == version
+            for name in cached:
+                assert getattr(application.highest_version_object, name) == getattr(version, name)
+            deferred_fields = set(field.attname for field in VersionWithClassBasedProperties._meta.concrete_fields)
+            deferred_fields.discard(VersionWithClassBasedProperties._meta.pk.attname)
+            deferred_fields.difference_update(cached)
+            assert application.highest_version_object.get_deferred_fields() == deferred_fields
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    def test_getter_cached_final_value(self, django_assert_num_queries, applications, ref):
+        application = applications[0]
+        version = application.versions.get(major=2)
+
+        ref.descriptor.set_cached_value(application, version)
+        with django_assert_num_queries(0):
+            assert application.highest_version_object is version
+
+        ref.descriptor.set_cached_value(application, None)
+        with django_assert_num_queries(0):
+            assert application.highest_version_object is None
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    @pytest.mark.parametrize('field_name, value, expected_properties, expect_v2_match', [
+        ('highest_version_object', 'pk', {'highest_version_object'}, True),
+        ('highest_version_object', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__gt', 'pk', {'highest_version_object'}, False),
+        ('highest_version_object__pk', 'pk', {'highest_version_object'}, True),
+        ('highest_version_object__pk', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__pk__gt', 'obj', {'highest_version_object'}, False),
+        ('highest_version_object__id', 'pk', {'highest_version_object'}, True),
+        ('highest_version_object__id', 'obj', {'highest_version_object'}, True),
+        ('highest_version_object__id__gt', 'obj', {'highest_version_object'}, False),
+        ('highest_version_object__application', 'application_id', {'highest_version_object-application_id'}, True),
+        ('highest_version_object__application_id', 'application_id', {'highest_version_object-application_id'}, True),
+        ('highest_version_object__major', 2, {'highest_version_object-major'}, True),
+        ('highest_version_object__major__gt', 1, {'highest_version_object-major'}, True),
+        ('highest_version_object__major', 1, {'highest_version_object-major'}, False),
+        ('highest_version_object__major__lt', 2, {'highest_version_object-major'}, False),
+        ('highest_version_object__version', '2.0.0', {'highest_version_object-version'}, True),
+        ('highest_version_object__version__iexact', '1.3.1', {'highest_version_object-version'}, False),
+    ])
+    def test_filter(self, categories, applications, field_name, value, expected_properties, expect_v2_match):
+        applications[1].versions.filter(major=2).delete()
+        expected_apps = {applications[int(not expect_v2_match)]}
+        expected_categories = {categories[0]} if expect_v2_match else set(categories[:2])
+        if value in ('pk', 'application_id'):
+            value = applications[0].versions.values_list(value, flat=True).get(major=2)
+        elif value == 'obj':
+            value = applications[0].versions.get(major=2)
+
+        for queryset, expected_results in (
+            (ApplicationWithClassBasedProperties.objects.filter(**{field_name: value}), expected_apps),
+            (
+                CategoryWithClassBasedProperties.objects.filter(**{'applications__{}'.format(field_name): value}),
+                expected_categories,
+            ),
+        ):
+            assert {ref.property.name for ref in queryset.query._queryable_property_annotations} == expected_properties
+            assert set(queryset) == expected_results
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    @pytest.mark.parametrize('select, expected_properties', [
+        (('highest_version_object',), None),
+        (
+            ('highest_version_object__major', 'highest_version_object__minor', 'highest_version_object__version'),
+            {'highest_version_object-major', 'highest_version_object-minor', 'highest_version_object-version'},
+        ),
+        (('highest_version_object__pk',), {'highest_version_object'}),
+        (('highest_version_object__id',), {'highest_version_object'}),
+        (('highest_version_object__major', 'highest_version_object'), None),
+    ])
+    def test_annotation_select(self, django_assert_num_queries, applications, ref, select, expected_properties):
+        version = VersionWithClassBasedProperties.objects.filter(major=2)[0]
+        if not expected_properties:
+            expected_properties = {sub_ref.property.name for sub_ref in
+                                   six.itervalues(ref.property._sub_property_refs)}
+            expected_properties.add(ref.property.name)
+        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select)
+
+        assert {r.property.name for r in queryset.query._queryable_property_annotations} == expected_properties
+        with django_assert_num_queries(1):
+            for application in queryset:
+                if 'highest_version_object' in expected_properties:
+                    assert ref.descriptor.has_cached_value(application)
+                expected_properties.discard('highest_version_object')
+                expected_properties.discard('highest_version_object-application_id')
+                for name in expected_properties:
+                    descriptor = get_queryable_property_descriptor(ApplicationWithClassBasedProperties, name)
+                    assert descriptor.get_cached_value(application) == getattr(version, descriptor.prop.field_name)
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('order_by, expected_property, expect_app2_first', [
+        ('highest_version_object', 'highest_version_object', False),
+        ('highest_version_object__pk', 'highest_version_object', False),
+        ('-highest_version_object__id', 'highest_version_object', True),
+        ('highest_version_object__application', 'highest_version_object-application_id', False),
+        ('-highest_version_object__application_id', 'highest_version_object-application_id', True),
+        ('highest_version_object__major', 'highest_version_object-major', True),
+        ('-highest_version_object__version', 'highest_version_object-version', False),
+    ])
+    def test_annotation_implicit(self, applications, versions, order_by, expected_property, expect_app2_first):
+        app_order_by = '{}application__{}'.format('-' if order_by.startswith('-') else '', order_by.replace('-', ''))
+        versions[7].delete()
+        expected_apps = [applications[1], applications[0]] if expect_app2_first else applications[:2]
+        expected_versions = versions[:7]
+        if expect_app2_first:
+            while expected_versions[-1].application == expected_apps[0]:
+                expected_versions.insert(0, expected_versions.pop())
+
+        for queryset, expected_results in (
+            (ApplicationWithClassBasedProperties.objects.order_by(order_by), expected_apps),
+            (VersionWithClassBasedProperties.objects.order_by(app_order_by, 'pk'), expected_versions),
+        ):
+            assert {ref.property.name for ref in queryset.query._queryable_property_annotations} == {expected_property}
+            assert list(queryset) == expected_results
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('select, names, expected_values', [
+        (('highest_version_object',), ('name', 'highest_version_object'), [
+            ['My cool App', 'pk3'],
+            ['Another App', 'pk6'],
+        ]),
+        (('highest_version_object',), ('name', 'highest_version_object__pk'), [
+            ['My cool App', 'pk3'],
+            ['Another App', 'pk6'],
+        ]),
+        (('highest_version_object',), ('highest_version_object__id', 'name'), [
+            ['pk3', 'My cool App'],
+            ['pk6', 'Another App'],
+        ]),
+        (('highest_version_object__pk',), ('highest_version_object__pk', 'name'), [
+            ['pk3', 'My cool App'],
+            ['pk6', 'Another App'],
+        ]),
+        (('highest_version_object__id',), ('name', 'highest_version_object__id'), [
+            ['My cool App', 'pk3'],
+            ['Another App', 'pk6'],
+        ]),
+        (('highest_version_object',), ('name', 'highest_version_object__major', 'highest_version_object__minor'), [
+            ['My cool App', 2, 0],
+            ['Another App', 1, 3],
+        ]),
+        (('highest_version_object',), ('name', 'highest_version_object__version'), [
+            ['My cool App', '2.0.0'],
+            ['Another App', '1.3.1'],
+        ]),
+        (('highest_version_object__version',), ('name', 'highest_version_object__version'), [
+            ['My cool App', '2.0.0'],
+            ['Another App', '1.3.1'],
+        ]),
+        (('highest_version_object',), ('name', Substr('highest_version_object__version', 1, 3)), [
+            ['My cool App', '2.0'],
+            ['Another App', '1.3'],
+        ]),
+        (('highest_version_object__version',), ('name', Substr('highest_version_object__version', 1, 3)), [
+            ['My cool App', '2.0'],
+            ['Another App', '1.3'],
+        ]),
+    ])
+    def test_raw_values(self, applications, versions, select, names, expected_values):
+        versions[7].delete()
+        expressions = {}
+        values_names = list(names)
+        for name in names:
+            if not isinstance(name, six.string_types):
+                expressions['expr'] = name
+                values_names.remove(name)
+        for values in expected_values:
+            for i, value in enumerate(values):
+                if value in ('pk3', 'pk6'):
+                    values[i] = versions[int(value[-1])].pk
+
+        queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select).order_by('pk')
+        for result, values in zip(queryset.values(*values_names, **expressions), expected_values):
+            assert result == dict(zip(values_names + (['expr'] if expressions else []), values))
+        for result, values in zip(queryset.values_list(*names), expected_values):
+            assert result == tuple(values)
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    def test_raw_values_with_transform(self):
+        # Django does not support using registered transforms on any annotation.
+        with pytest.raises(FieldError):
+            ApplicationWithClassBasedProperties.objects.select_properties('highest_version_object').values(
+                'highest_version_object__version__length')
+
+    @pytest.mark.django_db
+    def test_no_subquery_row(self, django_assert_num_queries, applications, versions):
+        applications[0].versions.all().delete()
+        version_pk = versions[7].pk
+
+        for queryset in (
+            ApplicationWithClassBasedProperties.objects.filter(highest_version_object__isnull=True),
+            ApplicationWithClassBasedProperties.objects.filter(highest_version_object=None),
+            ApplicationWithClassBasedProperties.objects.filter(highest_version_object__pk__isnull=True),
+            ApplicationWithClassBasedProperties.objects.filter(highest_version_object__id=None),
+            ApplicationWithClassBasedProperties.objects.filter(highest_version_object__major__isnull=True),
+            ApplicationWithClassBasedProperties.objects.filter(highest_version_object__version__isnull=True),
+        ):
+            assert queryset.get() == applications[0]
+
+        with django_assert_num_queries(1):
+            application = ApplicationWithClassBasedProperties.objects.select_properties('highest_version_object').get(
+                highest_version_object__isnull=True)
+            assert application.highest_version_object is None
+
+        base_queryset = (
+            ApplicationWithClassBasedProperties.objects.select_properties('highest_version_object').order_by('pk')
+        )
+        assert list(base_queryset.values('name', 'highest_version_object', 'highest_version_object__major')) == [
+            {'name': 'My cool App', 'highest_version_object': None, 'highest_version_object__major': None},
+            {'name': 'Another App', 'highest_version_object': version_pk, 'highest_version_object__major': 2},
+        ]
+        assert list(base_queryset.values_list('name', 'highest_version_object', 'highest_version_object__version')) == [
+            ('My cool App', None, None),
+            ('Another App', version_pk, '2.0.0'),
+        ]

@@ -13,7 +13,6 @@ from queryable_properties.managers import (
 )
 from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.utils import get_queryable_property
-from queryable_properties.utils.internal import QueryablePropertyReference, QueryPath
 from .app_management.models import (
     ApplicationTag, ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
@@ -33,10 +32,8 @@ class DummyOrderingIterable(LegacyOrderingMixin, LegacyIterable):
 @pytest.fixture
 def refs():
     model = ApplicationWithClassBasedProperties
-    return {
-        prop_name: QueryablePropertyReference(get_queryable_property(model, prop_name), model, QueryPath())
-        for prop_name in ('major_sum', 'version_count')
-    }
+    return {prop_name: get_queryable_property(model, prop_name)._resolve()[0]
+            for prop_name in ('major_sum', 'version_count')}
 
 
 class TestQueryablePropertiesQuerySetMixin(object):

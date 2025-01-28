@@ -4,6 +4,7 @@ from functools import wraps
 
 import six
 from django.db.models import BooleanField
+from django.utils.functional import cached_property
 
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
@@ -294,23 +295,17 @@ class SubqueryMixin(AnnotationGetterMixin):
                          queryset.
         :type queryset: django.db.models.QuerySet | function
         """
-        self.queryset = queryset
+        self._queryset = queryset
         super(SubqueryMixin, self).__init__(**kwargs)
 
-    def _build_subquery(self, queryset):  # pragma: no cover
+    @cached_property
+    def queryset(self):
         """
-        Build the subquery annotation that should be used to represent this
-        queryable property in querysets.
+        Cache and return the base queryset that is to be utilized as the
+        subquery. If a callable was provided, it is called before being
+        returned.
 
-        :param django.db.models.QuerySet queryset: The internal queryset to
-                                                   base the annotation on.
-        :return: The subquery annotation.
-        :rtype: django.db.models.expressions.Subquery
+        :return: The base queryset that is to be utilized as the subquery.
+        :rtype: django.db.models.QuerySet
         """
-        raise NotImplementedError()
-
-    def get_annotation(self, cls):
-        queryset = self.queryset
-        if callable(queryset):
-            queryset = queryset()
-        return self._build_subquery(queryset)
+        return self._queryset() if callable(self._queryset) else self._queryset

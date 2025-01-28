@@ -6,6 +6,7 @@ Module ``queryable_properties.properties``
 
 .. automodule:: queryable_properties.properties
    :members:
+   :exclude-members: QueryablePropertyReference
    :member-order: bysource
 
 Module ``queryable_properties.admin``

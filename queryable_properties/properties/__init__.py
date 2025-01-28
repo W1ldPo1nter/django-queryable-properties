@@ -9,7 +9,7 @@ from .mixins import (
     boolean_filter, lookup_filter,
 )
 from .specialized import MappingProperty, RangeCheckProperty, ValueCheckProperty
-from .subquery import SubqueryExistenceCheckProperty, SubqueryFieldProperty
+from .subquery import SubqueryExistenceCheckProperty, SubqueryFieldProperty, SubqueryObjectProperty
 
 __all__ = (
     'MISSING_OBJECT',
@@ -19,5 +19,5 @@ __all__ = (
     'AnnotationGetterMixin', 'AnnotationMixin', 'boolean_filter', 'LookupFilterMixin', 'lookup_filter',
     'REMAINING_LOOKUPS', 'SetterMixin', 'UpdateMixin',
     'MappingProperty', 'RangeCheckProperty', 'ValueCheckProperty',
-    'SubqueryExistenceCheckProperty', 'SubqueryFieldProperty',
+    'SubqueryExistenceCheckProperty', 'SubqueryFieldProperty', 'SubqueryObjectProperty',
 )

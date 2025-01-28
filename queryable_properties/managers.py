@@ -5,19 +5,18 @@ from __future__ import unicode_literals
 from copy import copy
 
 import six
-from django.db.models import Manager
+from django.db.models import F, Manager
 from django.db.models.query import QuerySet
 from django.utils.functional import cached_property
 
 from .compat import (
-    ANNOTATION_SELECT_CACHE_NAME, ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, MANAGER_QUERYSET_METHOD_NAME, DateQuerySet,
-    DateTimeQuerySet, ModelIterable, RawModelIterable, RawQuery, ValuesListQuerySet, ValuesQuerySet, chain_query,
-    chain_queryset,
+    ANNOTATION_TO_AGGREGATE_ATTRIBUTES_MAP, DateQuerySet, DateTimeQuerySet, ModelIterable, RawModelIterable,
+    ValuesListQuerySet, ValuesQuerySet, chain_queryset, compat_call, compat_getattr, compat_setattr,
 )
 from .exceptions import QueryablePropertyDoesNotExist, QueryablePropertyError
-from .query import QUERYING_PROPERTIES_MARKER, inject_query_mixin
-from .utils import get_queryable_property
-from .utils.internal import InjectableMixin, QueryablePropertyReference, QueryPath
+from .query import QUERYING_PROPERTIES_MARKER, QueryablePropertiesQueryMixin, QueryablePropertiesRawQueryMixin
+from .utils import get_queryable_property, QueryPath
+from .utils.internal import InjectableMixin, resolve_queryable_property
 
 
 class LegacyIterable(object):
@@ -36,16 +35,15 @@ class LegacyIterable(object):
         self.queryset = queryset
 
     def __iter__(self):
-        original = super(QueryablePropertiesBaseQuerySetMixin, self.queryset)
-        return getattr(original, 'iterator', original.__iter__)()
+        return compat_call(super(InjectableMixin, self.queryset), ('iterator', '__iter__'))
 
 
 class QueryablePropertiesIterableMixin(object):
     """
     Base class for iterable mixins that handle queryable properties logic.
 
-    Can be applied to both Django's iterable classes as well as the legacy
-    iterable classes.
+    Can be applied to both Django's iterable classes and the legacy iterable
+    classes.
     """
 
     def __init__(self, queryset, *args, **kwargs):
@@ -100,7 +98,7 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):  # pragma: no cover
         query = self.queryset.query
         occurrences = {}
         for ref in query._queryable_property_annotations:
-            annotation_name = six.text_type(ref.full_path)
+            annotation_name = ref.full_path.as_str()
             indexes = [index for index, field_name in enumerate(query.order_by)
                        if field_name in (annotation_name, '-{}'.format(annotation_name))]
             if indexes:
@@ -120,7 +118,7 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):  # pragma: no cover
         query = self.queryset.query
         select = set()
         for ref, occurrences in six.iteritems(self._order_by_occurrences):
-            annotation_name = six.text_type(ref.full_path)
+            annotation_name = ref.full_path.as_str()
             if annotation_name not in query.annotation_select and annotation_name in query.annotations:
                 select.add(ref)
         return select
@@ -131,9 +129,9 @@ class LegacyOrderingMixin(QueryablePropertiesIterableMixin):  # pragma: no cover
         select = dict(query.annotation_select)
 
         for property_ref in self._order_by_select:
-            annotation_name = six.text_type(property_ref.full_path)
+            annotation_name = property_ref.full_path.as_str()
             select[annotation_name] = query.annotations[annotation_name]
-        setattr(query, ANNOTATION_SELECT_CACHE_NAME, select)
+        query._annotation_select_cache = select
 
 
 class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryablePropertiesIterableMixin):
@@ -181,7 +179,7 @@ class LegacyValuesIterable(LegacyOrderingMixin, LegacyIterable):
     def _postprocess_queryable_properties(self, obj):
         obj = super(LegacyValuesIterable, self)._postprocess_queryable_properties(obj)
         for ref in self._order_by_select:
-            obj.pop(six.text_type(ref.full_path), None)
+            obj.pop(ref.full_path.as_str(), None)
         return obj
 
 
@@ -211,7 +209,7 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
         if self.queryset._fields:
             aggregate_names = [name for name in aggregate_names if name not in self.queryset._fields]
         aggregate_names.reverse()
-        forced_names = set(six.text_type(ref.full_path) for ref in self._order_by_select)
+        forced_names = set(ref.full_path.as_str() for ref in self._order_by_select)
         return {-i for i, name in enumerate(aggregate_names, start=1) if name in forced_names}
 
     def _postprocess_queryable_properties(self, obj):
@@ -222,32 +220,19 @@ class LegacyValuesListIterable(LegacyOrderingMixin, LegacyIterable):  # pragma: 
         return obj
 
 
-class QueryablePropertiesBaseQuerySetMixin(InjectableMixin):
-    """
-    Base mixin for queryable properties queryset mixins that takes care of
-    injecting the appropriate query mixin into the associated query.
-    """
-
-    def init_injected_attrs(self):
-        # To work correctly, a query using the QueryablePropertiesQueryMixin is
-        # required. If the current query is not using the mixin already, it
-        # will be dynamically injected into the query. That way, other Django
-        # extensions using custom query objects are also supported.
-        # Recent Django versions (>=3.1) have a property guarding the query
-        # attribute.
-        query_attr_name = '_query' if hasattr(self, '_query') else 'query'
-        query = getattr(self, query_attr_name)
-        chain_kwargs = {}
-        if RawQuery and isinstance(query, RawQuery):
-            chain_kwargs['using'] = self.db
-        setattr(self, query_attr_name, inject_query_mixin(chain_query(query, **chain_kwargs)))
-
-
-class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
+class QueryablePropertiesRawQuerySetMixin(InjectableMixin):
     """
     A mixin for Django's :class:`django.db.models.RawQuerySet` objects that
     allows to populate queryable properties in raw queries.
     """
+
+    def init_injected_attrs(self):
+        # To work correctly, a query using the QueryablePropertiesRawQueryMixin
+        # is required. If the current query is not using the mixin already, it
+        # will be dynamically injected into the query.
+        query = compat_call(self.query, ('chain', 'clone'), using=self.db)
+        self.query = QueryablePropertiesRawQueryMixin.inject_into_object(
+            query, 'QueryableProperties' + query.__class__.__name__)
 
     def __iter__(self):
         original = super(QueryablePropertiesRawQuerySetMixin, self)
@@ -262,11 +247,25 @@ class QueryablePropertiesRawQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
             yield obj
 
 
-class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
+class QueryablePropertiesQuerySetMixin(InjectableMixin):
     """
     A mixin for Django's :class:`django.db.models.QuerySet` objects that allows
     to use queryable properties in filters, annotations and update queries.
     """
+
+    def init_injected_attrs(self):
+        # To work correctly, a query using the QueryablePropertiesQueryMixin is
+        # required. If the current query is not using the mixin already, it
+        # will be dynamically injected into the query.
+        # Recent Django versions (>=3.1) have a property guarding the query
+        # attribute.
+        query = compat_call(compat_getattr(self, '_query', 'query'), ('chain', 'clone'))
+        compat_setattr(
+            self,
+            QueryablePropertiesQueryMixin.inject_into_object(query, 'QueryableProperties' + query.__class__.__name__),
+            '_query',
+            'query',
+        )
 
     @property
     def _iterable_class(self):
@@ -292,7 +291,7 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
         if not has_iterable_class:  # pragma: no cover
             # In older Django versions, the class of the queryset may be
             # replaced with a dynamically created class based on the current
-            # class and the value of klass while cloning (e.g when using
+            # class and the value of klass while cloning (e.g. when using
             # .values()). Therefore this needs to be re-injected to be on top
             # of the MRO again to enable queryable properties functionality.
             if klass:
@@ -342,6 +341,21 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
 
         return kwargs
 
+    def _values(self, *fields, **expressions):
+        for field in fields:
+            if isinstance(field, six.string_types):
+                # Properties may be resolved using a path that differs from
+                # their actual name. To keep the name that was provided to the
+                # .values/.values_list call, an F expression is used to alias
+                # the property in such cases.
+                query_path = QueryPath(field)
+                ref, remaining_path = resolve_queryable_property(self.model, query_path)
+                if ref and ref.full_path.as_str() != field:
+                    if remaining_path:
+                        field = query_path[:-len(remaining_path)].as_str()
+                    expressions[field] = F(ref.full_path.as_str())
+        return super(QueryablePropertiesQuerySetMixin, self)._values(*fields, **expressions)
+
     def select_properties(self, *names):
         """
         Add the annotations of the queryable properties with the specified
@@ -355,14 +369,18 @@ class QueryablePropertiesQuerySetMixin(QueryablePropertiesBaseQuerySetMixin):
         """
         queryset = chain_queryset(self)
         for name in names:
-            property_ref = QueryablePropertyReference(get_queryable_property(self.model, name), self.model, QueryPath())
+            property_ref, lookups = resolve_queryable_property(self.model, QueryPath(name))
+            if not property_ref:
+                raise QueryablePropertyDoesNotExist(name)
+            if property_ref.relation_path:
+                raise QueryablePropertyError('Cannot select properties on related models.')
             # A full GROUP BY is required if the query is not limited to
             # certain fields. Since only certain types of queries had the
             # _fields attribute in old Django versions, fall back to checking
             # for existing selection, on which the GROUP BY would be based.
-            full_group_by = not getattr(self, '_fields', self.query.select)
-            with queryset.query._add_queryable_property_annotation(property_ref, full_group_by, select=True):
-                pass
+            full_group_by = not compat_getattr(self, '_fields', 'query.select')
+            if property_ref.annotate_query(queryset.query, full_group_by, select=True, remaining_path=lookups)[1]:
+                raise QueryablePropertyError('Cannot select properties with lookups/transforms.')
         return queryset
 
     def iterator(self, *args, **kwargs):
@@ -440,7 +458,7 @@ class QueryablePropertiesManagerMixin(InjectableMixin):
     """
 
     def get_queryset(self):
-        queryset = getattr(super(QueryablePropertiesManagerMixin, self), MANAGER_QUERYSET_METHOD_NAME)()
+        queryset = compat_call(super(QueryablePropertiesManagerMixin, self), ('get_queryset', 'get_query_set'))
         return QueryablePropertiesQuerySetMixin.inject_into_object(queryset)
 
     get_query_set = get_queryset
