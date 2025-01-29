@@ -363,3 +363,19 @@ class VersionWithDecoratorBasedProperties(Version):
     @classmethod
     def is_version_2(cls):
         return models.Q(major=2)
+
+
+if DJANGO_VERSION >= (5, 2):
+    class DownloadLink(models.Model):  # Model with composite PK
+        pk = models.CompositePrimaryKey('version', 'published_on')
+        version = models.ForeignKey(VersionWithClassBasedProperties, on_delete=models.CASCADE,
+                                    related_name='download_links')
+        published_on = models.CharField(max_length=100)
+        url = models.URLField()
+
+        alternative = SubqueryObjectProperty(
+            'self',
+            lambda: (DownloadLink.objects.filter(version=models.OuterRef('version'))
+                                         .exclude(published_on=models.OuterRef('published_on'))
+                                         .order_by('published_on')),
+        )

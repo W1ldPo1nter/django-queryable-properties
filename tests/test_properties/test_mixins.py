@@ -189,6 +189,15 @@ class TestAnnotationGetterMixin(object):
         for application in applications[:2]:
             assert prop.get_queryset_for_object(application).get() == application
 
+    @pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
+    @pytest.mark.django_db
+    def test_get_queryset_for_object_composite_pk(self, download_links):
+        prop = get_queryable_property(download_links[0].__class__, 'alternative')
+        assert isinstance(prop, AnnotationGetterMixin)
+        for download_link in download_links[:3]:
+            assert isinstance(download_link.pk, tuple)
+            assert prop.get_queryset_for_object(download_link).get() == download_link
+
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
     def test_get_value(self, prop, applications):
