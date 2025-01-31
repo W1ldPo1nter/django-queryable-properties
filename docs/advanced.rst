@@ -61,13 +61,13 @@ row of the subquery or ``None`` if the subquery doesn't contain any rows:
 In addition to the regular configuration options for :ref:`annotation_based:Annotation-based properties`, a
 ``SubqueryObjectProperty`` can be configured with the following parameters:
 
-``model``
+``model`` (required)
   Defines the model class the subquery returns instances of.
   Can be defined as any of the values accepted by the first argument of
-  `foreign keys <https://docs.djangoproject.com/en/5.1/ref/models/fields/#foreignkey>`_.
+  `foreign keys <https://docs.djangoproject.com/en/stable/ref/models/fields/#foreignkey>`_.
   In the example above, the model is defined as the string ``'ApplicationVersion'``.
 
-``queryset``
+``queryset`` (required)
   The actual queryset to retrieve subquery objects from.
   Follows the same rules as the queryset parameter of any other
   :ref:`common:Subquery-based properties (Django 1.11 or higher)`.
