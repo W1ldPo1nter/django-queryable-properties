@@ -115,45 +115,49 @@ class TestSubqueryObjectProperty(object):
     def test_initializer(self, kwargs):
         prop = SubqueryObjectProperty(**kwargs)
         assert prop.queryset is kwargs['queryset']
-        assert prop.field_name == 'pk'
+        assert prop.field_name is None
         assert prop.output_field is None
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
         assert prop._descriptor is None
         assert prop._subquery_model == kwargs['model']
         assert prop._field_names == kwargs.get('field_names')
         assert prop._property_names == kwargs.get('property_names', ())
-        assert prop._sub_property_refs == {}
+        assert prop._managed_refs == {}
         assert prop._field_aliases == {}
+        assert prop._pk_field_names is None
 
     @pytest.mark.parametrize('subquery_model, field_names, property_names, expected_aliases', [
         (
             VersionWithClassBasedProperties,
             ['major', 'minor', 'patch', 'application'],
             [],
-            {'application': 'application_id'},
+            {'pk': 'id', 'application': 'application_id'},
         ),
-        (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {}),
+        (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {'pk': 'id'}),
     ])
-    def test_build_sub_properties(self, subquery_model, field_names, property_names, expected_aliases):
+    def test_finalize_setup(self, subquery_model, field_names, property_names, expected_aliases):
         model = Mock(__name__='MockModel')
         prop = SubqueryObjectProperty(subquery_model, None, field_names, property_names)
         prop.name = 'test'
         if field_names is None:
             field_names = [field.name for field in subquery_model._meta.concrete_fields]
-            field_names.remove(subquery_model._meta.pk.name)
         all_names = set(subquery_model._meta.get_field(field_name).attname for field_name in field_names)
+        all_names.add(subquery_model._meta.pk.attname)
         all_names.update(property_names)
 
-        prop._build_sub_properties(model, subquery_model)
+        prop._finalize_setup(model, subquery_model)
         assert prop._subquery_model is subquery_model
+        assert prop._pk_field_names == [subquery_model._meta.pk.attname]
+        assert prop.field_name == subquery_model._meta.pk.attname
         assert prop._field_aliases == expected_aliases
-        assert set(prop._sub_property_refs) == all_names
+        assert set(prop._managed_refs) == all_names
         for name in all_names:
-            sub_prop = prop._sub_property_refs[name].property
-            assert isinstance(sub_prop, SubqueryFieldProperty)
-            assert sub_prop.field_name == name
-            assert sub_prop.name == '-'.join((prop.name, name))
-            assert getattr(model, sub_prop.name).prop == sub_prop
+            managed_prop = prop._managed_refs[name].property
+            assert isinstance(managed_prop, SubqueryFieldProperty)
+            assert managed_prop.field_name == name
+            if managed_prop is not prop:
+                assert managed_prop.name == '-'.join((prop.name, name))
+                assert getattr(model, managed_prop.name).prop == managed_prop
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
@@ -168,9 +172,8 @@ class TestSubqueryObjectProperty(object):
             application.versions.all().delete()
             version = None
 
-        assert not ref.descriptor.has_cached_value(application)
-        for sub_ref in six.itervalues(ref.property._sub_property_refs):
-            assert not sub_ref.descriptor.has_cached_value(application)
+        for managed_ref in six.itervalues(ref.property._managed_refs):
+            assert not managed_ref.descriptor.has_cached_value(application)
 
         with django_assert_num_queries(1):
             value = application.highest_version_object
@@ -185,10 +188,10 @@ class TestSubqueryObjectProperty(object):
                 assert value.version == version.version
                 for field in VersionWithClassBasedProperties._meta.concrete_fields:
                     assert getattr(version, field.attname) == getattr(value, field.attname)
-            for name, sub_ref in six.iteritems(ref.property._sub_property_refs):
-                assert sub_ref.descriptor.has_cached_value(application) is cached
-                if cached:
-                    assert sub_ref.descriptor.get_cached_value(application) == getattr(version, name, None)
+            for name, managed_ref in six.iteritems(ref.property._managed_refs):
+                assert managed_ref.descriptor.has_cached_value(application) is cached
+                if cached and managed_ref.property is not ref.property:
+                    assert managed_ref.descriptor.get_cached_value(application) == getattr(version, name, None)
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
@@ -201,7 +204,7 @@ class TestSubqueryObjectProperty(object):
         version = application.versions.get(major=2)
         ref.descriptor.set_cached_value(application, version.pk)
         for name in cached:
-            ref.property._sub_property_refs[name].descriptor.set_cached_value(application, getattr(version, name))
+            ref.property._managed_refs[name].descriptor.set_cached_value(application, getattr(version, name))
 
         with django_assert_num_queries(0):
             assert application.highest_version_object == version
@@ -209,7 +212,7 @@ class TestSubqueryObjectProperty(object):
             for name in cached:
                 assert getattr(application.highest_version_object, name) == getattr(version, name)
             deferred_fields = set(field.attname for field in VersionWithClassBasedProperties._meta.concrete_fields)
-            deferred_fields.discard(VersionWithClassBasedProperties._meta.pk.attname)
+            deferred_fields.discard(ref.property.field_name)
             deferred_fields.difference_update(cached)
             assert application.highest_version_object.get_deferred_fields() == deferred_fields
 
@@ -282,9 +285,7 @@ class TestSubqueryObjectProperty(object):
     def test_annotation_select(self, django_assert_num_queries, applications, ref, select, expected_properties):
         version = VersionWithClassBasedProperties.objects.filter(major=2)[0]
         if not expected_properties:
-            expected_properties = {sub_ref.property.name for sub_ref in
-                                   six.itervalues(ref.property._sub_property_refs)}
-            expected_properties.add(ref.property.name)
+            expected_properties = {sub_ref.property.name for sub_ref in six.itervalues(ref.property._managed_refs)}
         queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select)
 
         assert {r.property.name for r in queryset.query._queryable_property_annotations} == expected_properties

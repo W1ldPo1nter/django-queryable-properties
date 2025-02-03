@@ -107,26 +107,41 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         :type property_names: collections.Sequence[str]
         """
         kwargs.pop('output_field', None)
-        super(SubqueryObjectProperty, self).__init__(queryset, 'pk', **kwargs)
+        super(SubqueryObjectProperty, self).__init__(queryset, None, **kwargs)
         self._descriptor = None
         self._subquery_model = model
         self._field_names = field_names
         self._property_names = property_names
-        self._sub_property_refs = {}
+        self._managed_refs = {}
         self._field_aliases = {}
+        self._pk_field_names = None
 
-    def _build_sub_properties(self, model, subquery_model):
+    def _finalize_setup(self, model, subquery_model):
         """
-        Construct the sub-properties this property builds on, attach them to
-        the model class and store references to them in attributes.
+        Finalize the setup of this property by constructing the sub-properties,
+        attaching them to the model class and populating attributes.
         """
+        pk_fields = getattr(subquery_model._meta, 'pk_fields', [subquery_model._meta.pk])
+        sub_field_names = set(self._field_names) if self._field_names is not None else None
+
+        self._subquery_model = subquery_model
+        self._pk_field_names = [pk_field.attname for pk_field in pk_fields]
+        self.field_name = self._pk_field_names[0]
+        self._managed_refs[self.field_name] = QueryablePropertyReference(self, self.model, QueryPath())
+        if pk_fields[0].name != self.field_name:
+            self._field_aliases[pk_fields[0].name] = self.field_name
+        if len(pk_fields) == 1:
+            self._field_aliases['pk'] = self.field_name
+        elif sub_field_names is not None:
+            sub_field_names.update(pk_field.name for pk_field in pk_fields[1:])
+
         def add_sub_property(name, queryset, output_field=None):
             prop = SubqueryFieldProperty(queryset, name, output_field=output_field, cached=self.cached)
             prop.contribute_to_class(model, '-'.join((self.name, name)))
-            self._sub_property_refs[name] = prop._resolve()[0]
+            self._managed_refs[name] = prop._resolve()[0]
 
         for field in subquery_model._meta.concrete_fields:
-            if field.primary_key or (self._field_names is not None and field.name not in self._field_names):
+            if field is pk_fields[0] or (sub_field_names is not None and field.name not in sub_field_names):
                 continue
             add_sub_property(field.attname, self._queryset)
             if field.name != field.attname:
@@ -138,20 +153,15 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                 lambda: QueryablePropertiesQuerySetMixin.apply_to(self.queryset).select_properties(property_name),
                 get_output_field(remote_ref.get_annotation()),
             )
-        # Ensure the attribute always references the actual class after
-        # initialization.
-        self._subquery_model = subquery_model
 
     def _resolve(self, model=None, relation_path=QueryPath(), remaining_path=QueryPath()):
         if remaining_path:
             first = self._field_aliases.get(remaining_path[0], remaining_path[0])
-            if first in self._sub_property_refs:
-                # Reference to one of the fields represented by the sub-properties.
-                ref = self._sub_property_refs[first]._replace(model=model or self.model, relation_path=relation_path)
+            if first in self._managed_refs:
+                # Reference to one of the fields represented by the managed
+                # properties.
+                ref = self._managed_refs[first]._replace(model=model or self.model, relation_path=relation_path)
                 return ref, remaining_path[1:]
-            if first in ('pk', self._subquery_model._meta.pk.name, self._subquery_model._meta.pk.attname):
-                # Reference to the primary key field represented by this property.
-                return super(SubqueryObjectProperty, self)._resolve(model, relation_path, remaining_path[1:])
         return SubqueryObjectPropertyReference(self, model or self.model, relation_path), remaining_path
 
     def contribute_to_class(self, cls, name):
@@ -162,7 +172,7 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         self._descriptor._ignore_cached_value = True
         # Build SubqueryFieldProperty objects for each field after the subquery
         # model was constructed.
-        lazy_related_operation(self._build_sub_properties, self.model, self._subquery_model)
+        lazy_related_operation(self._finalize_setup, self.model, self._subquery_model)
 
     def get_value(self, obj):
         if self._descriptor.has_cached_value(obj):
@@ -173,22 +183,18 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
                 return cached_value
 
             # The cached value is a raw primary key. Use this value and the
-            # present cache values of all sub-properties to construct the final
-            # model instance.
-            values = {self.name: cached_value}
-            for ref in six.itervalues(self._sub_property_refs):
-                if ref.descriptor.has_cached_value(obj):
-                    values[ref.property.name] = ref.descriptor.get_cached_value(obj)
+            # present cache values of all managed properties to construct the
+            # final model instance.
+            values = {ref.property.name: ref.descriptor.get_cached_value(obj)
+                      for ref in six.itervalues(self._managed_refs) if ref.descriptor.has_cached_value(obj)}
         else:
             # No value is cached at all: perform a single query to fetch the
             # values for all fields and populate the cache for this property
             # and all sub-properties if configured as cached.
-            names = [ref.property.name for ref in six.itervalues(self._sub_property_refs)]
-            names.append(self.name)
+            names = [ref.property.name for ref in six.itervalues(self._managed_refs)]
             values = self.get_queryset_for_object(obj).select_properties(*names).values(*names).get()
             if self.cached:
-                self._descriptor.set_cached_value(obj, values[self.name])
-                for ref in six.itervalues(self._sub_property_refs):
+                for ref in six.itervalues(self._managed_refs):
                     ref.descriptor.set_cached_value(obj, values[ref.property.name])
             if values[self.name] is None:
                 # The subquery didn't return a row, so no instance can be
@@ -197,21 +203,16 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
 
         field_names, field_values = [], []
         for field in self._subquery_model._meta.concrete_fields:
-            if field.primary_key:
-                field_values.append(values[self.name])
-            elif (field.attname in self._sub_property_refs and
-                  self._sub_property_refs[field.attname].property.name in values):
-                field_values.append(values[self._sub_property_refs[field.attname].property.name])
-            else:
-                continue
-            field_names.append(field.attname)
+            if field.attname in self._managed_refs and self._managed_refs[field.attname].property.name in values:
+                field_names.append(field.attname)
+                field_values.append(values[self._managed_refs[field.attname].property.name])
         subquery_obj = self._subquery_model.from_db(self.queryset.db, field_names, field_values)
 
-        # Populate any queryable properties whose values were queried for
-        # the subquery object.
+        # Populate any queryable properties whose values were queried for the
+        # subquery object.
         setattr(subquery_obj, QUERYING_PROPERTIES_MARKER, True)
         for property_name in self._property_names:
-            sub_name = self._sub_property_refs[property_name].property.name
+            sub_name = self._managed_refs[property_name].property.name
             if sub_name in values:
                 setattr(subquery_obj, property_name, values[sub_name])
         delattr(subquery_obj, QUERYING_PROPERTIES_MARKER)
@@ -238,7 +239,8 @@ class SubqueryObjectPropertyReference(QueryablePropertyReference):
             # A selection of the main property via .select_properties()
             # should lead to the selection of all sub-properties to be able to
             # populate the subquery object with all values.
-            for ref in six.itervalues(self.property._sub_property_refs):
-                ref = ref._replace(model=self.model, relation_path=self.relation_path)
-                ref.annotate_query(query, full_group_by, select)
+            for ref in six.itervalues(self.property._managed_refs):
+                if ref.property is not self.property:
+                    ref = ref._replace(model=self.model, relation_path=self.relation_path)
+                    ref.annotate_query(query, full_group_by, select)
         return super(SubqueryObjectPropertyReference, self).annotate_query(query, full_group_by, select, remaining_path)
