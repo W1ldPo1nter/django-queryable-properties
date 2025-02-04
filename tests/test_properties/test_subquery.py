@@ -230,6 +230,40 @@ class TestSubqueryObjectProperty(object):
         with django_assert_num_queries(0):
             assert application.highest_version_object is None
 
+    @pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
+    @pytest.mark.django_db
+    def test_getter_composite_pk(self, django_assert_num_queries, download_links):
+        ref = get_queryable_property(download_links[0].__class__, 'alternative')._resolve()[0]
+
+        # No cached value
+        assert not ref.descriptor.has_cached_value(download_links[0])
+        with django_assert_num_queries(1):
+            assert download_links[0].alternative == download_links[1]
+            assert 'sourceforge' in download_links[0].alternative.url
+            assert ref.descriptor.get_cached_value(download_links[0]) == download_links[1]
+
+        # Cached final value
+        with django_assert_num_queries(0):
+            assert download_links[0].alternative == download_links[1]
+
+        # Cached raw PK values
+        assert not ref.descriptor.has_cached_value(download_links[1])
+        ref.descriptor.set_cached_value(download_links[1], download_links[0].version_id)
+        ref.property._managed_refs['published_on'].descriptor.set_cached_value(download_links[1],
+                                                                               download_links[0].published_on)
+        with django_assert_num_queries(0):
+            assert download_links[1].alternative == download_links[0]
+        with django_assert_num_queries(1):
+            assert 'github' in download_links[1].alternative.url
+
+        # Partially cached raw PK values (treated as no cached value)
+        assert not ref.descriptor.has_cached_value(download_links[2])
+        ref.descriptor.set_cached_value(download_links[2], download_links[0].version_id)
+        with django_assert_num_queries(1):
+            assert download_links[2].alternative == download_links[3]
+            assert download_links[2].alternative.version_id != download_links[0].version_id
+            assert 'sourceforge' in download_links[2].alternative.url
+
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
     @pytest.mark.parametrize('field_name, value, expected_properties, expect_v2_match', [

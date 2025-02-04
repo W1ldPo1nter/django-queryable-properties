@@ -373,9 +373,12 @@ if DJANGO_VERSION >= (5, 2):
         published_on = models.CharField(max_length=100)
         url = models.URLField()
 
+        objects = QueryablePropertiesManager()
+
         alternative = SubqueryObjectProperty(
             'self',
             lambda: (DownloadLink.objects.filter(version=models.OuterRef('version'))
                                          .exclude(published_on=models.OuterRef('published_on'))
                                          .order_by('published_on')),
+            cached=True,
         )
