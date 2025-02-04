@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import six
+from django.db.models import Q
 
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..query import QUERYING_PROPERTIES_MARKER
@@ -170,11 +171,12 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         super(SubqueryObjectProperty, self).contribute_to_class(cls, name)
         self._descriptor = getattr(cls, name)
         self._descriptor._ignore_cached_value = True
-        # Build SubqueryFieldProperty objects for each field after the subquery
-        # model was constructed.
+        # Finalize the setup of this property after the subquery model was
+        # constructed.
         lazy_related_operation(self._finalize_setup, self.model, self._subquery_model)
 
     def get_value(self, obj):
+        values = {}
         if self._descriptor.has_cached_value(obj):
             cached_value = self._descriptor.get_cached_value(obj)
             if cached_value is None or isinstance(cached_value, self._subquery_model):
@@ -185,12 +187,19 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
             # The cached value is a raw primary key. Use this value and the
             # present cache values of all managed properties to construct the
             # final model instance.
-            values = {ref.property.name: ref.descriptor.get_cached_value(obj)
-                      for ref in six.itervalues(self._managed_refs) if ref.descriptor.has_cached_value(obj)}
-        else:
-            # No value is cached at all: perform a single query to fetch the
-            # values for all fields and populate the cache for this property
-            # and all sub-properties if configured as cached.
+            for attname, ref in six.iteritems(self._managed_refs):
+                if ref.descriptor.has_cached_value(obj):
+                    values[ref.property.name] = ref.descriptor.get_cached_value(obj)
+                elif attname in self._pk_field_names:
+                    # For composite PKs, all fields contributing to the PK must have
+                    # a value, otherwise the cached values can't be used.
+                    values.clear()
+                    break
+
+        if not values:
+            # No/insufficient cached values: perform a single query to fetch
+            # the values for all fields and populate the cache for all managed
+            # properties if configured as cached.
             names = [ref.property.name for ref in six.itervalues(self._managed_refs)]
             values = self.get_queryset_for_object(obj).select_properties(*names).values(*names).get()
             if self.cached:
@@ -224,6 +233,13 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
     def get_filter(self, cls, lookup, value):
         if isinstance(value, self._subquery_model):
             value = value.pk
+        if len(self._pk_field_names) > 1 and isinstance(value, tuple):
+            # Build individual filter clauses for each field of a composite PK.
+            base_path = QueryPath(self.name)
+            conditions = {}
+            for attname, pk_part in zip(self._pk_field_names, value):
+                conditions[(base_path + attname + lookup).as_str()] = pk_part
+            return Q(**conditions)
         return super(SubqueryObjectProperty, self).get_filter(cls, lookup, value)
 
 
