@@ -64,7 +64,7 @@ def prefetch_queryable_properties(model_instances, *property_paths):
     # figuring out which exact properties need to be queried and for which
     # models a query needs to be performed.
     properties_by_model = defaultdict(lambda: defaultdict(list))
-    pks_by_model = defaultdict(set)
+    pks_by_model = defaultdict(list)
     for path in property_paths:
         query_path = QueryPath(path)
         getter = ModelAttributeGetter(query_path[:-1])
@@ -72,20 +72,21 @@ def prefetch_queryable_properties(model_instances, *property_paths):
             for resolved_instance in getter.get_values(instance):
                 if resolved_instance is not None:
                     properties_by_model[resolved_instance.__class__][query_path[-1]].append(resolved_instance)
-                    pks_by_model[resolved_instance.__class__].add(resolved_instance.pk)
+                    if resolved_instance.pk not in pks_by_model[resolved_instance.__class__]:
+                        pks_by_model[resolved_instance.__class__].append(resolved_instance.pk)
 
     # Perform a single query for each model, querying all properties that have
     # been requested for that model (be it directly or via relations).
     for model, property_mappings in six.iteritems(properties_by_model):
         queryset = QueryablePropertiesQuerySetMixin.inject_into_object(model._base_manager.all())
         queryset = queryset.filter(pk__in=pks_by_model[model]).select_properties(*property_mappings)
-        for result in queryset.values('pk', *property_mappings):
-            pk = result.pop('pk')
-            for property_name, value in six.iteritems(result):
+        for result in queryset.only('pk'):
+            for property_name, instances in six.iteritems(property_mappings):
                 descriptor = get_queryable_property_descriptor(model, property_name)
-                for instance in property_mappings[property_name]:
+                value = getattr(result, property_name)
+                for instance in instances:
                     # Only populate the cache for the concrete objects the
                     # property values were requested for (different relations
                     # may lead to the same model).
-                    if instance.pk == pk:
+                    if instance.pk == result.pk:
                         descriptor.set_cached_value(instance, value)
