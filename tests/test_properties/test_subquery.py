@@ -11,6 +11,7 @@ try:
 except ImportError:
     Substr = Mock()
 
+from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (
     QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty, SubqueryObjectProperty,
 )
@@ -460,3 +461,42 @@ class TestSubqueryObjectProperty(object):
             ('My cool App', None, None),
             ('Another App', version_pk, '2.0.0'),
         ]
+
+    @pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
+    @pytest.mark.django_db
+    def test_composite_pk_in_queries(self, django_assert_num_queries, download_links):
+        model = download_links[0].__class__
+
+        assert model.objects.get(alternative=download_links[0]) == download_links[1]
+        assert (model.objects.get(alternative=(download_links[0].version_id, download_links[0].published_on)) ==
+                download_links[1])
+        assert not model.objects.filter(alternative=(download_links[0].version_id, 'Nowhere')).exists()
+        assert set(model.objects.filter(alternative=download_links[0].version_id)) == set(download_links[:2])
+        assert set(model.objects.filter(alternative__version=download_links[0].version_id)) == set(download_links[:2])
+        assert (set(model.objects.filter(alternative__version_id=download_links[0].version_id)) ==
+                set(download_links[:2]))
+        assert model.objects.filter(alternative__published_on='GitHub').count() == 6
+
+        for queryset, num_queries, field_names in (
+            (model.objects.select_properties('alternative'), 1, ('pk', 'version_id', 'published_on', 'url')),
+            (model.objects.select_properties('alternative__version', 'alternative__published_on'), 1,
+             ('pk', 'version_id', 'published_on')),
+            (model.objects.select_properties('alternative__version_id', 'alternative__published_on'), 1,
+             ('pk', 'version_id', 'published_on')),
+            (model.objects.select_properties('alternative__version'), 2, ('pk', 'version_id', 'published_on', 'url')),
+        ):
+            with django_assert_num_queries(num_queries):
+                instance = queryset.get(pk=download_links[0].pk)
+                for field_name in field_names:
+                    assert getattr(instance.alternative, field_name) == getattr(download_links[1], field_name)
+        with pytest.raises(QueryablePropertyError):
+            model.objects.select_properties('alternative__pk')
+
+        queryset = model.objects.filter(pk=download_links[0].pk).select_properties('alternative')
+        assert queryset.values_list('alternative', flat=True).get() == download_links[1].version_id
+        assert queryset.values_list('alternative__version', flat=True).get() == download_links[1].version_id
+        assert queryset.values_list('alternative__version_id', flat=True).get() == download_links[1].version_id
+        assert queryset.values_list('alternative__version', 'alternative__published_on').get() == (
+            download_links[1].version_id, download_links[1].published_on)
+        with pytest.raises(FieldError):
+            queryset.values_list('alternative__pk')

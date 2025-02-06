@@ -236,8 +236,8 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         if len(self._pk_field_names) > 1 and isinstance(value, tuple):
             # Build individual filter clauses for each field of a composite PK.
             base_path = QueryPath(self.name)
-            conditions = {}
-            for attname, pk_part in zip(self._pk_field_names, value):
+            conditions = {(base_path + lookup).as_str(): value[0]}
+            for attname, pk_part in zip(self._pk_field_names[1:], value[1:]):
                 conditions[(base_path + attname + lookup).as_str()] = pk_part
             return Q(**conditions)
         return super(SubqueryObjectProperty, self).get_filter(cls, lookup, value)
