@@ -3,9 +3,8 @@ import six
 from django.db.models import Q
 
 from ..managers import QueryablePropertiesQuerySetMixin
-from ..query import QUERYING_PROPERTIES_MARKER
 from ..utils import get_queryable_property
-from ..utils.internal import QueryPath, get_output_field
+from ..utils.internal import QueryPath, get_output_field, get_queryable_property_descriptor
 from .base import QueryableProperty, QueryablePropertyReference
 from .mixins import SubqueryMixin
 
@@ -219,12 +218,11 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
 
         # Populate any queryable properties whose values were queried for the
         # subquery object.
-        setattr(subquery_obj, QUERYING_PROPERTIES_MARKER, True)
         for property_name in self._property_names:
             sub_name = self._managed_refs[property_name].property.name
             if sub_name in values:
-                setattr(subquery_obj, property_name, values[sub_name])
-        delattr(subquery_obj, QUERYING_PROPERTIES_MARKER)
+                get_queryable_property_descriptor(self._subquery_model, property_name).set_cached_value(
+                    subquery_obj, values[sub_name])
 
         if self.cached or self._descriptor.has_cached_value(obj):
             self._descriptor.set_cached_value(obj, subquery_obj)
