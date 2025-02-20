@@ -18,12 +18,15 @@ from queryable_properties.properties import (
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
-    ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
+    ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, DownloadLink,
+    VersionWithClassBasedProperties,
 )
 
 pytestmark = [
     pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11"),
 ]
+
+composite_only = pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
 
 
 class TestSubqueryFieldProperty(object):
@@ -135,6 +138,8 @@ class TestSubqueryObjectProperty(object):
             {'pk': 'id', 'application': 'application_id'},
         ),
         (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {'pk': 'id'}),
+        pytest.param(DownloadLink, None, ['alternative'], {'version': 'version_id'}, marks=[composite_only]),
+        pytest.param(DownloadLink, ['url'], [], {'version': 'version_id'}, marks=[composite_only]),
     ])
     def test_finalize_setup(self, subquery_model, field_names, property_names, expected_aliases):
         model = Mock(__name__='MockModel')
@@ -142,14 +147,16 @@ class TestSubqueryObjectProperty(object):
         prop.name = 'test'
         if field_names is None:
             field_names = [field.name for field in subquery_model._meta.concrete_fields]
+        pk_attnames = [pk_field.attname for pk_field in
+                       getattr(subquery_model._meta, 'pk_fields', [subquery_model._meta.pk])]
         all_names = set(subquery_model._meta.get_field(field_name).attname for field_name in field_names)
-        all_names.add(subquery_model._meta.pk.attname)
+        all_names.update(pk_attnames)
         all_names.update(property_names)
 
         prop._finalize_setup(model, subquery_model)
         assert prop._subquery_model is subquery_model
-        assert prop._pk_field_names == [subquery_model._meta.pk.attname]
-        assert prop.field_name == subquery_model._meta.pk.attname
+        assert prop._pk_field_names == pk_attnames
+        assert prop.field_name == pk_attnames[0]
         assert prop._field_aliases == expected_aliases
         assert set(prop._managed_refs) == all_names
         for name in all_names:
@@ -231,7 +238,7 @@ class TestSubqueryObjectProperty(object):
         with django_assert_num_queries(0):
             assert application.highest_version_object is None
 
-    @pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
+    @composite_only
     @pytest.mark.django_db
     def test_getter_composite_pk(self, django_assert_num_queries, download_links):
         ref = get_queryable_property(download_links[0].__class__, 'alternative')._resolve()[0]
@@ -462,7 +469,7 @@ class TestSubqueryObjectProperty(object):
             ('Another App', version_pk, '2.0.0'),
         ]
 
-    @pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
+    @composite_only
     @pytest.mark.django_db
     def test_composite_pk_in_queries(self, django_assert_num_queries, download_links):
         model = download_links[0].__class__

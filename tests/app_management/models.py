@@ -382,3 +382,5 @@ if DJANGO_VERSION >= (5, 2):
                                          .order_by('published_on')),
             cached=True,
         )
+else:
+    DownloadLink = None
