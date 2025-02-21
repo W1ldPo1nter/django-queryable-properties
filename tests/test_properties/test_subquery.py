@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import pytest
 import six
-from django import VERSION as DJANGO_VERSION
 from django.core.exceptions import FieldError
 from django.db import models
 from mock import Mock
@@ -21,12 +20,9 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, DownloadLink,
     VersionWithClassBasedProperties,
 )
+from ..marks import skip_if_no_composite_pks, skip_if_no_subqueries
 
-pytestmark = [
-    pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11"),
-]
-
-composite_only = pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
+pytestmark = [skip_if_no_subqueries]
 
 
 class TestSubqueryFieldProperty(object):
@@ -138,8 +134,9 @@ class TestSubqueryObjectProperty(object):
             {'pk': 'id', 'application': 'application_id'},
         ),
         (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {'pk': 'id'}),
-        pytest.param(DownloadLink, None, ['alternative'], {'version': 'version_id'}, marks=[composite_only]),
-        pytest.param(DownloadLink, ['url'], [], {'version': 'version_id'}, marks=[composite_only]),
+        pytest.param(DownloadLink, None, ['alternative'], {'version': 'version_id'},
+                     marks=[skip_if_no_composite_pks]),
+        pytest.param(DownloadLink, ['url'], [], {'version': 'version_id'}, marks=[skip_if_no_composite_pks]),
     ])
     def test_finalize_setup(self, subquery_model, field_names, property_names, expected_aliases):
         model = Mock(__name__='MockModel')
@@ -238,7 +235,7 @@ class TestSubqueryObjectProperty(object):
         with django_assert_num_queries(0):
             assert application.highest_version_object is None
 
-    @composite_only
+    @skip_if_no_composite_pks
     @pytest.mark.django_db
     def test_getter_composite_pk(self, django_assert_num_queries, download_links):
         ref = get_queryable_property(download_links[0].__class__, 'alternative')._resolve()[0]
@@ -469,7 +466,7 @@ class TestSubqueryObjectProperty(object):
             ('Another App', version_pk, '2.0.0'),
         ]
 
-    @composite_only
+    @skip_if_no_composite_pks
     @pytest.mark.django_db
     def test_composite_pk_in_queries(self, django_assert_num_queries, download_links):
         model = download_links[0].__class__

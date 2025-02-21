@@ -3,7 +3,6 @@ from collections import Counter
 
 import pytest
 import six
-from django import VERSION as DJANGO_VERSION
 from django.db.models import CharField, IntegerField, Q, Sum
 from six.moves import cPickle
 
@@ -20,6 +19,7 @@ from ..app_management.models import (
     CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
 )
 from ..conftest import Concat, Value
+from ..marks import skip_if_no_output_fields
 
 
 class BaseMetaclass(type):
@@ -475,7 +475,7 @@ class TestGetOutputField(object):
     CHAR_FIELD = CharField()
     INTEGER_FIELD = IntegerField(null=True)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
+    @skip_if_no_output_fields
     @pytest.mark.parametrize('annotation, expected_result', [
         (Concat(Value('test'), 'some_field', output_field=CHAR_FIELD), CHAR_FIELD),
         (Sum('aggregate', output_field=INTEGER_FIELD), INTEGER_FIELD),

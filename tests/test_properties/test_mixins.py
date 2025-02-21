@@ -11,6 +11,7 @@ from queryable_properties.properties import (
 from queryable_properties.properties.mixins import SubqueryMixin
 from queryable_properties.utils import get_queryable_property
 from ..app_management.models import ApplicationWithClassBasedProperties
+from ..marks import skip_if_no_composite_pks, skip_if_no_subqueries
 
 
 class BaseLookupFilterProperty(LookupFilterMixin, QueryableProperty):
@@ -189,7 +190,7 @@ class TestAnnotationGetterMixin(object):
         for application in applications[:2]:
             assert prop.get_queryset_for_object(application).get() == application
 
-    @pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
+    @skip_if_no_composite_pks
     @pytest.mark.django_db
     def test_get_queryset_for_object_composite_pk(self, download_links):
         prop = get_queryable_property(download_links[0].__class__, 'alternative')
@@ -218,7 +219,7 @@ class TestAnnotationGetterMixin(object):
             prop.get_value(application)
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+@skip_if_no_subqueries
 class TestSubqueryMixin(object):
 
     @pytest.mark.parametrize('kwargs', [

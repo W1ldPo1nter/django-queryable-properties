@@ -2,7 +2,6 @@
 from itertools import groupby
 
 import pytest
-from django import VERSION as DJANGO_VERSION
 
 from queryable_properties.exceptions import QueryablePropertyDoesNotExist
 from queryable_properties.properties import QueryableProperty
@@ -12,6 +11,7 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
     VersionWithDecoratorBasedProperties,
 )
+from ..marks import skip_if_no_composite_pks
 
 
 class TestGetQueryableProperty(object):
@@ -98,7 +98,7 @@ class TestPrefetchQueryableProperties(object):
         for cls, instances in grouped_instances.items():
             self.assert_cached(get_queryable_property_descriptor(cls, 'version_count'), *instances)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (5, 2), reason="Composite PKs didn't exist before Django 5.2")
+    @skip_if_no_composite_pks
     def test_composite_pks(self, django_assert_num_queries, download_links):
         descriptor = get_queryable_property_descriptor(download_links[0].__class__, 'alternative')
         self.assert_not_cached(descriptor, *download_links)

@@ -12,6 +12,7 @@ from django.utils.translation import trans_real
 from queryable_properties.compat import nullcontext
 from queryable_properties.utils import get_queryable_property
 from ..app_management.models import VersionWithClassBasedProperties
+from ..marks import skip_if_no_expressions
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -59,7 +60,7 @@ class TestValueCheckProperty(object):
         assert len(results) == len(expected_versions) * 2
         assert set(result.version for result in results) == expected_versions
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.parametrize('ordering, expected_version_order', [
         (('-is_stable', '-version'), ['1.3.1', '1.3.0', '2.0.0', '1.2.3']),
         (('-is_unstable', '-is_alpha', 'version'), ['2.0.0', '1.2.3', '1.3.0', '1.3.1']),
@@ -164,7 +165,7 @@ class TestRangeCheckProperty(object):
         results = VersionWithClassBasedProperties.objects.filter(condition)
         assert set(version.version for version in results) == expected_versions
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     def test_annotation(self):
         results = VersionWithClassBasedProperties.objects.order_by('-is_supported', 'version')
         assert list(results.select_properties('version').values_list('version', flat=True)) == [
@@ -209,7 +210,7 @@ class TestMappingProperty(object):
         with self.apply_dummy_translations() if apply_dummy_translations else nullcontext():
             assert versions[0].release_type_verbose_name is None
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.parametrize('apply_dummy_translations, filter_value, expected_count', [
         (False, 'Alpha', 2),
         (False, 'Stable', 4),
@@ -221,7 +222,7 @@ class TestMappingProperty(object):
             queryset = VersionWithClassBasedProperties.objects.filter(release_type_verbose_name=filter_value)
             assert queryset.count() == expected_count
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.parametrize('apply_dummy_translations', [False, True])
     def test_filter_default(self, versions, apply_dummy_translations):
         versions[0].release_type = 'x'
@@ -229,7 +230,7 @@ class TestMappingProperty(object):
         with self.apply_dummy_translations() if apply_dummy_translations else nullcontext():
             assert VersionWithClassBasedProperties.objects.get(release_type_verbose_name=None) == versions[0]
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.parametrize('apply_dummy_translations, expected_verbose_names', [
         (False, ['Beta', 'Stable', 'Stable', 'Alpha']),
         (True, ['eta', 'table', 'table', 'lpha']),
@@ -240,7 +241,7 @@ class TestMappingProperty(object):
             queryset = queryset.filter(application=applications[0]).select_properties('release_type_verbose_name')
             assert list(queryset.values_list('release_type_verbose_name', flat=True)) == expected_verbose_names
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.parametrize('apply_dummy_translations', [False, True])
     def test_annotation_default(self, versions, apply_dummy_translations):
         versions[0].release_type = 'x'

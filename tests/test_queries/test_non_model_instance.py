@@ -9,6 +9,7 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
     CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
 )
+from ..marks import skip_if_no_expressions, skip_if_no_subqueries
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -138,7 +139,7 @@ class TestAggregateAnnotations(object):
         assert list(queryset) == [date(2017, 1, 1), date(2018, 1, 1)]
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+@skip_if_no_expressions
 class TestExpressionAnnotations(object):
 
     @pytest.mark.parametrize('model, filters, expected_versions', [
@@ -156,7 +157,7 @@ class TestExpressionAnnotations(object):
         versions = set(obj_dict['version'] for obj_dict in queryset)
         assert versions == expected_versions
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+    @skip_if_no_subqueries
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_group_by_property(self, model):
         queryset = model.objects.select_properties('highest_version').values('highest_version')

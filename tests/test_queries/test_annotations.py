@@ -11,6 +11,7 @@ from ..app_management.models import (
     VersionWithDecoratorBasedProperties,
 )
 from ..conftest import Concat, Value
+from ..marks import skip_if_no_expressions
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -56,7 +57,7 @@ class TestAggregateAnnotations(object):
         result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum('application__version_count'))
         assert result['total_version_count'] == expected_total
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.parametrize('model, annotation', [
         (VersionWithClassBasedProperties, models.F('application__version_count')),
         (VersionWithDecoratorBasedProperties, models.F('application__version_count')),
@@ -118,7 +119,7 @@ class TestAggregateAnnotations(object):
         assert counter == 2
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+@skip_if_no_expressions
 class TestExpressionAnnotations(object):
 
     @pytest.mark.parametrize('model, filters', [

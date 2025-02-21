@@ -7,6 +7,7 @@ from queryable_properties.properties import AggregateProperty, AnnotationPropert
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath
 from ..app_management.models import ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties
+from ..marks import skip_if_no_expressions
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -122,14 +123,14 @@ class TestRelatedExistenceCheckProperty(object):
         assert category_queryset.get(applications__has_version_with_changelog=not negated) == categories[0]
         assert category_queryset.get(applications__has_version_with_changelog=negated) == categories[1]
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     def test_annotation(self, categories, applications):
         queryset = CategoryWithClassBasedProperties.objects.all()
         assert list(queryset.order_by('has_versions', 'pk')) == categories[:2]
         applications[1].versions.all().delete()
         assert list(queryset.order_by('has_versions', 'pk')) == [categories[1], categories[0]]
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     def test_annotation_based_on_non_relation_field(self, categories, applications):
         app_queryset = ApplicationWithClassBasedProperties.objects.all()
         category_queryset = CategoryWithClassBasedProperties.objects.all()
