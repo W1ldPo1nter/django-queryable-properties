@@ -11,7 +11,7 @@ from ..app_management.models import (
     VersionWithDecoratorBasedProperties,
 )
 from ..conftest import Concat, Value
-from ..marks import skip_if_no_expressions
+from ..marks import skip_if_no_alias, skip_if_no_expressions
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -75,7 +75,7 @@ class TestAggregateAnnotations(object):
             assert application.version_count == 4
         assert queryset._result_cache is None
 
-    @pytest.mark.skipif(DJANGO_VERSION < (3, 2), reason="The alias() method didn't exist before Django 3.2")
+    @skip_if_no_alias
     @pytest.mark.parametrize('model, with_selection', [
         (ApplicationWithClassBasedProperties, False),
         (ApplicationWithClassBasedProperties, True),
@@ -165,7 +165,7 @@ class TestExpressionAnnotations(object):
             descriptor = get_queryable_property_descriptor(model, property_name)
             assert all(not descriptor.has_cached_value(obj) for obj in queryset)
 
-    @pytest.mark.skipif(DJANGO_VERSION < (3, 2), reason="The alias() method didn't exist before Django 3.2")
+    @skip_if_no_alias
     @pytest.mark.parametrize('model, with_selection', [
         (VersionWithClassBasedProperties, False),
         (VersionWithClassBasedProperties, True),

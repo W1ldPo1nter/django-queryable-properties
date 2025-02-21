@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import pytest
-from django import VERSION as DJANGO_VERSION
 from django.db.models import Avg, Q
 
 from queryable_properties.properties import AggregateProperty, AnnotationProperty, RelatedExistenceCheckProperty
