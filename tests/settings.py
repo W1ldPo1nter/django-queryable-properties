@@ -25,6 +25,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
     'django.contrib.admin',
     'tests.app_management',
+    'tests.inheritance',
 )
 if DJANGO_VERSION < (1, 9):
     INSTALLED_APPS += ('tests.dummy_lib',)  # Django versions before 1.9 don't support abstract models outside of apps

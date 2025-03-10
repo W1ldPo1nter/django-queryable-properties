@@ -21,6 +21,9 @@ from .app_management.models import (
     CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties,
 )
 from .dummy_lib.models import ReleaseTypeModel
+from .inheritance.models import (
+    Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, MultipleParent2, Parent,
+)
 
 collect_ignore = []
 if DJANGO_VERSION < (4, 1):
@@ -101,3 +104,11 @@ def tags(applications):
     applications[0].tags.add(tags[0])
     applications[1].tags.add(tags[1])
     return tags
+
+
+@pytest.fixture
+def inheritance_instances():
+    return {
+        model: model.objects.create() for model in
+        (Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, MultipleParent2, Parent)
+    }
