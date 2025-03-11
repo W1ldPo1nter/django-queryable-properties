@@ -53,6 +53,7 @@ class InheritanceModelProperty(AnnotationGetterMixin, QueryableProperty):
                  respective query paths as values.
         :rtype: OrderedDict[type, QueryPath]
         """
+        model = model._meta.proxy_for_model or model
         child_paths = self._child_paths.get(model)
         if not child_paths:
             from django.db.models.fields.related import ForeignObjectRel
@@ -72,7 +73,7 @@ class InheritanceModelProperty(AnnotationGetterMixin, QueryableProperty):
 
         cases = (
             When((query_path + 'isnull').build_filter(False), then=Value(self.value_generator(child_model)))
-            for child_model, query_path in self._get_child_paths(cls)
+            for child_model, query_path in six.iteritems(self._get_child_paths(cls))
             if self.depth is None or len(query_path) <= self.depth
         )
         return Case(*cases, default=Value(self.value_generator(cls)), output_field=self.output_field)

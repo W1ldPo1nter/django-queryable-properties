@@ -11,7 +11,7 @@ class Abstract(models.Model):
 
     objects = QueryablePropertiesManager()
 
-    type_label = InheritanceModelProperty(lambda cls: six.text_type(cls._meta.verbose_name), models.CharField())
+    plural = InheritanceModelProperty(lambda cls: six.text_type(cls._meta.verbose_name_plural), models.CharField())
 
 
 class Parent(Abstract):
@@ -46,7 +46,7 @@ class MultipleParent1(models.Model):
 
     objects = QueryablePropertiesManager()
 
-    type_label = InheritanceModelProperty(lambda cls: six.text_type(cls._meta.verbose_name), models.CharField())
+    plural = InheritanceModelProperty(lambda cls: six.text_type(cls._meta.verbose_name_plural), models.CharField())
 
 
 class MultipleParent2(models.Model):
