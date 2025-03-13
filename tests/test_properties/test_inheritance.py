@@ -89,7 +89,13 @@ class TestInheritanceModelProperty(object):
     @pytest.mark.django_db
     def test_annotation(self, django_assert_num_queries, inheritance_instances):
         with django_assert_num_queries(1):
-            instances = Parent.objects.select_properties('plural').in_bulk()
+            instances = Parent.objects.select_properties('plural').in_bulk([
+                inheritance_instances[Parent].pk,
+                inheritance_instances[Child1].pk,
+                inheritance_instances[Child2].pk,
+                inheritance_instances[Grandchild1].pk,
+                inheritance_instances[DisconnectedGrandchild2].pk,
+            ])
             assert instances[inheritance_instances[Parent].pk].plural == 'parents'
             assert instances[inheritance_instances[Child1].pk].plural == 'child1s'
             assert instances[inheritance_instances[Child2].pk].plural == 'child2s'
@@ -97,12 +103,18 @@ class TestInheritanceModelProperty(object):
             assert instances[inheritance_instances[DisconnectedGrandchild2].pk].plural == 'child2s'
 
         with django_assert_num_queries(1):
-            instances = MultipleParent1.objects.select_properties('plural').in_bulk()
+            instances = MultipleParent1.objects.select_properties('plural').in_bulk([
+                inheritance_instances[MultipleParent1].pk,
+                inheritance_instances[MultipleChild].pk,
+            ])
             assert instances[inheritance_instances[MultipleParent1].pk].plural == 'multiple parent1s'
             assert instances[inheritance_instances[MultipleChild].pk].plural == 'multiple childs'
 
         with django_assert_num_queries(1):
-            instances = ProxyChild.objects.select_properties('plural').in_bulk()
+            instances = ProxyChild.objects.select_properties('plural').in_bulk([
+                inheritance_instances[Child1].pk,
+                inheritance_instances[Grandchild1].pk,
+            ])
             assert instances[inheritance_instances[Child1].pk].plural == 'proxy childs'
             assert instances[inheritance_instances[Grandchild1].pk].plural == 'grandchild1s'
 
@@ -156,6 +168,12 @@ class TestInheritanceModelProperty(object):
         prop = get_queryable_property(Parent, 'plural')
         monkeypatch.setattr(prop, 'depth', depth)
 
-        instances = Parent.objects.select_properties('plural').in_bulk()
+        instances = Parent.objects.select_properties('plural').in_bulk([
+            inheritance_instances[Parent].pk,
+            inheritance_instances[Child1].pk,
+            inheritance_instances[Child2].pk,
+            inheritance_instances[Grandchild1].pk,
+            inheritance_instances[DisconnectedGrandchild2].pk,
+        ])
         for model, expected_value in expected_values.items():
             assert instances[inheritance_instances[model].pk].plural == expected_value
