@@ -6,6 +6,7 @@ without notice or be removed without deprecation.
 
 from copy import deepcopy
 from functools import wraps
+from inspect import isclass
 
 import six
 from django.core.exceptions import ObjectDoesNotExist
@@ -13,7 +14,7 @@ from django.db.models import Manager, Q
 from django.utils.decorators import method_decorator
 from django.utils.tree import Node
 
-from ..compat import LOOKUP_SEP, get_related_model
+from ..compat import LOOKUP_SEP, get_model, get_related_model
 from ..exceptions import FieldDoesNotExist, QueryablePropertyDoesNotExist
 
 MISSING_OBJECT = object()  #: Arbitrary object to represent that an object in an attribute chain is missing.
@@ -439,13 +440,20 @@ def get_queryable_property_descriptor(model, name):
     name from the given model class or raise an error if no queryable property
     with that name exists on the model class.
 
-    :param type model: The model class to retrieve the descriptor object from.
+    :param model: The model to retrieve the descriptor object from. May be
+                  specified as the model class, a model instance or a string
+                  containing Django's ``<app_label>.<model_name>`` format.
+    :type model: type | django.db.models.Model | str
     :param str name: The name of the property to retrieve the descriptor for.
     :return: The descriptor object.
     :rtype: queryable_properties.properties.base.QueryablePropertyDescriptor
     """
     from ..properties.base import QueryablePropertyDescriptor
 
+    if isinstance(model, six.string_types):
+        model = get_model(*model.split('.', 1))
+    elif not isclass(model):
+        model = model.__class__
     descriptor = getattr(model, name, None)
     if not isinstance(descriptor, QueryablePropertyDescriptor):
         raise QueryablePropertyDoesNotExist("{model} has no queryable property named '{name}'".format(

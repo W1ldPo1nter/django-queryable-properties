@@ -4,6 +4,7 @@ A stable import interface for Python/Django entities across versions as well as 
 """
 
 from copy import deepcopy
+from functools import partial
 from operator import attrgetter
 
 try:  # pragma: no cover
@@ -23,9 +24,11 @@ except ImportError:  # pragma: no cover
 from django.db.models.sql.query import Query
 
 try:  # pragma: no cover
-    from django.apps import AppConfig  # noqa: F401
+    from django.apps import apps
 except ImportError:  # pragma: no cover
-    AppConfig = None  # noqa: F401
+    from django.db.models import get_model
+else:  # pragma: no cover
+    get_model = partial(apps.get_model, require_ready=False)
 
 try:  # pragma: no cover
     from django.contrib.admin import validation as admin_validation  # noqa: F401

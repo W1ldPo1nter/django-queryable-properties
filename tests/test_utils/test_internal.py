@@ -352,22 +352,29 @@ def test_parametrizable_decorator():
 
 class TestGetQueryablePropertyDescriptor(object):
 
-    @pytest.mark.parametrize('model, property_name', [
-        (VersionWithClassBasedProperties, 'major_minor'),
-        (VersionWithDecoratorBasedProperties, 'major_minor'),
-        (VersionWithClassBasedProperties, 'version'),
-        (VersionWithDecoratorBasedProperties, 'version'),
+    @pytest.mark.parametrize('model', [
+        VersionWithClassBasedProperties,
+        VersionWithDecoratorBasedProperties,
+        VersionWithClassBasedProperties(),
+        VersionWithDecoratorBasedProperties(),
+        'app_management.VersionWithClassBasedProperties',
+        'app_management.VersionWithDecoratorBasedProperties',
     ])
+    @pytest.mark.parametrize('property_name', ['major_minor', 'version'])
     def test_property_found(self, model, property_name):
         descriptor = get_queryable_property_descriptor(model, property_name)
         assert isinstance(descriptor, QueryablePropertyDescriptor)
+        assert descriptor.prop.name == property_name
 
-    @pytest.mark.parametrize('model, property_name', [
-        (VersionWithClassBasedProperties, 'non_existent'),
-        (VersionWithDecoratorBasedProperties, 'non_existent'),
-        (VersionWithClassBasedProperties, 'major'),  # Existing model field
-        (VersionWithDecoratorBasedProperties, 'major'),  # Existing model field
+    @pytest.mark.parametrize('model', [
+        VersionWithClassBasedProperties,
+        VersionWithDecoratorBasedProperties,
+        VersionWithClassBasedProperties(),
+        VersionWithDecoratorBasedProperties(),
+        'app_management.VersionWithClassBasedProperties',
+        'app_management.VersionWithDecoratorBasedProperties',
     ])
+    @pytest.mark.parametrize('property_name', ['non_existent', 'major'])
     def test_exception(self, model, property_name):
         with pytest.raises(QueryablePropertyDoesNotExist):
             get_queryable_property_descriptor(model, property_name)

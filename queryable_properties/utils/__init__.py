@@ -15,7 +15,10 @@ def get_queryable_property(model, name):
     object with the given attribute name from the given model class or raise
     an error if no queryable property with that name exists on the model class.
 
-    :param type model: The model class to retrieve the property object from.
+    :param model: The model to retrieve the property object from. May be
+                  specified as the model class, a model instance or a string
+                  containing Django's ``<app_label>.<model_name>`` format.
+    :type model: type | django.db.models.Model | str
     :param str name: The name of the property to retrieve.
     :return: The queryable property.
     :rtype: queryable_properties.properties.QueryableProperty
