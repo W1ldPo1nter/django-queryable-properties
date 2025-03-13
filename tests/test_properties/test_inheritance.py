@@ -110,13 +110,15 @@ class TestInheritanceModelProperty(object):
             assert instances[inheritance_instances[MultipleParent1].pk].plural == 'multiple parent1s'
             assert instances[inheritance_instances[MultipleChild].pk].plural == 'multiple childs'
 
-        with django_assert_num_queries(1):
-            instances = ProxyChild.objects.select_properties('plural').in_bulk([
-                inheritance_instances[Child1].pk,
-                inheritance_instances[Grandchild1].pk,
-            ])
-            assert instances[inheritance_instances[Child1].pk].plural == 'proxy childs'
-            assert instances[inheritance_instances[Grandchild1].pk].plural == 'grandchild1s'
+        # In Django versions below 1.10, proxy models seemingly can't access parent links.
+        if DJANGO_VERSION >= (1, 10):
+            with django_assert_num_queries(1):
+                instances = ProxyChild.objects.select_properties('plural').in_bulk([
+                    inheritance_instances[Child1].pk,
+                    inheritance_instances[Grandchild1].pk,
+                ])
+                assert instances[inheritance_instances[Child1].pk].plural == 'proxy childs'
+                assert instances[inheritance_instances[Grandchild1].pk].plural == 'grandchild1s'
 
         assert Parent.objects.get(plural='parents') == inheritance_instances[Parent]
         assert Parent.objects.get(plural='grandchild1s').pk == inheritance_instances[Grandchild1].pk
