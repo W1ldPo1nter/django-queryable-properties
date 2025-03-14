@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-
 from itertools import chain
 
 import six
+from django import VERSION as DJANGO_VERSION
 from django.contrib.admin.options import InlineModelAdmin
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F, expressions
@@ -195,6 +195,16 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         if field_name.startswith('-') or field_name.startswith('+'):
             field_name = field_name[1:]
         return self._check_queryable_property(obj, model, QueryPath(field_name), label)
+
+    def _check_list_display_item(self, obj, *args):
+        errors = super(QueryablePropertiesChecksMixin, self)._check_list_display_item(obj, *args)
+        if not errors or errors[0].id != 'admin.E108' or DJANGO_VERSION < (5, 1):
+            return errors
+        query_path = QueryPath(args[0])
+        if len(query_path) <= 1:  # Not a relation path.
+            return errors
+        prop, property_errors = self._check_queryable_property(obj, obj.model, query_path, args[1], allow_lookups=False)
+        return property_errors if prop else errors
 
     def _check_list_filter_item(self, obj, *args):
         errors = super(QueryablePropertiesChecksMixin, self)._check_list_filter_item(obj, *args)
