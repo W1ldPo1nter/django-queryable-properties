@@ -5,9 +5,12 @@ from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import site
 from django.contrib.admin.filters import ChoicesFieldListFilter, FieldListFilter
 from django.contrib.admin.options import ModelAdmin
+from django.contrib.admin.views.main import ChangeList
+from django.contrib.auth.models import AnonymousUser
 from django.db.models.query import QuerySet
 from mock import patch
 
+from queryable_properties.admin import QueryablePropertiesChangeListMixin
 from queryable_properties.compat import nullcontext
 from queryable_properties.managers import QueryablePropertiesQuerySetMixin
 from queryable_properties.utils import get_queryable_property
@@ -51,26 +54,14 @@ class TestQueryablePropertiesAdminMixin(object):
         for prop in expected_selected_properties:
             assert any(ref.property is prop for ref in queryset.query._queryable_property_annotations)
 
-    @pytest.mark.parametrize('list_filter_item, property_name', [
-        ('name', None),
-        (DummyListFilter, None),
-        ('support_start_date', 'support_start_date'),
-        (('support_start_date', ChoicesFieldListFilter), 'support_start_date'),
+    @pytest.mark.parametrize('admin_class, model', [
+        (ApplicationAdmin, ApplicationWithClassBasedProperties),
+        (VersionAdmin, VersionWithClassBasedProperties),
     ])
-    def test_get_list_filter(self, monkeypatch, rf, list_filter_item, property_name):
-        monkeypatch.setattr(ApplicationAdmin, 'list_filter', ('common_data', list_filter_item))
-        admin = ApplicationAdmin(ApplicationWithClassBasedProperties, site)
-        list_filter = admin.list_filter
-        if DJANGO_VERSION >= (1, 5):
-            list_filter = admin.get_list_filter(rf.get('/'))
-        assert list_filter[0] == 'common_data'
-        assert (list_filter[1] == list_filter_item) is (not property_name)
-        if property_name:
-            replacement = list_filter[1]
-            assert callable(replacement)
-            filter_instance = replacement(rf.get('/'), {}, admin.model, admin)
-            assert isinstance(filter_instance, FieldListFilter)
-            assert filter_instance.field.name == property_name
+    def test_get_changelist(self, rf, admin_class, model):
+        admin = admin_class(model, site)
+        cls = admin.get_changelist(rf.get('/'))
+        assert issubclass(cls, QueryablePropertiesChangeListMixin)
 
     @pytest.mark.skipif(DJANGO_VERSION < (2, 1), reason='Arbitrary search fields were not allowed before Django 2.1')
     @pytest.mark.django_db
@@ -93,3 +84,43 @@ class TestQueryablePropertiesAdminMixin(object):
         admin = ApplicationAdmin(ApplicationWithClassBasedProperties, site)
         queryset = admin.get_search_results(request, admin.get_queryset(request), search_term)[0]
         assert queryset.count() == expected_count
+
+
+class TestQueryablePropertiesChangeListMixin(object):
+
+    def get_instance_from_admin(self, rf, admin):
+        request = rf.get('/')
+        request.user = AnonymousUser()
+        method_name = 'get_queryset' if hasattr(ChangeList, 'get_queryset') else 'get_query_set'
+        with patch('django.contrib.admin.views.main.ChangeList.{}'.format(method_name)):
+            if hasattr(admin, 'get_changelist_instance'):
+                instance = admin.get_changelist_instance(request)
+            else:
+                list_display = admin.get_list_display(request)
+                instance = admin.get_changelist(request)(
+                    request, admin.model, list_display, admin.get_list_display_links(request, list_display),
+                    admin.list_filter, admin.date_hierarchy, admin.search_fields, admin.list_select_related,
+                    admin.list_per_page, admin.list_max_show_all, admin.list_editable, admin,
+                )
+        assert isinstance(instance, QueryablePropertiesChangeListMixin)
+        return instance
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('list_filter_item, property_name', [
+        ('name', None),
+        (DummyListFilter, None),
+        ('support_start_date', 'support_start_date'),
+        (('support_start_date', ChoicesFieldListFilter), 'support_start_date'),
+    ])
+    def test_initializer_list_filter(self, monkeypatch, rf, list_filter_item, property_name):
+        monkeypatch.setattr(ApplicationAdmin, 'list_filter', ('common_data', list_filter_item))
+        admin = ApplicationAdmin(ApplicationWithClassBasedProperties, site)
+        changelist = self.get_instance_from_admin(rf, admin)
+        assert changelist.list_filter[0] == 'common_data'
+        assert (changelist.list_filter[1] == list_filter_item) is (not property_name)
+        if property_name:
+            replacement = changelist.list_filter[1]
+            assert callable(replacement)
+            filter_instance = replacement(rf.get('/'), {}, admin.model, admin)
+            assert isinstance(filter_instance, FieldListFilter)
+            assert filter_instance.field.name == property_name

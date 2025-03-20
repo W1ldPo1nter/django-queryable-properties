@@ -5,7 +5,7 @@ from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
 from ..compat import admin_validation, compat_call
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
-from ..utils.internal import QueryPath
+from ..utils.internal import QueryPath, InjectableMixin
 from .checks import QueryablePropertiesChecksMixin
 from .filters import QueryablePropertyField
 
@@ -25,14 +25,6 @@ class QueryablePropertiesAdminMixin(object):
 
     list_select_properties = ()
     """A sequence of queryable property names that should be selected."""
-
-    def __init__(self, *args, **kwargs):
-        super(QueryablePropertiesAdminMixin, self).__init__(*args, **kwargs)
-        if hasattr(self, 'list_filter') and not hasattr(ModelAdmin, 'get_list_filter'):  # pragma: no cover
-            # In very old Django versions, there was no get_list_filter method,
-            # therefore the processed queryable property filters must be stored
-            # directly in the list_filter attribute.
-            self.list_filter = self.process_queryable_property_filters(self.list_filter)
 
     @classmethod
     def validate(cls, model):  # pragma: no cover
@@ -85,6 +77,12 @@ class QueryablePropertiesAdminMixin(object):
         # necessary.
         return self.get_queryset(request)
 
+    def get_changelist(self, request, **kwargs):
+        # Dynamically add a mixin that handles queryable properties into the
+        # admin's changelist class.
+        cls = super(QueryablePropertiesAdminMixin, self).get_changelist(request, **kwargs)
+        return QueryablePropertiesChangeListMixin.mix_with_class(cls, 'QueryableProperties' + cls.__name__)
+
     def get_list_select_properties(self, request):
         """
         Wrapper around the ``list_select_properties`` attribute that allows to
@@ -97,10 +95,6 @@ class QueryablePropertiesAdminMixin(object):
         """
         return self.list_select_properties
 
-    def get_list_filter(self, request):
-        list_filter = super(QueryablePropertiesAdminMixin, self).get_list_filter(request)
-        return self.process_queryable_property_filters(list_filter)
-
     def process_queryable_property_filters(self, list_filter):
         """
         Process a sequence of list filters to create a new sequence in which
@@ -111,19 +105,8 @@ class QueryablePropertiesAdminMixin(object):
         :return: The processed list filter sequence.
         :rtype: list
         """
-        processed_filters = []
-        for item in list_filter:
-            if not callable(item):
-                if isinstance(item, (tuple, list)):
-                    field_name, filter_class = item
-                else:
-                    field_name, filter_class = item, None
-                try:
-                    item = QueryablePropertyField(self, QueryPath(field_name)).get_filter_creator(filter_class)
-                except QueryablePropertyError:
-                    pass
-            processed_filters.append(item)
-        return processed_filters
+        # TODO: deprecate
+        return list_filter
 
 
 class QueryablePropertiesAdmin(QueryablePropertiesAdminMixin, ModelAdmin):
@@ -151,6 +134,27 @@ class QueryablePropertiesTabularInline(QueryablePropertiesAdminMixin, TabularInl
 
     Intended to be used in place of Django's regular ``TabularInline`` class.
     """
+
+
+class QueryablePropertiesChangeListMixin(InjectableMixin):
+
+    def init_injected_attrs(self):
+        # Process queryable properties to be used as filters by replacing their
+        # references with custom callables that make them compatible with
+        # Django's filter workflow
+        processed_filters = []
+        for item in self.list_filter:
+            if not callable(item):
+                if isinstance(item, (tuple, list)):
+                    field_name, filter_class = item
+                else:
+                    field_name, filter_class = item, None
+                try:
+                    item = QueryablePropertyField(self, QueryPath(field_name)).get_filter_creator(filter_class)
+                except QueryablePropertyError:
+                    pass
+            processed_filters.append(item)
+        self.list_filter = processed_filters
 
 
 # In very old django versions, the admin validation happens in one big function
