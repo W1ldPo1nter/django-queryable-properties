@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import pytest
-from django.contrib.admin.views.main import ChangeList
 
 
 @pytest.fixture
@@ -11,7 +10,7 @@ def changelist_factory(rf, admin_user):
 
         :param model_admin: The model admin to create the changelist for.
         :return: The changelist instance.
-        :rtype: ChangeList
+        :rtype: django.contrib.admin.views.main.ChangeList
         """
         request = rf.get('/')
         request.user = admin_user
