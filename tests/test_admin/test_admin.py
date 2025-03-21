@@ -88,23 +88,6 @@ class TestQueryablePropertiesAdminMixin(object):
 
 class TestQueryablePropertiesChangeListMixin(object):
 
-    def get_instance_from_admin(self, rf, admin):
-        request = rf.get('/')
-        request.user = AnonymousUser()
-        method_name = 'get_queryset' if hasattr(ChangeList, 'get_queryset') else 'get_query_set'
-        with patch('django.contrib.admin.views.main.ChangeList.{}'.format(method_name)):
-            if hasattr(admin, 'get_changelist_instance'):
-                instance = admin.get_changelist_instance(request)
-            else:
-                list_display = admin.get_list_display(request)
-                instance = admin.get_changelist(request)(
-                    request, admin.model, list_display, admin.get_list_display_links(request, list_display),
-                    admin.list_filter, admin.date_hierarchy, admin.search_fields, admin.list_select_related,
-                    admin.list_per_page, admin.list_max_show_all, admin.list_editable, admin,
-                )
-        assert isinstance(instance, QueryablePropertiesChangeListMixin)
-        return instance
-
     @pytest.mark.django_db
     @pytest.mark.parametrize('list_filter_item, property_name', [
         ('name', None),
@@ -112,10 +95,10 @@ class TestQueryablePropertiesChangeListMixin(object):
         ('support_start_date', 'support_start_date'),
         (('support_start_date', ChoicesFieldListFilter), 'support_start_date'),
     ])
-    def test_initializer_list_filter(self, monkeypatch, rf, list_filter_item, property_name):
+    def test_initializer_list_filter(self, monkeypatch, rf, changelist_factory, list_filter_item, property_name):
         monkeypatch.setattr(ApplicationAdmin, 'list_filter', ('common_data', list_filter_item))
         admin = ApplicationAdmin(ApplicationWithClassBasedProperties, site)
-        changelist = self.get_instance_from_admin(rf, admin)
+        changelist = changelist_factory(admin)
         assert changelist.list_filter[0] == 'common_data'
         assert (changelist.list_filter[1] == list_filter_item) is (not property_name)
         if property_name:

@@ -138,23 +138,28 @@ class QueryablePropertiesTabularInline(QueryablePropertiesAdminMixin, TabularInl
 
 class QueryablePropertiesChangeListMixin(InjectableMixin):
 
-    def init_injected_attrs(self):
+    def __init__(self, request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields,
+                 list_select_related, list_per_page, list_max_show_all, list_editable, model_admin, *args, **kwargs):
         # Process queryable properties to be used as filters by replacing their
         # references with custom callables that make them compatible with
-        # Django's filter workflow
+        # Django's filter workflow.
         processed_filters = []
-        for item in self.list_filter:
+        for item in list_filter:
             if not callable(item):
                 if isinstance(item, (tuple, list)):
                     field_name, filter_class = item
                 else:
                     field_name, filter_class = item, None
                 try:
-                    item = QueryablePropertyField(self, QueryPath(field_name)).get_filter_creator(filter_class)
+                    item = QueryablePropertyField(model_admin, QueryPath(field_name)).get_filter_creator(filter_class)
                 except QueryablePropertyError:
                     pass
             processed_filters.append(item)
-        self.list_filter = processed_filters
+
+        super(QueryablePropertiesChangeListMixin, self).__init__(request, model, list_display, list_display_links,
+                                                                 processed_filters, date_hierarchy, search_fields,
+                                                                 list_select_related, list_per_page, list_max_show_all,
+                                                                 list_editable, model_admin, *args, **kwargs)
 
 
 # In very old django versions, the admin validation happens in one big function
