@@ -5,8 +5,6 @@ from django import VERSION as DJANGO_VERSION
 from django.contrib.admin import site
 from django.contrib.admin.filters import ChoicesFieldListFilter, FieldListFilter
 from django.contrib.admin.options import ModelAdmin
-from django.contrib.admin.views.main import ChangeList
-from django.contrib.auth.models import AnonymousUser
 from django.db.models.query import QuerySet
 from mock import patch
 

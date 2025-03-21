@@ -11,7 +11,6 @@ from queryable_properties.admin.filters import QueryablePropertyField, Queryable
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath, get_output_field
-from .conftest import changelist_factory
 from ..app_management.admin import ApplicationAdmin, VersionAdmin
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
