@@ -472,7 +472,7 @@ def resolve_queryable_property(model, query_path):
              path that represent lookups (or transforms). The first item will
              be None and the query path will be empty if no queryable property
              could be resolved.
-    :rtype: (QueryablePropertyReference | None, QueryPath)
+    :rtype: (queryable_properties.properties.base.QueryablePropertyReference | None, QueryPath)
     """
     from . import get_queryable_property
 
