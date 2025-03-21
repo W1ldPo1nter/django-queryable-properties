@@ -27,7 +27,11 @@ class Dummy(object):
 
 
 class DummyListFilter(SimpleListFilter):
+    title = 'dummy'
     parameter_name = 'dummy'
+
+    def lookups(self, request, model_admin):
+        return []
 
 
 if not hasattr(F, 'asc'):
