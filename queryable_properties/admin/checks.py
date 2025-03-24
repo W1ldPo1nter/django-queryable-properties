@@ -2,7 +2,6 @@
 from itertools import chain
 
 import six
-from django import VERSION as DJANGO_VERSION
 from django.contrib.admin.options import InlineModelAdmin
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F, expressions
@@ -79,12 +78,29 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
         :return: A fake class to be validated by Django's standard validation.
         :rtype: type
         """
-        list_filter = []
-        ordering = []
+        fake_attrs = dict(__module__=cls.__module__, ordering=[])
         errors = self._check_list_select_properties(cls, model)
         pk_name = model._meta.pk.name
 
         if not issubclass(cls, InlineModelAdmin):
+            fake_attrs['list_display'] = []
+            fake_attrs['list_display_links'] = list(cls.list_display_links or ())
+            for i, item in enumerate(cls.list_display or ()):
+                if not callable(item):
+                    prop, property_errors = self._check_list_display_queryable_property(cls, model, item,
+                                                                                        'list_display[{}]'.format(i))
+                    if prop:
+                        errors.extend(property_errors)
+                        # Replace a valid reference to a queryable property
+                        # with a reference to the PK field so avoid Django
+                        # validation errors while not changing indexes of
+                        # other items.
+                        if item in fake_attrs['list_display_links']:
+                            fake_attrs['list_display_links'][fake_attrs['list_display_links'].index(item)] = pk_name
+                        item = pk_name
+                fake_attrs['list_display'].append(item)
+
+            fake_attrs['list_filter'] = []
             for i, item in enumerate(cls.list_filter or ()):
                 if not callable(item):
                     prop, property_errors = self._check_list_filter_queryable_property(cls, model, item,
@@ -96,7 +112,7 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                         # validation errors while not changing indexes of
                         # other items.
                         item = (pk_name, item[1]) if isinstance(item, (tuple, list)) else pk_name
-                list_filter.append(item)
+                fake_attrs['list_filter'].append(item)
 
         for i, field_name in enumerate(cls.ordering or ()):
             prop, property_errors = self._check_ordering_queryable_property(cls, model, field_name,
@@ -107,18 +123,14 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                 # reference to the PK field so avoid Django validation errors
                 # while not changing indexes of other items.
                 field_name = pk_name
-            ordering.append(field_name)
+            fake_attrs['ordering'].append(field_name)
 
         if errors:
             errors[0].raise_exception()
 
         # Build a fake admin class without queryable property references to be
         # validated by Django.
-        return type(cls.__name__, (cls,), {
-            '__module__': cls.__module__,
-            'list_filter': list_filter,
-            'ordering': ordering,
-        })
+        return type(cls.__name__, (cls,), fake_attrs)
 
     def _check_queryable_property(self, obj, model, query_path, label, allow_relation=True, allow_lookups=True):
         """
@@ -156,6 +168,24 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
                            .format(label, query_path))
                 errors.append(Error(message, obj, error_id=4))
         return property_ref and property_ref.property, errors
+
+    def _check_list_display_queryable_property(self, obj, model, item, label):
+        """
+        Perform checks for a (potential) queryable property used as a list
+        display item.
+
+        :param obj: The admin object or class.
+        :param model: The model the admin class is used for.
+        :param str item: The list display item.
+        :param str label: A label to use for error messages.
+        :return: A 2-tuple containing the resolved queryable property (if any)
+                 as well as a list of check errors.
+        :rtype: (queryable_properties.properties.QueryableProperty, list[Error])
+        """
+        query_path = QueryPath(item)
+        if len(query_path) <= 1:  # Not a relation path.
+            return None, []
+        return self._check_queryable_property(obj, model, query_path, label, allow_lookups=False)
 
     def _check_list_filter_queryable_property(self, obj, model, item, label):
         """
@@ -198,12 +228,13 @@ class QueryablePropertiesChecksMixin(InjectableMixin):
 
     def _check_list_display_item(self, obj, *args):
         errors = super(QueryablePropertiesChecksMixin, self)._check_list_display_item(obj, *args)
-        if not errors or errors[0].id != 'admin.E108' or DJANGO_VERSION < (5, 1):
+        if not errors or errors[0].id != 'admin.E108':
             return errors
-        query_path = QueryPath(args[0])
-        if len(query_path) <= 1:  # Not a relation path.
-            return errors
-        prop, property_errors = self._check_queryable_property(obj, obj.model, query_path, args[1], allow_lookups=False)
+
+        # The number of arguments differs between old and recent Django
+        # versions.
+        model = args[0] if len(args) > 2 else obj.model
+        prop, property_errors = self._check_list_display_queryable_property(obj, model, *args[-2:])
         return property_errors if prop else errors
 
     def _check_list_filter_item(self, obj, *args):

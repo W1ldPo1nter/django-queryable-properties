@@ -14,11 +14,6 @@ from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
 from ..conftest import Concat, Value
 
-skip_if_no_relations_in_list_display = pytest.mark.skipif(
-    DJANGO_VERSION < (5, 1),
-    reason="Related fields weren't allowed in list_display before Django 5.1",
-)
-
 
 class Dummy(object):
 
@@ -109,22 +104,13 @@ class TestQueryablePropertiesChecksMixin(object):
         ('major', None, None),
         ('version', None, None),
         ('does_not_exist', 'admin.E108', "'does_not_exist' is not a callable or"),
-        pytest.param('application__version_count', None, None, marks=skip_if_no_relations_in_list_display),
-        pytest.param(
-            'application__does_not_exist',
-            'admin.E108',
-            "'application__does_not_exist' is not a callable or",
-            marks=skip_if_no_relations_in_list_display,
-        ),
-        pytest.param(
-            'application__version_count__abs',
-            'queryable_properties.admin.E004',
-            'must not contain lookups/transforms',
-            marks=skip_if_no_relations_in_list_display,
-        ),
+        ('application__version_count', None, None),
+        ('application__does_not_exist', 'admin.E108', "'application__does_not_exist' is not a callable or"),
+        ('application__version_count__abs', 'queryable_properties.admin.E004', 'must not contain lookups/transforms'),
     ])
     def test_list_display(self, monkeypatch, item, error_id, exception_text):
         monkeypatch.setattr(VersionAdmin, 'list_display', (item,))
+        monkeypatch.setattr(VersionAdmin, 'list_display_links', (item,))
         assert_admin_validation(VersionAdmin, VersionWithClassBasedProperties, error_id, exception_text)
 
     @pytest.mark.parametrize('filter_item', [
