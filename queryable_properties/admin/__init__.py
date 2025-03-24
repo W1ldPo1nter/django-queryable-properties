@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-
+import six
 from django.contrib.admin import ModelAdmin, StackedInline, TabularInline
+from django.db.models import F
 
 from ..compat import admin_validation, compat_call
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
-from ..utils.internal import QueryPath, InjectableMixin
+from ..utils.internal import InjectableMixin, QueryPath, resolve_queryable_property
 from .checks import QueryablePropertiesChecksMixin
 from .filters import QueryablePropertyField
 
@@ -140,6 +141,22 @@ class QueryablePropertiesChangeListMixin(InjectableMixin):
 
     def __init__(self, request, model, list_display, list_display_links, list_filter, date_hierarchy, search_fields,
                  list_select_related, list_per_page, list_max_show_all, list_editable, model_admin, *args, **kwargs):
+        # Process related queryable properties to be used as display columns by
+        # replacing their references with custom callables that make them
+        # compatible with Django's list_display handling.
+        self._related_display_properties = {}
+        processed_display = []
+        for item in list_display:
+            if not callable(item):
+                property_ref = resolve_queryable_property(model, QueryPath(item))[0]
+                if property_ref and property_ref.relation_path:
+                    full_name = property_ref.full_path.as_str()
+                    item = lambda obj: getattr(obj, full_name)
+                    item.short_description = property_ref.property.short_description
+                    item.admin_order_field = full_name
+                    self._related_display_properties[full_name] = item
+            processed_display.append(item)
+
         # Process queryable properties to be used as filters by replacing their
         # references with custom callables that make them compatible with
         # Django's filter workflow.
@@ -156,10 +173,30 @@ class QueryablePropertiesChangeListMixin(InjectableMixin):
                     pass
             processed_filters.append(item)
 
-        super(QueryablePropertiesChangeListMixin, self).__init__(request, model, list_display, list_display_links,
+        super(QueryablePropertiesChangeListMixin, self).__init__(request, model, processed_display, list_display_links,
                                                                  processed_filters, date_hierarchy, search_fields,
                                                                  list_select_related, list_per_page, list_max_show_all,
                                                                  list_editable, model_admin, *args, **kwargs)
+
+        list_display_refs = []
+        if self.list_display_links:
+            self.list_display_links = list(self.list_display_links)
+            list_display_refs.append(self.list_display_links)
+        if hasattr(self, 'sortable_by') and self.sortable_by:
+            self.sortable_by = list(self.sortable_by)
+            list_display_refs.append(self.sortable_by)
+        for list_display_ref in list_display_refs:
+            for item, replacement in six.iteritems(self._related_display_properties):
+                if item in list_display_ref:
+                    list_display_ref.remove(item)
+                    list_display_ref.append(replacement)
+
+    def get_queryset(self, *args, **kwargs):
+        if self._related_display_properties:
+            self.root_queryset = self.root_queryset.annotate(**{
+                item: F(item) for item in self._related_display_properties
+            })
+        return super(QueryablePropertiesChangeListMixin, self).get_queryset(*args, **kwargs)
 
 
 # In very old django versions, the admin validation happens in one big function
