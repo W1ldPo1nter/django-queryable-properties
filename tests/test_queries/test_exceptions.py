@@ -10,6 +10,7 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
     CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
 )
+from ..marks import skip_if_no_expressions
 
 pytestmark = pytest.mark.django_db
 
@@ -44,7 +45,7 @@ class TestAnnotation(object):
         with pytest.raises(QueryablePropertyError):
             model.objects.select_properties('major_minor')
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.parametrize('model', [CategoryWithClassBasedProperties, CategoryWithDecoratorBasedProperties])
     def test_circular_property(self, model):
         with pytest.raises(QueryablePropertyError, match='circular dependency'):

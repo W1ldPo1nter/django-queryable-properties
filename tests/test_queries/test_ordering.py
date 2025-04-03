@@ -8,6 +8,7 @@ from ..app_management.models import (
     VersionWithDecoratorBasedProperties,
 )
 from ..conftest import Concat, Value
+from ..marks import skip_if_no_expressions, skip_if_no_subqueries
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -59,7 +60,7 @@ class TestAggregateAnnotations(object):
         assert results == sorted(results, key=lambda version: version.application.version_count, reverse=reverse)
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+@skip_if_no_expressions
 class TestExpressionAnnotations(object):
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
@@ -155,7 +156,7 @@ class TestExpressionAnnotations(object):
             '1.3.0', '1.3.0', '1.2.3', '1.2.3', '1.3.1', '1.3.1', '2.0.0', '2.0.0']
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+@skip_if_no_subqueries
 class TestSubqueryAnnotations(object):
 
     @pytest.mark.parametrize('model, order_by, reverse, with_selection', [

@@ -11,6 +11,7 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties, CategoryWithClassBasedProperties,
     CategoryWithDecoratorBasedProperties, VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
 )
+from ..marks import skip_if_no_expressions, skip_if_no_subqueries
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -98,7 +99,7 @@ class TestFilterWithoutAnnotations(object):
         for version in version_model.objects.filter(application__in=apps).select_related('application'):
             assert version.application.name == 'My cool App'
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.parametrize('model, property_name, condition', [
         (VersionWithClassBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
         (VersionWithDecoratorBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
@@ -217,7 +218,7 @@ class TestFilterWithAggregateAnnotation(object):
         assert categories[1].has_multiple_stable_versions is False
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+@skip_if_no_expressions
 class TestFilterWithExpressionAnnotation(object):
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count, expected_distinct_count, record_checker', [
@@ -284,7 +285,7 @@ class TestFilterWithExpressionAnnotation(object):
         assert queryset.count() == len(queryset) == 2
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11")
+@skip_if_no_subqueries
 class TestFilterWithSubqueryAnnotation(object):
 
     @pytest.mark.parametrize('model, property_name, filters, expected_count, record_checker', [

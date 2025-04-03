@@ -1,10 +1,10 @@
 # encoding: utf-8
 
 import pytest
-from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from ..app_management.models import VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties
+from ..marks import skip_if_no_expressions
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -36,7 +36,7 @@ def test_update_based_on_other_property(model, update_kwargs):
         assert version.version == update_kwargs['version']
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Conditional expressions didn't exist before Django 1.8")
+@skip_if_no_expressions
 @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
 def test_update_using_conditional_expression(model):
     assert model.objects.filter(major=1, changes__isnull=True).count() == 6

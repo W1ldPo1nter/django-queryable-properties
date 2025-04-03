@@ -107,6 +107,25 @@ def tags(applications):
 
 
 @pytest.fixture
+def download_links(versions):
+    from django.utils.text import slugify
+
+    links = []
+    for version in versions[:8]:
+        app_slug = slugify(version.application.name)
+        links.append(version.download_links.create(
+            published_on='GitHub',
+            url='https://github.com/test/{}/archive/refs/tags/{}.zip'.format(app_slug, version.version),
+        ))
+        if version.major < 2:
+            links.append(version.download_links.create(
+                published_on='SourceForge',
+                url='https://sourceforge.net/projects/{}/files/{}.zip'.format(app_slug, version.version),
+            ))
+    return links
+
+
+@pytest.fixture
 def inheritance_instances():
     return {
         model: model.objects.create() for model in

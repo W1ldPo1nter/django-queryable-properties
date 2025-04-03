@@ -15,6 +15,7 @@ from ..app_management.admin import ApplicationAdmin, VersionAdmin
 from ..app_management.models import (
     ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
 )
+from ..marks import skip_if_no_expressions, skip_if_no_output_fields
 
 
 class TestQueryablePropertyField(object):
@@ -104,7 +105,7 @@ class TestQueryablePropertyField(object):
         request.user = admin_user
         assert self.get_list_filter_queryset(request, field, admin_instance, params).count() == expected_count
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.django_db
     def test_boolean_list_filter(self, rf, changelist_factory, admin_instance):
         field = QueryablePropertyField(admin_instance, QueryPath('has_version_with_changelog'))
@@ -115,7 +116,7 @@ class TestQueryablePropertyField(object):
         display_values = [item['display'] for item in list_filter.choices(changelist)]
         assert display_values == ['All', 'Yes', 'No']
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.django_db
     @pytest.mark.parametrize('params, expected_count', [
         ({}, 2),
@@ -129,7 +130,7 @@ class TestQueryablePropertyField(object):
         request.user = admin_user
         assert self.get_list_filter_queryset(request, field, admin_instance, params).count() == expected_count
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.django_db
     def test_mapping_choices_list_filter(self, rf, changelist_factory):
         admin = VersionAdmin(VersionWithClassBasedProperties, site)
@@ -146,7 +147,7 @@ class TestQueryablePropertyField(object):
         display_values = [item['display'] for item in list_filter.choices(changelist)]
         assert display_values == ['All', 'Alpha', 'Beta', 'Stable', field.empty_value_display]
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+    @skip_if_no_expressions
     @pytest.mark.django_db
     @pytest.mark.parametrize('params, expected_count', [
         ({}, 8),
@@ -197,7 +198,7 @@ class TestQueryablePropertyField(object):
 
 class TestQueryablePropertyListFilter(object):
 
-    @pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Output fields couldn't be declared before Django 1.8")
+    @skip_if_no_output_fields
     @pytest.mark.parametrize('prop, admin_class, expected_filter_class', [
         (get_queryable_property(ApplicationWithClassBasedProperties, 'has_version_with_changelog'),
          ApplicationAdmin, BooleanFieldListFilter),

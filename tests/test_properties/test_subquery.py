@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import pytest
 import six
-from django import VERSION as DJANGO_VERSION
 from django.core.exceptions import FieldError
 from django.db import models
 from mock import Mock
@@ -11,18 +10,19 @@ try:
 except ImportError:
     Substr = Mock()
 
+from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (
     QueryableProperty, SubqueryExistenceCheckProperty, SubqueryFieldProperty, SubqueryObjectProperty,
 )
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
-    ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, VersionWithClassBasedProperties,
+    ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties, DownloadLink,
+    VersionWithClassBasedProperties,
 )
+from ..marks import skip_if_no_composite_pks, skip_if_no_subqueries
 
-pytestmark = [
-    pytest.mark.skipif(DJANGO_VERSION < (1, 11), reason="Explicit subqueries didn't exist before Django 1.11"),
-]
+pytestmark = [skip_if_no_subqueries]
 
 
 class TestSubqueryFieldProperty(object):
@@ -115,45 +115,54 @@ class TestSubqueryObjectProperty(object):
     def test_initializer(self, kwargs):
         prop = SubqueryObjectProperty(**kwargs)
         assert prop.queryset is kwargs['queryset']
-        assert prop.field_name == 'pk'
+        assert prop.field_name is None
         assert prop.output_field is None
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
         assert prop._descriptor is None
         assert prop._subquery_model == kwargs['model']
         assert prop._field_names == kwargs.get('field_names')
         assert prop._property_names == kwargs.get('property_names', ())
-        assert prop._sub_property_refs == {}
+        assert prop._managed_refs == {}
         assert prop._field_aliases == {}
+        assert prop._pk_field_names is None
 
     @pytest.mark.parametrize('subquery_model, field_names, property_names, expected_aliases', [
         (
             VersionWithClassBasedProperties,
             ['major', 'minor', 'patch', 'application'],
             [],
-            {'application': 'application_id'},
+            {'pk': 'id', 'application': 'application_id'},
         ),
-        (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {}),
+        (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {'pk': 'id'}),
+        pytest.param(DownloadLink, None, ['alternative'], {'version': 'version_id'},
+                     marks=[skip_if_no_composite_pks]),
+        pytest.param(DownloadLink, ['url'], [], {'version': 'version_id'}, marks=[skip_if_no_composite_pks]),
     ])
-    def test_build_sub_properties(self, subquery_model, field_names, property_names, expected_aliases):
+    def test_finalize_setup(self, subquery_model, field_names, property_names, expected_aliases):
         model = Mock(__name__='MockModel')
         prop = SubqueryObjectProperty(subquery_model, None, field_names, property_names)
         prop.name = 'test'
         if field_names is None:
             field_names = [field.name for field in subquery_model._meta.concrete_fields]
-            field_names.remove(subquery_model._meta.pk.name)
+        pk_attnames = [pk_field.attname for pk_field in
+                       getattr(subquery_model._meta, 'pk_fields', [subquery_model._meta.pk])]
         all_names = set(subquery_model._meta.get_field(field_name).attname for field_name in field_names)
+        all_names.update(pk_attnames)
         all_names.update(property_names)
 
-        prop._build_sub_properties(model, subquery_model)
+        prop._finalize_setup(model, subquery_model)
         assert prop._subquery_model is subquery_model
+        assert prop._pk_field_names == pk_attnames
+        assert prop.field_name == pk_attnames[0]
         assert prop._field_aliases == expected_aliases
-        assert set(prop._sub_property_refs) == all_names
+        assert set(prop._managed_refs) == all_names
         for name in all_names:
-            sub_prop = prop._sub_property_refs[name].property
-            assert isinstance(sub_prop, SubqueryFieldProperty)
-            assert sub_prop.field_name == name
-            assert sub_prop.name == '-'.join((prop.name, name))
-            assert getattr(model, sub_prop.name).prop == sub_prop
+            managed_prop = prop._managed_refs[name].property
+            assert isinstance(managed_prop, SubqueryFieldProperty)
+            assert managed_prop.field_name == name
+            if managed_prop is not prop:
+                assert managed_prop.name == '-'.join((prop.name, name))
+                assert getattr(model, managed_prop.name).prop == managed_prop
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
@@ -168,9 +177,8 @@ class TestSubqueryObjectProperty(object):
             application.versions.all().delete()
             version = None
 
-        assert not ref.descriptor.has_cached_value(application)
-        for sub_ref in six.itervalues(ref.property._sub_property_refs):
-            assert not sub_ref.descriptor.has_cached_value(application)
+        for managed_ref in six.itervalues(ref.property._managed_refs):
+            assert not managed_ref.descriptor.has_cached_value(application)
 
         with django_assert_num_queries(1):
             value = application.highest_version_object
@@ -185,10 +193,10 @@ class TestSubqueryObjectProperty(object):
                 assert value.version == version.version
                 for field in VersionWithClassBasedProperties._meta.concrete_fields:
                     assert getattr(version, field.attname) == getattr(value, field.attname)
-            for name, sub_ref in six.iteritems(ref.property._sub_property_refs):
-                assert sub_ref.descriptor.has_cached_value(application) is cached
-                if cached:
-                    assert sub_ref.descriptor.get_cached_value(application) == getattr(version, name, None)
+            for name, managed_ref in six.iteritems(ref.property._managed_refs):
+                assert managed_ref.descriptor.has_cached_value(application) is cached
+                if cached and managed_ref.property is not ref.property:
+                    assert managed_ref.descriptor.get_cached_value(application) == getattr(version, name, None)
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
@@ -201,7 +209,7 @@ class TestSubqueryObjectProperty(object):
         version = application.versions.get(major=2)
         ref.descriptor.set_cached_value(application, version.pk)
         for name in cached:
-            ref.property._sub_property_refs[name].descriptor.set_cached_value(application, getattr(version, name))
+            ref.property._managed_refs[name].descriptor.set_cached_value(application, getattr(version, name))
 
         with django_assert_num_queries(0):
             assert application.highest_version_object == version
@@ -209,7 +217,7 @@ class TestSubqueryObjectProperty(object):
             for name in cached:
                 assert getattr(application.highest_version_object, name) == getattr(version, name)
             deferred_fields = set(field.attname for field in VersionWithClassBasedProperties._meta.concrete_fields)
-            deferred_fields.discard(VersionWithClassBasedProperties._meta.pk.attname)
+            deferred_fields.discard(ref.property.field_name)
             deferred_fields.difference_update(cached)
             assert application.highest_version_object.get_deferred_fields() == deferred_fields
 
@@ -226,6 +234,40 @@ class TestSubqueryObjectProperty(object):
         ref.descriptor.set_cached_value(application, None)
         with django_assert_num_queries(0):
             assert application.highest_version_object is None
+
+    @skip_if_no_composite_pks
+    @pytest.mark.django_db
+    def test_getter_composite_pk(self, django_assert_num_queries, download_links):
+        ref = get_queryable_property(download_links[0].__class__, 'alternative')._resolve()[0]
+
+        # No cached value
+        assert not ref.descriptor.has_cached_value(download_links[0])
+        with django_assert_num_queries(1):
+            assert download_links[0].alternative == download_links[1]
+            assert 'sourceforge' in download_links[0].alternative.url
+            assert ref.descriptor.get_cached_value(download_links[0]) == download_links[1]
+
+        # Cached final value
+        with django_assert_num_queries(0):
+            assert download_links[0].alternative == download_links[1]
+
+        # Cached raw PK values
+        assert not ref.descriptor.has_cached_value(download_links[1])
+        ref.descriptor.set_cached_value(download_links[1], download_links[0].version_id)
+        ref.property._managed_refs['published_on'].descriptor.set_cached_value(download_links[1],
+                                                                               download_links[0].published_on)
+        with django_assert_num_queries(0):
+            assert download_links[1].alternative == download_links[0]
+        with django_assert_num_queries(1):
+            assert 'github' in download_links[1].alternative.url
+
+        # Partially cached raw PK values (treated as no cached value)
+        assert not ref.descriptor.has_cached_value(download_links[2])
+        ref.descriptor.set_cached_value(download_links[2], download_links[0].version_id)
+        with django_assert_num_queries(1):
+            assert download_links[2].alternative == download_links[3]
+            assert download_links[2].alternative.version_id != download_links[0].version_id
+            assert 'sourceforge' in download_links[2].alternative.url
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures('versions')
@@ -282,9 +324,7 @@ class TestSubqueryObjectProperty(object):
     def test_annotation_select(self, django_assert_num_queries, applications, ref, select, expected_properties):
         version = VersionWithClassBasedProperties.objects.filter(major=2)[0]
         if not expected_properties:
-            expected_properties = {sub_ref.property.name for sub_ref in
-                                   six.itervalues(ref.property._sub_property_refs)}
-            expected_properties.add(ref.property.name)
+            expected_properties = {sub_ref.property.name for sub_ref in six.itervalues(ref.property._managed_refs)}
         queryset = ApplicationWithClassBasedProperties.objects.select_properties(*select)
 
         assert {r.property.name for r in queryset.query._queryable_property_annotations} == expected_properties
@@ -425,3 +465,42 @@ class TestSubqueryObjectProperty(object):
             ('My cool App', None, None),
             ('Another App', version_pk, '2.0.0'),
         ]
+
+    @skip_if_no_composite_pks
+    @pytest.mark.django_db
+    def test_composite_pk_in_queries(self, django_assert_num_queries, download_links):
+        model = download_links[0].__class__
+
+        assert model.objects.get(alternative=download_links[0]) == download_links[1]
+        assert (model.objects.get(alternative=(download_links[0].version_id, download_links[0].published_on)) ==
+                download_links[1])
+        assert not model.objects.filter(alternative=(download_links[0].version_id, 'Nowhere')).exists()
+        assert set(model.objects.filter(alternative=download_links[0].version_id)) == set(download_links[:2])
+        assert set(model.objects.filter(alternative__version=download_links[0].version_id)) == set(download_links[:2])
+        assert (set(model.objects.filter(alternative__version_id=download_links[0].version_id)) ==
+                set(download_links[:2]))
+        assert model.objects.filter(alternative__published_on='GitHub').count() == 6
+
+        for queryset, num_queries, field_names in (
+            (model.objects.select_properties('alternative'), 1, ('pk', 'version_id', 'published_on', 'url')),
+            (model.objects.select_properties('alternative__version', 'alternative__published_on'), 1,
+             ('pk', 'version_id', 'published_on')),
+            (model.objects.select_properties('alternative__version_id', 'alternative__published_on'), 1,
+             ('pk', 'version_id', 'published_on')),
+            (model.objects.select_properties('alternative__version'), 2, ('pk', 'version_id', 'published_on', 'url')),
+        ):
+            with django_assert_num_queries(num_queries):
+                instance = queryset.get(pk=download_links[0].pk)
+                for field_name in field_names:
+                    assert getattr(instance.alternative, field_name) == getattr(download_links[1], field_name)
+        with pytest.raises(QueryablePropertyError):
+            model.objects.select_properties('alternative__pk')
+
+        queryset = model.objects.filter(pk=download_links[0].pk).select_properties('alternative')
+        assert queryset.values_list('alternative', flat=True).get() == download_links[1].version_id
+        assert queryset.values_list('alternative__version', flat=True).get() == download_links[1].version_id
+        assert queryset.values_list('alternative__version_id', flat=True).get() == download_links[1].version_id
+        assert queryset.values_list('alternative__version', 'alternative__published_on').get() == (
+            download_links[1].version_id, download_links[1].published_on)
+        with pytest.raises(FieldError):
+            queryset.values_list('alternative__pk')

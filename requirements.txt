@@ -1,5 +1,5 @@
 -r requirements-tox.txt
-Django>=5.1,<5.2
+Django>=5.2,<6.0
 flake8==3.9.2
 isort==5.10.1
 pytest==6.2.5

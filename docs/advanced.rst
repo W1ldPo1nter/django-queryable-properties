@@ -61,13 +61,13 @@ row of the subquery or ``None`` if the subquery doesn't contain any rows:
 In addition to the regular configuration options for :ref:`annotation_based:Annotation-based properties`, a
 ``SubqueryObjectProperty`` can be configured with the following parameters:
 
-``model``
+``model`` (required)
   Defines the model class the subquery returns instances of.
   Can be defined as any of the values accepted by the first argument of
-  `foreign keys <https://docs.djangoproject.com/en/5.1/ref/models/fields/#foreignkey>`_.
+  `foreign keys <https://docs.djangoproject.com/en/stable/ref/models/fields/#foreignkey>`_.
   In the example above, the model is defined as the string ``'ApplicationVersion'``.
 
-``queryset``
+``queryset`` (required)
   The actual queryset to retrieve subquery objects from.
   Follows the same rules as the queryset parameter of any other
   :ref:`common:Subquery-based properties (Django 1.11 or higher)`.
@@ -78,7 +78,7 @@ In addition to the regular configuration options for :ref:`annotation_based:Anno
   populated.
   If a restricted set of fields is given, all other fields will be treated as deferred when constructing instances
   (the same behavior as ``.only()``/``.defer()`` calls).
-  The primary key field of the model will always be included automatically and does not have to be specified here.
+  All primary key fields of the model will always be included automatically and do not have to be specified here.
 
 ``property_names`` (optional)
   If the subquery model defines its own queryable properties, a ``SubqueryObjectProperty`` can be configured to also
@@ -95,8 +95,8 @@ extra work to be able to retrieve entire model instances.
 In fact, defining a ``SubqueryObjectProperty`` will actually define multiple queryable properties at once in most cases.
 To properly work with Django's annotation system, a :class:`queryable_properties.properties.SubqueryFieldProperty` will
 be created for each field or queryable property that should be handled for subquery objects.
-The actual ``SubqueryObjectProperty`` will handle the primary key value of the subquery object internally while
-managing all created sub-properties.
+The actual ``SubqueryObjectProperty`` will handle the primary key value (or the value of the first primary key field
+in composite primary key scenarios) of the subquery object internally while managing all created sub-properties.
 
 These additional properties are automatically named
 ``<name of the object property>-<name of the represented field or property>``.
@@ -106,7 +106,8 @@ This means that in the example above, the ``Application`` model doesn't just con
 are actually five properties:
 
 * ``latest_version``: The actual ``SubqueryObjectProperty`` that handles the primary key value internally
-* ``latest_version-application``: Handles the ``application`` field of subquery objects
+* ``latest_version-application_id``: Handles the ``application`` field (whose column name is ``application_id``) of
+  subquery objects
 * ``latest_version-major``: Handles the ``major`` field of subquery objects
 * ``latest_version-minor``: Handles the ``minor`` field of subquery objects
 * ``latest_version-version_str``: Handles the ``version_str`` property of subquery objects
@@ -134,7 +135,7 @@ The following examples should be able to convey how a ``SubqueryObjectProperty``
     Application.objects.filter(latest_version=42)
     Application.objects.filter(latest_version__isnull=True)  # Finds applications without latest versions
 
-    # The 'pk' shortcut or the name of the subquery model's primary key field can also be used
+    # The 'pk' shortcut (non-composite PKs only) or the name of the subquery model's primary key field can also be used
     Application.objects.filter(latest_version__pk=42)
     Application.objects.filter(latest_version__id__gt=42)
 
@@ -148,7 +149,13 @@ The following examples should be able to convey how a ``SubqueryObjectProperty``
     Application.objects.order_by('-latest_version__major')
     Application.objects.order_by('latest_version__version_str')
 
-.. caution::
+.. note::
+   The ``pk`` shortcut is not available if the subquery model uses a composite primary key as the primary key value
+   cannot be represented by a single column.
+   However, it is still possible to filter the main property by a composite primary key as a tuple or to filter the
+   individual primary key fields using ``__`` notation.
+
+.. note::
    If the subquery model contains foreign keys or its own ``SubqueryObjectProperty``, they are only represented by
    raw primary key values.
    Their sub-fields or sub-properties are not available for filtering and ordering.
@@ -187,9 +194,14 @@ All fields that haven't been selected are treated as deferred and accessing them
         print(application.latest_version.minor)
         print(application.latest_version.version_str)
 
+.. note::
+   The ``pk`` shortcut is not available if the subquery model uses a composite primary key as the primary key value
+   cannot be represented by a single column.
+   However, it is still possible to select all primary key fields via their name using ``__`` notation.
+
 .. caution::
    When selecting only a subset of the configured fields and queryable properties, make sure to always include the
-   selection of the primary key value.
+   selection of all primary key values.
    If the primary key isn't populated, a ``SubqueryObjectProperty``'s getter will assume that no fields have been
    populated and perform a query to populate them all.
    This would render the initial selection of the otherfields useless.
@@ -209,8 +221,7 @@ All other fields or queryable properties have to be requested individually.
         print(major)  # Will output the value of the "major" field of the latest version
 
 .. caution::
-   Due to the behavior in ``.values()`` or ``.values_list()`` queries, prefetching values for a
-   ``SubqueryObjectProperty`` via :func:`queryable_properties.utils.prefetch_queryable_properties` will also only
-   prefetch the primary key value.
-   Any of the configured fields and queryable propertie that should also be prefetched have to be stated explicitly
-   via the ``__`` syntax shown above.
+   The ``pk`` shortcut is not available if the subquery model uses a composite primary key as the primary key value
+   cannot be represented by a single column.
+   Also, the selection of the main property will only select the first primary key field.
+   Select the individual primary key fields using ``__`` notation to get all parts of the primary key.

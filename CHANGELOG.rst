@@ -4,6 +4,13 @@ Changelog
 master (unreleased)
 -------------------
 
+1.10.1 (2025-04-02)
+-------------------
+
+- Added support for Django 5.2
+- Improved the ``prefetch_queryable_properties`` utility for proper support of ``SubqueryObjectProperty`` and composite
+  primary keys
+
 1.10.0 (2025-01-28)
 -------------------
 
