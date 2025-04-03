@@ -11,9 +11,10 @@ from queryable_properties.utils.internal import QueryPath
 from ..inheritance.models import (
     Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, Parent, ProxyChild,
 )
+from ..marks import skip_if_no_expressions
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 8), reason="Expression-based annotations didn't exist before Django 1.8")
+@skip_if_no_expressions
 class TestInheritanceModelProperty(object):
 
     @pytest.mark.parametrize('kwargs', [
@@ -110,7 +111,8 @@ class TestInheritanceModelProperty(object):
             assert instances[inheritance_instances[MultipleParent1].pk].plural == 'multiple parent1s'
             assert instances[inheritance_instances[MultipleChild].pk].plural == 'multiple childs'
 
-        # In Django versions below 1.10, proxy models seemingly can't access parent links.
+        # In Django versions below 1.10, proxy models seemingly can't access
+        # parent links.
         if DJANGO_VERSION >= (1, 10):
             with django_assert_num_queries(1):
                 instances = ProxyChild.objects.select_properties('plural').in_bulk([
