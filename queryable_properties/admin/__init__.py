@@ -6,6 +6,7 @@ from django.db.models import F
 from ..compat import admin_validation, compat_call
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
+from ..utils.deprecation import deprecated
 from ..utils.internal import InjectableMixin, QueryPath, resolve_queryable_property
 from .checks import QueryablePropertiesChecksMixin
 from .filters import QueryablePropertyField
@@ -96,6 +97,7 @@ class QueryablePropertiesAdminMixin(object):
         """
         return self.list_select_properties
 
+    @deprecated(hint='Calls are no longer required and may simply be removed without replacement.')
     def process_queryable_property_filters(self, list_filter):
         """
         Process a sequence of list filters to create a new sequence in which
@@ -106,7 +108,6 @@ class QueryablePropertiesAdminMixin(object):
         :return: The processed list filter sequence.
         :rtype: list
         """
-        # TODO: deprecate
         return list_filter
 
 
