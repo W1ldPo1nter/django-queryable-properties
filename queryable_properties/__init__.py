@@ -3,7 +3,9 @@
 
 from __future__ import unicode_literals
 
-__version__ = '1.10.1'
+VERSION = (1, 10, 1)
+
+__version__ = '.'.join(map(str, VERSION))
 __author__ = 'Marcus Klöpfel'
 __copyright__ = 'Copyright 2025, Marcus Klöpfel'
 __license__ = 'BSD'
