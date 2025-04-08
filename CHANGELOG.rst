@@ -4,6 +4,13 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added a new ready-to-use queryable property implementation that provides information about the final model in
+  inheritance scenarios (``InheritanceModelProperty``)
+- Queryable properties on related models can now be used in the admin's ``list_display`` in Django versions above 1.7
+- Queryable properties in the admin's ``list_filter`` are now processed in a more robust way, eliminating the need for
+  special handling when overriding ``get_list_filter`` (``process_queryable_property_filters`` is therefore now
+  deprecated)
+
 1.10.1 (2025-04-02)
 -------------------
 
