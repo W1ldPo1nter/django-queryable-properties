@@ -92,7 +92,7 @@ class TestQueryablePropertiesChangeListMixin(object):
         ('major', False),
         (lambda obj: 'test', False),
         ('is_supported', False),
-        ('application__version_count', True),
+        pytest.param('application__version_count', True, marks=[skip_if_no_expressions]),
     ])
     def test_initializer_list_display(self, monkeypatch, changelist_factory, list_display_item, expect_replacement):
         has_sortable_by = DJANGO_VERSION >= (2, 1)
