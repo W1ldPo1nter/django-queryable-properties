@@ -20,8 +20,7 @@ to enable queryable properties functionality while using different admin/inline 
 The following table shows the admin/inline options that queryable properties may be referenced in and whether each
 feature requires the use of one of the specialized base classes mentioned above.
 Queryable properties may be refenced via name in either the listed admin/inline class attributes or in the result of
-their corresponding ``get_*`` methods (although there is a special case for ``get_list_filter`` as described in
-:ref:`admin:Dynamically generating list filters` below).
+their corresponding ``get_*`` methods.
 
 .. list-table::
    :header-rows: 1
@@ -35,10 +34,12 @@ their corresponding ``get_*`` methods (although there is a special case for ``ge
      - * For properties with a getter or selected properties only
        * Properties must also be part of ``readonly_fields``
    * - ``list_display``
-     - No
-     - * For properties with a getter or selected properties only
+     - * No for properties on the same model
+       * Yes for properties on related models (requires Django 1.8 or higher)
+     - * Properties on the same model must have a getter or be selected
+       * Properties on related models must be annotatable
    * - ``list_display_links``
-     - No
+     - See ``list_display``
      - * For properties with a getter or selected properties only
    * - ``list_filter``
      - Yes
@@ -64,45 +65,6 @@ their corresponding ``get_*`` methods (although there is a special case for ``ge
      - No
      - * For annotatable properties only
    * - ``search_fields``
-     - No
+     - See ``list_display``
      - * Requires Django 2.1 or higher
        * Properties must support the lookup used by their respective entry in ``search_fields``
-
-Dynamically generating list filters
------------------------------------
-
-Whenever the list filters are to be determined dynamically by overriding ``get_list_filter``, proper handling of
-queryable property items may be disabled as this is also implemented by overriding ``get_list_filter``.
-Therefore, it is important either invoke the queryable property processing by either generating the base filters
-using a ``super`` call:
-
-.. code-block:: python
-
-    from queryable_properties.admin import QueryablePropertiesAdmin
-
-
-    class MyAdmin(QueryablePropertiesAdmin):
-
-        def get_list_filter(self, request):
-            list_filter = super(MyAdmin, self).get_list_filter(request)
-            # ... process the list filter sequence ...
-            # Note: queryable property entries have been replaced with custom callables at this point.
-            return list_filter
-
-
-... or by utilizing the admin method
-:meth:`queryable_properties.admin.QueryablePropertiesAdminMixin.process_queryable_property_filters` to postprocess a
-custom generated filter sequence:
-
-.. code-block:: python
-
-    from queryable_properties.admin import QueryablePropertiesAdmin
-
-
-    class MyAdmin(QueryablePropertiesAdmin):
-
-        def get_list_filter(self, request):
-            list_filter = []
-            # ... generate the list filter sequence ...
-            # Utilize process_queryable_property_filters to handle queryable property filters correctly.
-            return self.process_queryable_property_filters(list_filter)
