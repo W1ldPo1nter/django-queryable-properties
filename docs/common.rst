@@ -655,6 +655,10 @@ as their first parameter, which in turn must return the queryset.
 This is useful in cases where the model class for the subquery's queryset cannot be imported on the module level or is
 defined later in the same module.
 
+.. note::
+   In addition to the subquery-based properties shown here, there is also the more advanced
+   :ref:`advanced:\`\`SubqueryObjectProperty\`\`: Getting an entire model object from a subquery`.
+
 ``SubqueryFieldProperty``: Getting a field value from a subquery
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
