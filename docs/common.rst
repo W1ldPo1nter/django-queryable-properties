@@ -648,10 +648,10 @@ object in efficient way.
 
 Working with multi-table inheritance can often be made more convenient by being able to determine or display
 information about the final model class of an object - and this is what the ``InheritanceModelProperty`` provides.
-This type of property is annotation-based (i.e. the getter also performs a query if the value isn't already cached)
-and the value determination is achieved using ``CASE``/``WHEN`` expressions based on Django's ``Case``/``When``
-objects, which means that this property class can only be properly used in Django versions that provide these features
-(1.8+).
+Properties of this kind are :ref:`annotation_based:Annotation-based properties` (i.e. the getter also performs a query
+if the value isn't already cached) and their value determination is achieved using ``CASE``/``WHEN`` expressions based
+on Django's ``Case``/``When`` objects, which means that this property class can only be properly used in Django
+versions that provide these features (1.8+).
 
 Let's use some different example for once - taken from Django's documentation itself and extended with the ``Event``
 model:
