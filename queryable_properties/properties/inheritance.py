@@ -55,7 +55,7 @@ class InheritanceModelProperty(AnnotationGetterMixin, QueryableProperty):
         """
         model = model._meta.proxy_for_model or model
         child_paths = self._child_paths.get(model)
-        if not child_paths:
+        if child_paths is None:
             from django.db.models.fields.related import ForeignObjectRel
 
             child_paths = OrderedDict()
