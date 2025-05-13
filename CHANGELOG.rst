@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.11.0 (2025-05-13)
+-------------------
+
 - Added a new ready-to-use queryable property implementation that provides information about the final model in
   inheritance scenarios (``InheritanceModelProperty``)
 - Queryable properties on related models can now be used in the admin's ``list_display`` in Django versions above 1.7
