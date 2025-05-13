@@ -22,6 +22,8 @@ def deprecated(function, hint=None):
     :param function function: The function or method to mark as deprecated.
     :param str | None hint: An optional hint to provide further details
                             regarding the deprecation.
+    :return: A wrapper function that will replace the decorated function.
+    :rtype: function
     """
     @functools.wraps(function)
     def wrapper(*args, **kwargs):
