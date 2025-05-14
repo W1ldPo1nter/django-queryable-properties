@@ -98,7 +98,7 @@ class QueryablePropertiesAdminMixin(object):
         return self.list_select_properties
 
     @deprecated(hint='Calls are no longer required and may simply be removed without replacement.')
-    def process_queryable_property_filters(self, list_filter):
+    def process_queryable_property_filters(self, list_filter):  # pragma: no cover
         """
         Process a sequence of list filters to create a new sequence in which
         queryable property references are replaced with custom callables that
