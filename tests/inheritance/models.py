@@ -14,6 +14,9 @@ class Abstract(models.Model):
 
     plural = InheritanceModelProperty(lambda cls: six.text_type(cls._meta.verbose_name_plural), models.CharField())
 
+    class Meta:
+        abstract = True
+
 
 class Parent(Abstract):
     parent_field = models.CharField(max_length=100, default='parent_field')
