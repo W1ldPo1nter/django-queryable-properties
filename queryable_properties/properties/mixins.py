@@ -309,3 +309,19 @@ class SubqueryMixin(AnnotationGetterMixin):
         :rtype: django.db.models.QuerySet
         """
         return self._queryset() if callable(self._queryset) else self._queryset
+
+
+class IgnoreCacheMixin(object):
+    """
+    Internal mixin for properties that need to utilize the internal flag that
+    allows to ignore cached values in getter/setter interactions.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(IgnoreCacheMixin, self).__init__(*args, **kwargs)
+        self._descriptor = None
+
+    def contribute_to_class(self, cls, name):
+        super(IgnoreCacheMixin, self).contribute_to_class(cls, name)
+        self._descriptor = getattr(cls, name)
+        self._descriptor._ignore_cached_value = True

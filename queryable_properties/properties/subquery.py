@@ -6,7 +6,7 @@ from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils import get_queryable_property
 from ..utils.internal import QueryPath, get_output_field, get_queryable_property_descriptor
 from .base import QueryableProperty, QueryablePropertyReference
-from .mixins import SubqueryMixin
+from .mixins import IgnoreCacheMixin, SubqueryMixin
 
 
 class SubqueryFieldProperty(SubqueryMixin, QueryableProperty):
@@ -72,7 +72,7 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
         return subquery
 
 
-class SubqueryObjectProperty(SubqueryFieldProperty):
+class SubqueryObjectProperty(IgnoreCacheMixin, SubqueryFieldProperty):
     """
     A property that allows to fetch an entire model object from the first row
     of a given subquery.
@@ -108,7 +108,6 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         """
         kwargs.pop('output_field', None)
         super(SubqueryObjectProperty, self).__init__(queryset, None, **kwargs)
-        self._descriptor = None
         self._subquery_model = model
         self._field_names = field_names
         self._property_names = property_names
@@ -168,8 +167,6 @@ class SubqueryObjectProperty(SubqueryFieldProperty):
         from django.db.models.fields.related import lazy_related_operation
 
         super(SubqueryObjectProperty, self).contribute_to_class(cls, name)
-        self._descriptor = getattr(cls, name)
-        self._descriptor._ignore_cached_value = True
         # Finalize the setup of this property after the subquery model was
         # constructed.
         lazy_related_operation(self._finalize_setup, self.model, self._subquery_model)

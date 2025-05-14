@@ -8,8 +8,9 @@ from queryable_properties.properties import (
     REMAINING_LOOKUPS, AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin, QueryableProperty, boolean_filter,
     lookup_filter,
 )
-from queryable_properties.properties.mixins import SubqueryMixin
+from queryable_properties.properties.mixins import IgnoreCacheMixin, SubqueryMixin
 from queryable_properties.utils import get_queryable_property
+from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import ApplicationWithClassBasedProperties
 from ..marks import skip_if_no_composite_pks, skip_if_no_subqueries
 
@@ -238,3 +239,21 @@ class TestSubqueryMixin(object):
         queryset = ApplicationWithClassBasedProperties.objects.all()
         prop = cls((lambda: queryset) if use_function else queryset)
         assert prop.queryset is queryset
+
+
+class TestIgnoreCacheMixin(object):
+
+    @pytest.fixture
+    def prop(self):
+        return type('DummyIgnoreCacheProperty', (IgnoreCacheMixin, QueryableProperty), {})()
+
+    def test_initializer(self, prop):
+        assert prop._descriptor is None
+
+    def test_contribute_to_class(self, prop):
+        class DummyModel(object):
+            pass
+
+        prop.contribute_to_class(DummyModel, 'dummy')
+        assert prop._descriptor is get_queryable_property_descriptor(DummyModel, 'dummy')
+        assert prop._descriptor._ignore_cached_value is True
