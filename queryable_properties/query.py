@@ -106,6 +106,10 @@ class QueryablePropertiesBaseQueryMixin(InjectableMixin):
         self._queryable_property_stack = []
         # Determines whether to inject the QUERYING_PROPERTIES_MARKER.
         self._use_querying_properties_marker = False
+        # Collects callbacks that are invoked lazily, i.e. just before the
+        # query will be executed, and may be thus used to alter the query at
+        # the last possible moment.
+        self._queryable_property_lazy_callbacks = []
 
     def clone(self, *args, **kwargs):
         # Very old Django versions didn't have the chain method yet. Simply
@@ -127,6 +131,7 @@ class QueryablePropertiesBaseQueryMixin(InjectableMixin):
                 break
         obj.init_injected_attrs()
         obj._queryable_property_annotations.update(self._queryable_property_annotations)
+        obj._queryable_property_lazy_callbacks.extend(self._queryable_property_lazy_callbacks)
         return obj
 
 

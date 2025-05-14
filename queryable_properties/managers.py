@@ -145,6 +145,8 @@ class QueryablePropertiesModelIterableMixin(InjectableMixin, QueryableProperties
     def _setup_queryable_properties(self):
         super(QueryablePropertiesModelIterableMixin, self)._setup_queryable_properties()
         self.queryset.query._use_querying_properties_marker = True
+        for callback in self.queryset.query._queryable_property_lazy_callbacks:
+            callback(self.queryset)
 
     def _postprocess_queryable_properties(self, obj):
         obj = super(QueryablePropertiesModelIterableMixin, self)._postprocess_queryable_properties(obj)
