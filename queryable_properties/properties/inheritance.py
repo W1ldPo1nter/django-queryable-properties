@@ -2,10 +2,13 @@
 from collections import OrderedDict
 
 import six
+from django.db.models import CharField, Model
 
+from ..compat import get_model
 from ..utils.internal import QueryPath
-from .base import QueryableProperty
-from .mixins import AnnotationGetterMixin
+from .base import QueryableProperty, QueryablePropertyReference
+from .mixins import AnnotationGetterMixin, IgnoreCacheMixin
+from .operations import SelectRelatedOperation
 
 
 class InheritanceModelProperty(AnnotationGetterMixin, QueryableProperty):
@@ -77,3 +80,47 @@ class InheritanceModelProperty(AnnotationGetterMixin, QueryableProperty):
             if self.depth is None or len(query_path) <= self.depth
         )
         return Case(*cases, default=Value(self.value_generator(cls)), output_field=self.output_field)
+
+
+class InheritanceObjectProperty(IgnoreCacheMixin, InheritanceModelProperty):
+
+    def __init__(self, depth=None, **kwargs):
+        super(InheritanceObjectProperty, self).__init__(
+            value_generator=lambda cls: '.'.join((cls._meta.app_label, cls._meta.object_name)),
+            output_field=CharField(),
+            depth=depth,
+            **kwargs
+        )
+
+    def _resolve(self, model=None, relation_path=QueryPath(), remaining_path=QueryPath()):
+        return InheritanceObjectPropertyReference(self, model or self.model, relation_path), remaining_path
+
+    def get_value(self, obj):
+        if self._descriptor.has_cached_value(obj):
+            cached_value = self._descriptor.get_cached_value(obj)
+            if isinstance(cached_value, Model):
+                return cached_value
+
+            child_obj = obj  # TODO: should this be copied?
+            model = get_model(*cached_value.split('.', 1))
+            for part in self._get_child_paths(obj.__class__).get(model, QueryPath()):
+                child_obj = getattr(child_obj, part)
+        else:
+            queryset = self.get_queryset_for_object(obj).select_properties(self.name)
+            child_obj = getattr(queryset.get(), self.name)
+
+        if self.cached or self._descriptor.has_cached_value(obj):
+            self._descriptor.set_cached_value(obj, child_obj)
+        return child_obj
+
+
+class InheritanceObjectPropertyReference(QueryablePropertyReference):
+    __slots__ = ()
+
+    def annotate_query(self, query, full_group_by, select=False, remaining_path=QueryPath()):
+        if select:
+            fields = (child_path.as_str() for child_path in six.itervalues(self.property._get_child_paths(self.model))
+                      if self.property.depth is None or len(child_path) <= self.property.depth)
+            query._lazy_queryable_property_operations.append(SelectRelatedOperation(*fields))
+        return super(InheritanceObjectPropertyReference, self).annotate_query(query, full_group_by, select,
+                                                                              remaining_path)
