@@ -4,7 +4,7 @@ from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from queryable_properties.managers import QueryablePropertiesManager
-from queryable_properties.properties import InheritanceModelProperty
+from queryable_properties.properties import InheritanceModelProperty, InheritanceObjectProperty
 
 
 class Abstract(models.Model):
@@ -20,6 +20,8 @@ class Abstract(models.Model):
 
 class Parent(Abstract):
     parent_field = models.CharField(max_length=100, default='parent_field')
+
+    subclass_obj = InheritanceObjectProperty(cached=True)
 
     if DJANGO_VERSION < (2, 0):
         objects = QueryablePropertiesManager()
@@ -71,6 +73,10 @@ class MultipleParent1(models.Model):
 class MultipleParent2(models.Model):
     id2 = models.AutoField(primary_key=True)
     multiple_parent2_field = models.CharField(max_length=100, default='multiple_parent2_field')
+
+    objects = QueryablePropertiesManager()
+
+    subclass_obj = InheritanceObjectProperty(cached=True)
 
 
 class MultipleChild(MultipleParent1, MultipleParent2):

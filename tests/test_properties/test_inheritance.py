@@ -181,3 +181,59 @@ class TestInheritanceModelProperty(object):
         ])
         for model, expected_value in expected_values.items():
             assert instances[inheritance_instances[model].pk].plural == expected_value
+
+
+@skip_if_no_expressions
+class TestInheritanceObjectProperty(object):
+
+    @pytest.fixture
+    def ref(self):
+        return get_queryable_property(Parent, 'subclass_obj')._resolve()[0]
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('cached', [True, False])
+    @pytest.mark.parametrize('model, depth, expected_model', [
+        (Parent, None, Grandchild1),
+        (Parent, 2, Grandchild1),
+        (Parent, 1, Child1),
+        (Parent, 0, Parent),
+        (Child1, None, Grandchild1),
+        (Child1, 2, Grandchild1),
+        (Child1, 1, Grandchild1),
+        (Child1, 0, Child1),
+        (Grandchild1, None, Grandchild1),
+        (Grandchild1, 2, Grandchild1),
+        (Grandchild1, 1, Grandchild1),
+        (Grandchild1, 0, Grandchild1),
+    ])
+    def test_getter_no_cache(self, monkeypatch, django_assert_num_queries, inheritance_instances, ref,
+                             cached, model, depth, expected_model):
+        monkeypatch.setattr(ref.property, 'cached', cached)
+        base_obj = model.objects.get(pk=inheritance_instances[Grandchild1].pk)
+        with django_assert_num_queries(1):
+            child_obj = base_obj.subclass_obj
+        assert isinstance(child_obj, expected_model)
+        assert not child_obj.get_deferred_fields()
+        assert ref.descriptor.has_cached_value(base_obj) is cached
+        if cached:
+            assert ref.descriptor.get_cached_value(base_obj) == child_obj
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('model', [Grandchild1, Child1, Parent])
+    def test_cached_raw_values(self, django_assert_num_queries, inheritance_instances, ref, model):
+        base_obj = model.objects.select_related().get(pk=inheritance_instances[Grandchild1].pk)
+        ref.descriptor.set_cached_value(base_obj, ref.property.value_generator(model))
+        with django_assert_num_queries(0):
+            child_obj = base_obj.subclass_obj
+        assert isinstance(child_obj, model)
+        assert not child_obj.get_deferred_fields()
+        assert ref.descriptor.get_cached_value(base_obj) == child_obj
+
+    @pytest.mark.django_db
+    def test_getter_cached_final_value(self, django_assert_num_queries, inheritance_instances, ref):
+        child_obj = inheritance_instances[Grandchild1]
+        base_obj = Parent.objects.get(pk=child_obj.pk)
+        ref.descriptor.set_cached_value(base_obj, child_obj)
+        with django_assert_num_queries(0):
+            assert base_obj.subclass_obj is child_obj
+        assert ref.descriptor.get_cached_value(base_obj) is child_obj
