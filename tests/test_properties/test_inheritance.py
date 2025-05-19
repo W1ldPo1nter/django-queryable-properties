@@ -217,6 +217,8 @@ class TestInheritanceObjectProperty(object):
         assert ref.descriptor.has_cached_value(base_obj) is cached
         if cached:
             assert ref.descriptor.get_cached_value(base_obj) == child_obj
+        child_obj.parent_field = 'changed'
+        assert base_obj.parent_field == 'parent_field'
 
     @pytest.mark.django_db
     @pytest.mark.parametrize('model', [Grandchild1, Child1, Parent])
@@ -228,6 +230,8 @@ class TestInheritanceObjectProperty(object):
         assert isinstance(child_obj, model)
         assert not child_obj.get_deferred_fields()
         assert ref.descriptor.get_cached_value(base_obj) == child_obj
+        child_obj.parent_field = 'changed'
+        assert base_obj.parent_field == 'parent_field'
 
     @pytest.mark.django_db
     def test_getter_cached_final_value(self, django_assert_num_queries, inheritance_instances, ref):

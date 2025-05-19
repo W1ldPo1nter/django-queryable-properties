@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
+from copy import deepcopy
 
 import six
 from django.db.models import CharField, Model
@@ -101,7 +102,7 @@ class InheritanceObjectProperty(IgnoreCacheMixin, InheritanceModelProperty):
             if isinstance(cached_value, Model):
                 return cached_value
 
-            child_obj = obj  # TODO: should this be copied?
+            child_obj = deepcopy(obj)
             model = get_model(*cached_value.split('.', 1))
             for part in self._get_child_paths(obj.__class__).get(model, QueryPath()):
                 child_obj = getattr(child_obj, part)
