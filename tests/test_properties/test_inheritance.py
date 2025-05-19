@@ -5,7 +5,7 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db.models import CharField
 
-from queryable_properties.properties import InheritanceModelProperty, QueryableProperty
+from queryable_properties.properties import InheritanceModelProperty, QueryableProperty, InheritanceObjectProperty
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath
 from ..inheritance.models import (
@@ -25,6 +25,7 @@ class TestInheritanceModelProperty(object):
         {
             'value_generator': lambda cls: str(cls),
             'output_field': CharField(),
+            'depth': 1,
             'cached': True,
             'verbose_name': 'Test',
         },
@@ -33,6 +34,7 @@ class TestInheritanceModelProperty(object):
         prop = InheritanceModelProperty(**kwargs)
         assert prop.value_generator is kwargs['value_generator']
         assert prop.output_field is kwargs['output_field']
+        assert prop.depth == kwargs.get('depth')
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
         assert prop.verbose_name == kwargs.get('verbose_name')
 
@@ -189,6 +191,18 @@ class TestInheritanceObjectProperty(object):
     @pytest.fixture
     def ref(self):
         return get_queryable_property(Parent, 'subclass_obj')._resolve()[0]
+
+    @pytest.mark.parametrize('kwargs', [
+        {'depth': 1},
+        {'cached': True, 'verbose_name': 'Test'},
+    ])
+    def test_initializer(self, kwargs):
+        prop = InheritanceObjectProperty(**kwargs)
+        assert prop.value_generator(MultipleChild) == 'inheritance.MultipleChild'
+        assert isinstance(prop.output_field, CharField)
+        assert prop.depth == kwargs.get('depth')
+        assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
+        assert prop.verbose_name == kwargs.get('verbose_name')
 
     @pytest.mark.django_db
     @pytest.mark.parametrize('cached', [True, False])
