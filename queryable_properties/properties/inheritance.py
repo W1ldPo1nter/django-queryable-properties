@@ -19,7 +19,7 @@ class InheritanceModelProperty(AnnotationGetterMixin, QueryableProperty):
     in inheritance scenarios.
     """
 
-    #: A shared cache that maps holds a dictionary per model class. The
+    #: A shared cache that holds a dictionary per model class. The
     #: dictionaries contain child model classes as keys and their corresponding
     #: query paths as values.
     _child_paths = {}
