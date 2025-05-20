@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
 from copy import deepcopy
+from inspect import isclass
 
 import six
-from django.db.models import CharField, Model
+from django.db.models import CharField, Model, Q
 
 from ..compat import get_model
 from ..utils.internal import QueryPath
@@ -100,19 +101,37 @@ class InheritanceObjectProperty(IgnoreCacheMixin, InheritanceModelProperty):
         if self._descriptor.has_cached_value(obj):
             cached_value = self._descriptor.get_cached_value(obj)
             if isinstance(cached_value, Model):
+                # The cached value is already the final model object, so it can
+                # be returned as-is.
                 return cached_value
 
+            # The cached value is a string in '<app_label>.<ModelName>' format
+            # while child relations should have been fetched via
+            # select_related. Determine the actual model class and determine
+            # the path to follow to get the actual child instance.
             child_obj = deepcopy(obj)
             model = get_model(*cached_value.split('.', 1))
             for part in self._get_child_paths(obj.__class__).get(model, QueryPath()):
                 child_obj = getattr(child_obj, part)
         else:
+            # No cached value. Perform a query utilizing this property and use
+            # the value from its final result. This allows to re-use the query-
+            # level implementation including the select_related setup.
             queryset = self.get_queryset_for_object(obj).select_properties(self.name)
             child_obj = getattr(queryset.get(), self.name)
 
         if self.cached or self._descriptor.has_cached_value(obj):
             self._descriptor.set_cached_value(obj, child_obj)
         return child_obj
+
+    def get_filter(self, cls, lookup, value):
+        filter_value = value
+        if isinstance(value, self.model) or (isclass(value) and issubclass(value, self.model)):
+            filter_value = self.value_generator(value)
+        condition = super(InheritanceObjectProperty, self).get_filter(cls, lookup, filter_value)
+        if isinstance(value, self.model):
+            condition &= Q(**{(QueryPath('pk') + lookup).as_str(): value.pk})
+        return condition
 
 
 class InheritanceObjectPropertyReference(QueryablePropertyReference):
