@@ -258,17 +258,17 @@ class TestInheritanceObjectProperty(object):
         assert ref.descriptor.get_cached_value(base_obj) is child_obj
 
     @pytest.mark.django_db
-    @pytest.mark.parametrize('queryset, filter_obj, filter_model, expected_model', [
-        (Parent.objects.filter(subclass_obj='inheritance.Child1'), None, None, Child1),
-        (Parent.objects.filter(subclass_obj=Grandchild1), None, None, Grandchild1),
-        (Parent.objects.all(), Child1, None, Child1),
-        (Parent.objects.all(), Grandchild1, Child1, None),
+    @pytest.mark.parametrize('filter_value, filter_model, expected_model', [
+        ('inheritance.Child1', None, Child1),
+        (Grandchild1, None, Grandchild1),
+        (Child1(), Child1, Child1),
+        (Grandchild1(), Child1, None),
     ])
-    def test_filter(self, inheritance_instances, queryset, filter_obj, filter_model, expected_model):
-        if filter_obj:
+    def test_filter(self, inheritance_instances, filter_value, filter_model, expected_model):
+        if isinstance(filter_value, Parent):
             if filter_model:
-                filter_obj = filter_model.objects.get(pk=inheritance_instances[filter_obj].pk)
-            queryset = queryset.filter(subclass_obj=filter_obj)
+                filter_value = filter_model.objects.get(pk=inheritance_instances[filter_value.__class__].pk)
+        queryset = Parent.objects.filter(subclass_obj=filter_value)
 
         try:
             result = queryset.get()
