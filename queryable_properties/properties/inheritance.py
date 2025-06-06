@@ -4,7 +4,7 @@ from copy import deepcopy
 from inspect import isclass
 
 import six
-from django.db.models import CharField, Model, Q
+from django.db.models import CharField, Model
 
 from ..compat import get_model
 from ..utils.internal import QueryPath

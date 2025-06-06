@@ -10,8 +10,7 @@ from queryable_properties.properties import InheritanceModelProperty, QueryableP
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath
 from ..inheritance.models import (
-    Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, MultipleParent2, Parent,
-    ProxyChild,
+    Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, Parent, ProxyChild,
 )
 from ..marks import skip_if_no_expressions
 
