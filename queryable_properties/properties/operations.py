@@ -50,7 +50,12 @@ class SelectRelatedOperation(QuerySetOperation):
         self.fields = fields
 
     def is_applicable(self, queryset):
-        return bool(self.fields) and queryset.query.select_related is not True
+        return (
+            bool(self.fields) and
+            getattr(queryset, '_fields', None) is None and
+            queryset.query.select_related is not True and
+            not getattr(queryset.query, 'combinator', None)
+        )
 
     def execute(self, queryset):
         queryset.query.add_select_related(self.fields)

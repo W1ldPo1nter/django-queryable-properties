@@ -130,7 +130,7 @@ class InheritanceObjectProperty(IgnoreCacheMixin, InheritanceModelProperty):
             filter_value = self.value_generator(value)
         condition = super(InheritanceObjectProperty, self).get_filter(cls, lookup, filter_value)
         if isinstance(value, self.model):
-            condition &= Q(**{(QueryPath('pk') + lookup).as_str(): value.pk})
+            condition &= (QueryPath('pk') + lookup).build_filter(value.pk)
         return condition
 
 
