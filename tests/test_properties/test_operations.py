@@ -28,6 +28,12 @@ class TestSelectRelatedOperation(object):
     @pytest.mark.parametrize('fields, queryset, expected_result', [
         ((), Parent.objects.all(), False),
         (('child1', 'child2'), Parent.objects.select_related(), False),
+        (('child1',), Parent.objects.values('parent_field'), False),
+        (
+            ('child2',),
+            getattr(Parent.objects.all(), 'union', lambda qs: qs.select_related())(Parent.objects.all()),
+            False,
+        ),
         (('child1', 'child2'), Parent.objects.all(), True),
         (('child1',), Parent.objects.select_related('child2'), True),
     ])
