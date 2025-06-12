@@ -11,6 +11,7 @@ from queryable_properties.managers import (
     QueryablePropertiesIterableMixin, QueryablePropertiesManager, QueryablePropertiesManagerMixin,
     QueryablePropertiesQuerySet, QueryablePropertiesQuerySetMixin,
 )
+from queryable_properties.properties.operations import SelectRelatedOperation
 from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.utils import get_queryable_property
 from .app_management.models import (
@@ -39,12 +40,13 @@ def refs():
 class TestQueryablePropertiesQuerySetMixin(object):
 
     def assert_queryset_picklable(self, queryset, selected_descriptors=()):
-        expected_results = list(queryset)
+        expected_results = list(queryset.all())
         serialized_queryset = cPickle.dumps(queryset)
         deserialized_queryset = cPickle.loads(serialized_queryset)
         assert list(deserialized_queryset) == expected_results
         for descriptor in selected_descriptors:
             assert all(descriptor.has_cached_value(obj) for obj in deserialized_queryset)
+        return deserialized_queryset
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_pickle_model_instance_queryset(self, model):
@@ -65,6 +67,16 @@ class TestQueryablePropertiesQuerySetMixin(object):
     def test_pickle_dates_queryset(self, model):
         queryset = model.objects.filter(application__version_count=3).dates('supported_from', 'year')
         self.assert_queryset_picklable(queryset)
+
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_pickle_queryset_with_lazy_operation(self, model):
+        queryset = model.objects.filter(application__version_count=3)
+        queryset.query._lazy_queryable_property_operations.append(SelectRelatedOperation('application'))
+        deserialized_queryset = self.assert_queryset_picklable(queryset)
+        assert len(deserialized_queryset.query._lazy_queryable_property_operations) == 1
+        operation = deserialized_queryset.query._lazy_queryable_property_operations[0]
+        assert isinstance(operation, SelectRelatedOperation)
+        assert operation.fields == ('application',)
 
     @pytest.mark.skipif(DJANGO_VERSION >= (1, 9), reason="_clone doesn't change the class in recent Django versions.")
     @pytest.mark.parametrize('change_class, setup, kwargs', [
