@@ -2,6 +2,7 @@
 from collections import OrderedDict
 
 import pytest
+import six
 from django import VERSION as DJANGO_VERSION
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import CharField
@@ -10,7 +11,8 @@ from queryable_properties.properties import InheritanceModelProperty, QueryableP
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath
 from ..inheritance.models import (
-    Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, Parent, ProxyChild,
+    Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, MultipleParent2, Parent,
+    ProxyChild,
 )
 from ..marks import skip_if_no_expressions
 
@@ -266,8 +268,7 @@ class TestInheritanceObjectProperty(object):
     ])
     def test_filter(self, inheritance_instances, filter_value, filter_model, expected_model):
         if isinstance(filter_value, Parent):
-            if filter_model:
-                filter_value = filter_model.objects.get(pk=inheritance_instances[filter_value.__class__].pk)
+            filter_value = filter_model.objects.get(pk=inheritance_instances[filter_value.__class__].pk)
         queryset = Parent.objects.filter(subclass_obj=filter_value)
 
         try:
@@ -276,3 +277,50 @@ class TestInheritanceObjectProperty(object):
             assert expected_model is None
         else:
             assert result == inheritance_instances[expected_model].parent_ptr
+
+    @pytest.mark.django_db
+    def test_annotation_model_instance(self, django_assert_num_queries, inheritance_instances):
+        with django_assert_num_queries(1):
+            instances = Parent.objects.select_properties('subclass_obj').in_bulk([
+                inheritance_instances[Parent].pk,
+                inheritance_instances[Child1].pk,
+                inheritance_instances[Child2].pk,
+                inheritance_instances[Grandchild1].pk,
+                inheritance_instances[DisconnectedGrandchild2].pk,
+            ])
+            assert instances[inheritance_instances[Parent].pk].subclass_obj == inheritance_instances[Parent]
+            assert instances[inheritance_instances[Child1].pk].subclass_obj == inheritance_instances[Child1]
+            assert instances[inheritance_instances[Child2].pk].subclass_obj == inheritance_instances[Child2]
+            assert instances[inheritance_instances[Grandchild1].pk].subclass_obj == inheritance_instances[Grandchild1]
+            assert (instances[inheritance_instances[DisconnectedGrandchild2].pk].subclass_obj ==
+                    inheritance_instances[DisconnectedGrandchild2].parent_link)
+
+        with django_assert_num_queries(1):
+            instances = MultipleParent2.objects.select_properties('subclass_obj').in_bulk([
+                inheritance_instances[MultipleParent2].pk,
+                inheritance_instances[MultipleChild].pk,
+            ])
+            assert (instances[inheritance_instances[MultipleParent2].pk].subclass_obj ==
+                    inheritance_instances[MultipleParent2])
+            assert (instances[inheritance_instances[MultipleChild].pk].subclass_obj ==
+                    inheritance_instances[MultipleChild])
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize('query_model, expected_results', [
+        (Parent, {
+            Parent: 'inheritance.Parent',
+            Child1: 'inheritance.Child1',
+            Child2: 'inheritance.Child2',
+            Grandchild1: 'inheritance.Grandchild1',
+            DisconnectedGrandchild2: 'inheritance.Child2',
+        }),
+        (MultipleParent2, {
+            MultipleParent2: 'inheritance.MultipleParent2',
+            MultipleChild: 'inheritance.MultipleChild',
+        }),
+    ])
+    def test_annotation_values(self, inheritance_instances, query_model, expected_results):
+        results = dict(query_model.objects.select_properties('subclass_obj').values_list('pk', 'subclass_obj'))
+        assert len(results) == len(expected_results)
+        for model, expected_value in six.iteritems(expected_results):
+            assert results[inheritance_instances[model].pk] == expected_value
