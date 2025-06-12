@@ -280,20 +280,22 @@ class TestInheritanceObjectProperty(object):
 
     @pytest.mark.django_db
     def test_annotation_model_instance(self, django_assert_num_queries, inheritance_instances):
+        grandchild2_as_child2 = inheritance_instances[DisconnectedGrandchild2]
+        grandchild2_as_child2.__class__ = Child2
+
         with django_assert_num_queries(1):
             instances = Parent.objects.select_properties('subclass_obj').in_bulk([
                 inheritance_instances[Parent].pk,
                 inheritance_instances[Child1].pk,
                 inheritance_instances[Child2].pk,
                 inheritance_instances[Grandchild1].pk,
-                inheritance_instances[DisconnectedGrandchild2].pk,
+                grandchild2_as_child2.pk,
             ])
             assert instances[inheritance_instances[Parent].pk].subclass_obj == inheritance_instances[Parent]
             assert instances[inheritance_instances[Child1].pk].subclass_obj == inheritance_instances[Child1]
             assert instances[inheritance_instances[Child2].pk].subclass_obj == inheritance_instances[Child2]
             assert instances[inheritance_instances[Grandchild1].pk].subclass_obj == inheritance_instances[Grandchild1]
-            assert (instances[inheritance_instances[DisconnectedGrandchild2].pk].subclass_obj ==
-                    inheritance_instances[DisconnectedGrandchild2].parent_link)
+            assert instances[grandchild2_as_child2.pk].subclass_obj == grandchild2_as_child2
 
         with django_assert_num_queries(1):
             instances = MultipleParent2.objects.select_properties('subclass_obj').in_bulk([
