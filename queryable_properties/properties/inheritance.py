@@ -85,8 +85,22 @@ class InheritanceModelProperty(AnnotationGetterMixin, QueryableProperty):
 
 
 class InheritanceObjectProperty(IgnoreCacheMixin, InheritanceModelProperty):
+    """
+    A property that returns the final submodel instance in inheritance
+    scenarios.
+    """
 
     def __init__(self, depth=None, **kwargs):
+        """
+        Initialize a new property that returns the final submodel instance in
+        inheritance scenarios.
+
+        :param depth: The maximum depth of the inheritance hierarchy to follow.
+                      Instances of model classes below this maximum depth will
+                      be treated as objects of the maximum depth. If not
+                      provided, no maximum depth will be enforced.
+        :type depth: int | None
+        """
         super(InheritanceObjectProperty, self).__init__(
             value_generator=lambda cls: '.'.join((cls._meta.app_label, cls._meta.object_name)),
             output_field=CharField(),
@@ -135,6 +149,10 @@ class InheritanceObjectProperty(IgnoreCacheMixin, InheritanceModelProperty):
 
 
 class InheritanceObjectPropertyReference(QueryablePropertyReference):
+    """
+    A specialized property reference that allows
+    :class:`InheritanceObjectProperty` objects to be annotated properly.
+    """
     __slots__ = ()
 
     def annotate_query(self, query, full_group_by, select=False, remaining_path=QueryPath()):
