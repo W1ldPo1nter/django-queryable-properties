@@ -87,8 +87,8 @@ In addition to the regular configuration options for :ref:`annotation_based:Anno
   Specified properties must be annotatable.
   If it is not used, no queryable properties will be populated on submodel instances.
 
-How it works
-^^^^^^^^^^^^
+``SubqueryObjectProperty``: How it works
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Since Django can generally only retrieve one value per field or annotation, a ``SubqueryObjectProperty`` has to do some
 extra work to be able to retrieve entire model instances.
@@ -225,3 +225,122 @@ All other fields or queryable properties have to be requested individually.
    cannot be represented by a single column.
    Also, the selection of the main property will only select the first primary key field.
    Select the individual primary key fields using ``__`` notation to get all parts of the primary key.
+
+``InheritanceObjectProperty``: Getting the final subclass object in inheritance scenarios
+-----------------------------------------------------------------------------------------
+
+When working with model inheritance, a common problem is figuring out the final model class of instances efficiently.
+The property class :class:`queryable_properties.properties.InheritanceObjectProperty` attempts to solve this problem
+by determining the final model class and returning the model instance as an instance of that class.
+Being based on ``Case``/``When`` objects, this property class can only be used in conjunction with a Django version
+that supports these expressions, i.e. Django 1.8 or higher.
+
+Let's look at a full example based on the example inheritance models from Django's documentation:
+
+.. code-block:: python
+
+    from django.db import models
+    from queryable_properties.properties import InheritanceObjectProperty
+
+
+    class Place(models.Model):
+        name = models.CharField(max_length=50)
+        address = models.CharField(max_length=80)
+
+        subclass_instance = InheritanceObjectProperty(cached=True)
+
+        def __str__(self):
+            return self.name
+
+
+    class Restaurant(Place):
+        serves_hot_dogs = models.BooleanField(default=False)
+        serves_pizza = models.BooleanField(default=False)
+
+
+    p = Place.objects.create(name='Empire State Building', address='New York')
+    r = Restaurant.objects.create(name='Stoned Pizza', address='New York', serves_pizza=True)
+
+    for place in Place.objects.select_properties('subclass_instance').order_by('pk'):
+        print(repr(place))
+        print(repr(place.subclass_instance))
+
+    # Output:
+    # <Place: Empire State Building>
+    # <Place: Empire State Building>
+    # <Place: Stoned Pizza>
+    # <Restaurant: Stoned Pizza>
+
+In this example, a place and a restaurant (which is also a place due to inheritance) object are created and the
+``Place`` model is used to query all available places.
+While all objects returned via the query are base ``Place`` instances, the ``InheritanceObjectProperty`` allows to
+access the instance of the final class for each instance (with all subclass fields properly populated).
+Due to the use of ``select_properties``, the property will already be populated for each instance, so the entire loop
+only executes a single query.
+
+The ``InheritanceObjectProperty`` property class is based on
+:ref:`common:\`\`InheritanceModelProperty\`\`: Getting information about the final model class` and therefore supports
+its ``depth`` argument in addition to all common property arguments.
+
+``InheritanceObjectProperty``: How it works
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+As mentioned above, ``InheritanceObjectProperty`` is based on ``InheritanceModelProperty`` and therefore contains
+information about the final model class of each instance on the queryset level.
+Specifically, ``InheritanceObjectProperty`` instances use strings in the form of ``"<app_label>.<ModelName>"`` as
+their values in queries.
+If the models shown above would live in an app called ``places``, possible values would therefore be ``"places.Place"``
+and ``"places.Restaurant"``.
+On the object level, this value is then used to determine the final model class via Django's app registry.
+
+Additionally, ``InheritanceObjectProperty`` instances automatically perform some ``.select_related()`` setup while
+querying.
+This allows to query all possbible submodel fields in the same queryset, thus executing only a single query.
+The model that was determined for each instance is then used to figure out which of the child relations to follow to
+get the instance of the final model class.
+
+.. note::
+   The ``.select_related()`` operation is performed lazily just before the query is executed (and only if no queryset
+   features which would conflict with it are used).
+   This is done to ensure that the required selection of the child objects is not accidentally reverted through other
+   queryset modifications.
+   As a consequence, the queryset and its query will not reflect the selection of the child instances when inspecting
+   them (or their SQL code) before the query is actually executed.
+
+Usage in querysets
+^^^^^^^^^^^^^^^^^^
+
+When an ``InheritanceObjectProperty`` is used in queryset operations other than selection via ``select_properties``,
+it behaves differently compared to the object level.
+As already described in the previous section, an ``InheritanceObjectProperty`` is represented by strings in the form
+of ``"<app_label>.<ModelName>"`` in queries, which means that any interaction with such properties in queryset means
+interacting with these string values.
+For example, using ``.order_by()`` or ``.values()`` with ``InheritanceObjectProperty`` instances means ordering by or
+retrieving these strings.
+The same applies to filtering, although there are some convenience additions to be able to filter directly by model
+classes or objects.
+Refer to the following examples, which are based on the example models and objects above, to get an idea of how to work
+with these properties in queryset operations:
+
+.. code-block:: python
+
+    # Filtering can be performed using strings or model classes
+    # The following queries will find object p, but not object r
+    Place.objects.filter(subclass_instance='places.Place')
+    Place.objects.filter(subclass_instance=Place)
+
+    # Filtering can also take model instances, which leads to both type and primary key being compared
+    # The following query will find no objects since p is a base Place and thus does not match the condition
+    # "model class is Restaurant and pk is p's pk"
+    Place.objects.filter(subclass_instance=Restaurant(pk=p.pk))
+
+    # The following query will place all base Place objects before Restaurant objects
+    # since 'places.Place' < 'places.Restaurant'
+    Place.objects.order_by('subclass_instance')
+
+    # Using .values/.values_list returns the string values
+    for data in Place.objects.select_properties('subclass_instance').order_by('pk').values('name', 'subclass_instance'):
+        print(data)
+    # Output:
+    # {'name': 'Empire State Building', 'subclass_instance': 'places.Place'}
+    # {'name': 'Stoned Pizza', 'subclass_instance': 'places.Restaurant'}

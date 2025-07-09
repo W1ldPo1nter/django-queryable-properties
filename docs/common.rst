@@ -643,6 +643,10 @@ When querying objects this base model, it is often difficult to know which final
 This is where the properties of this category come in: to help make distinctions based on the actual model of each
 object in efficient way.
 
+.. note::
+   In addition to the properties dealing with model inheritance shown here, there is also the more advanced
+   :ref:`advanced:\`\`InheritanceObjectProperty\`\`: Getting the final subclass object in inheritance scenarios`.
+
 ``InheritanceModelProperty``: Getting information about the final model class
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
