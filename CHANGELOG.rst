@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added a new ready-to-use queryable property implementation that allows to retrieve the final subclass object in
+  inheritance scenarios (``InheritanceObjectProperty``)
+
 1.11.0 (2025-05-13)
 -------------------
 
