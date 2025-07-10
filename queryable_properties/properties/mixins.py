@@ -1,5 +1,5 @@
 # encoding: utf-8
-
+from collections import OrderedDict
 from functools import wraps
 
 import six
@@ -309,6 +309,104 @@ class SubqueryMixin(AnnotationGetterMixin):
         :rtype: django.db.models.QuerySet
         """
         return self._queryset() if callable(self._queryset) else self._queryset
+
+
+class InheritanceMixin(AnnotationGetterMixin):
+    """
+    Internal mixin class for common properties that deal with model
+    inheritance.
+    """
+
+    #: A shared cache that holds a dictionary per model class. The
+    #: dictionaries contain child model classes as keys and their corresponding
+    #: query paths as values.
+    _child_paths = {}
+    _inheritance_output_field = None  #: The output field for CASE expressions.
+
+    def __init__(self, depth=None, **kwargs):
+        """
+        Initialize a new queryable property dealing with model inheritance.
+
+        :param depth: The maximum depth of the inheritance hierarchy to follow.
+                      Instances of model classes below this maximum depth will
+                      be treated as objects of the maximum depth. If not
+                      provided, no maximum depth will be enforced.
+        :type depth: int | None
+        """
+        self.depth = depth
+        super(InheritanceMixin, self).__init__(**kwargs)
+
+    def _get_value_for_model(self, model):  # pragma: no cover
+        """
+        Get the value to represent the given model class in querysets.
+
+        :param model: The model class to get the value for.
+        :return: The annotation value to use in querysets.
+        """
+        raise NotImplementedError()
+
+    def _get_condition_for_model(self, model, query_path):
+        """
+        Get the query condition that allows to check if objects are instances
+        of the given model class.
+
+        :param model: The model class to get the condition for.
+        :param QueryPath query_path: The query path that leads to objects of
+                                     the given model class.
+        :return: The query condition for the given model class.
+        :rtype: django.db.models.Q | django.db.models.Expression
+        """
+        return (query_path + 'isnull').build_filter(False)
+
+    def _get_child_paths(self, model):
+        """
+        Get a dictionary containg child model classes and their respective
+        query paths for the given model.
+
+        :param type model: The model to get the child paths for.
+        :return: A dictionary containg child model classes as keys and their
+                 respective query paths as values.
+        :rtype: OrderedDict[type, QueryPath]
+        """
+        model = model._meta.proxy_for_model or model
+        child_paths = self._child_paths.get(model)
+        if child_paths is None:
+            from django.db.models.fields.related import ForeignObjectRel
+
+            child_paths = OrderedDict()
+            for field in model._meta.get_fields(include_parents=False, include_hidden=False):
+                if isinstance(field, ForeignObjectRel) and field.parent_link:
+                    path = QueryPath(field.name)
+                    for sub_model, sub_path in six.iteritems(self._get_child_paths(field.related_model)):
+                        child_paths[sub_model] = path + sub_path
+                    child_paths[field.related_model] = path
+            self._child_paths[model] = child_paths
+        return child_paths
+
+    def _build_case_expression(self, model):
+        """
+        Build a ``CASE``/``WHEN`` expression that results in the queryset value
+        for each child model class based on the child model condition.
+
+        :param model: The model class to start from.
+        :return: A ``CASE``/``WHEN`` expression to assign each record the
+                 proper value based on its model class.
+        :rtype: django.db.models.Case
+        """
+        from django.db.models import Case, Value, When
+
+        return Case(
+            *(
+                When(
+                    self._get_condition_for_model(child_model, query_path),
+                    then=Value(self._get_value_for_model(child_model)),
+                )
+                for child_model, query_path in six.iteritems(self._get_child_paths(model))
+                if self.depth is None or len(query_path) <= self.depth
+            ),
+            default=Value(self._get_value_for_model(model)),
+            output_field=self._inheritance_output_field,
+        )
 
 
 class IgnoreCacheMixin(object):

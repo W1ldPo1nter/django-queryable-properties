@@ -1,18 +1,22 @@
 # encoding: utf-8
+from collections import OrderedDict
+
 import pytest
+import six
 from django import VERSION as DJANGO_VERSION
-from django.db.models import Q
+from django.db.models import CharField, Q
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (
     REMAINING_LOOKUPS, AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin, QueryableProperty, boolean_filter,
     lookup_filter,
 )
-from queryable_properties.properties.mixins import IgnoreCacheMixin, SubqueryMixin
-from queryable_properties.utils import get_queryable_property
+from queryable_properties.properties.mixins import IgnoreCacheMixin, InheritanceMixin, SubqueryMixin
+from queryable_properties.utils import get_queryable_property, QueryPath
 from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import ApplicationWithClassBasedProperties
-from ..marks import skip_if_no_composite_pks, skip_if_no_subqueries
+from ..inheritance.models import Child1, Child2, Grandchild1, MultipleChild, MultipleParent1, Parent, ProxyChild
+from ..marks import skip_if_no_composite_pks, skip_if_no_expressions
 
 
 class BaseLookupFilterProperty(LookupFilterMixin, QueryableProperty):
@@ -220,7 +224,6 @@ class TestAnnotationGetterMixin(object):
             prop.get_value(application)
 
 
-@skip_if_no_subqueries
 class TestSubqueryMixin(object):
 
     @pytest.mark.parametrize('kwargs', [
@@ -239,6 +242,107 @@ class TestSubqueryMixin(object):
         queryset = ApplicationWithClassBasedProperties.objects.all()
         prop = cls((lambda: queryset) if use_function else queryset)
         assert prop.queryset is queryset
+
+
+class TestInheritanceMixin(object):
+
+    @pytest.mark.parametrize('kwargs', [
+        {},
+        {'cached': True},
+        {'depth': 2},
+        {'depth': 3, 'cached': True}
+    ])
+    def test_initializer(self, kwargs):
+        cls = InheritanceMixin.mix_with_class(QueryableProperty)
+        prop = cls(**kwargs)
+        assert prop.depth == kwargs.get('depth')
+        assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
+
+    def test_get_condition_for_model(self):
+        result = InheritanceMixin()._get_condition_for_model(Grandchild1, QueryPath('child1__grandchild1'))
+        assert isinstance(result, Q)
+        assert result.children == [('child1__grandchild1__isnull', False)]
+
+    @pytest.mark.parametrize('model, expected_result, expected_cache', [
+        (Grandchild1, OrderedDict(), {Grandchild1: OrderedDict()}),
+        (
+            Child1,
+            OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
+            {
+                Grandchild1: OrderedDict(),
+                Child1: OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
+            },
+        ),
+        (
+            ProxyChild,
+            OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
+            {
+                Grandchild1: OrderedDict(),
+                Child1: OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
+            },
+        ),
+        (
+            Parent,
+            OrderedDict([
+                (Grandchild1, QueryPath('child1__grandchild1')),
+                (Child1, QueryPath('child1')),
+                (Child2, QueryPath('child2')),
+            ]),
+            {
+                Grandchild1: OrderedDict(),
+                Child2: OrderedDict(),
+                Child1: OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
+                Parent: OrderedDict([
+                    (Grandchild1, QueryPath('child1__grandchild1')),
+                    (Child1, QueryPath('child1')),
+                    (Child2, QueryPath('child2')),
+                ]),
+            },
+        ),
+        (
+            MultipleParent1,
+            OrderedDict([(MultipleChild, QueryPath('multiplechild'))]),
+            {
+                MultipleChild: OrderedDict(),
+                MultipleParent1: OrderedDict([(MultipleChild, QueryPath('multiplechild'))]),
+            },
+        ),
+    ])
+    def test_get_child_paths(self, model, expected_result, expected_cache):
+        prop = InheritanceMixin.mix_with_class(QueryableProperty)()
+        prop._child_paths = {}
+        assert prop._get_child_paths(model) == expected_result
+        assert prop._child_paths == expected_cache
+
+    @skip_if_no_expressions
+    @pytest.mark.parametrize('depth', [None, 2, 1, 0])
+    def test_build_case_expression(self, depth):
+        from django.db.models import Case, Value, When
+
+        prop = InheritanceMixin.mix_with_class(QueryableProperty)(depth=depth)
+        prop._child_paths = {Parent: OrderedDict((
+            (Grandchild1, QueryPath('child1__grandchild1')),
+            (Child1, QueryPath('child1')),
+        ))}
+        prop._inheritance_output_field = CharField()
+        prop._get_value_for_model = lambda model: model.__name__
+        if depth == 0:
+            expected_conditions = []
+        else:
+            expected_conditions = [((query_path + 'isnull').as_str(), False) for query_path
+                                   in six.itervalues(prop._child_paths[Parent])]
+            if depth is not None:
+                expected_conditions = expected_conditions[-depth:]
+
+        case = prop._build_case_expression(Parent)
+        assert isinstance(case, Case)
+        assert len(case.cases) == len(expected_conditions)
+        for when, expected_condition in zip(case.cases, expected_conditions):
+            assert isinstance(when, When)
+            assert when.condition.children == [expected_condition]
+        assert isinstance(case.default, Value)
+        assert case.default.value == 'Parent'
+        assert case.output_field is prop._inheritance_output_field
 
 
 class TestIgnoreCacheMixin(object):
