@@ -405,7 +405,7 @@ class InheritanceMixin(AnnotationGetterMixin):
                 if self.depth is None or len(query_path) <= self.depth
             ),
             default=Value(self._get_value_for_model(model)),
-            output_field=self._inheritance_output_field,
+            output_field=self._inheritance_output_field
         )
 
 
