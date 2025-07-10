@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from collections import OrderedDict
-
 import pytest
 import six
 from django import VERSION as DJANGO_VERSION
@@ -9,7 +7,6 @@ from django.db.models import CharField
 
 from queryable_properties.properties import InheritanceModelProperty, QueryableProperty, InheritanceObjectProperty
 from queryable_properties.utils import get_queryable_property
-from queryable_properties.utils.internal import QueryPath
 from ..inheritance.models import (
     Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, MultipleParent2, Parent,
     ProxyChild,
@@ -36,61 +33,14 @@ class TestInheritanceModelProperty(object):
     def test_initializer(self, kwargs):
         prop = InheritanceModelProperty(**kwargs)
         assert prop.value_generator is kwargs['value_generator']
-        assert prop.output_field is kwargs['output_field']
+        assert prop._inheritance_output_field is kwargs['output_field']
         assert prop.depth == kwargs.get('depth')
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
         assert prop.verbose_name == kwargs.get('verbose_name')
 
-    @pytest.mark.parametrize('model, expected_result, expected_cache', [
-        (Grandchild1, OrderedDict(), {Grandchild1: OrderedDict()}),
-        (
-            Child1,
-            OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
-            {
-                Grandchild1: OrderedDict(),
-                Child1: OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
-            },
-        ),
-        (
-            ProxyChild,
-            OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
-            {
-                Grandchild1: OrderedDict(),
-                Child1: OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
-            },
-        ),
-        (
-            Parent,
-            OrderedDict([
-                (Grandchild1, QueryPath('child1__grandchild1')),
-                (Child1, QueryPath('child1')),
-                (Child2, QueryPath('child2')),
-            ]),
-            {
-                Grandchild1: OrderedDict(),
-                Child2: OrderedDict(),
-                Child1: OrderedDict([(Grandchild1, QueryPath('grandchild1'))]),
-                Parent: OrderedDict([
-                    (Grandchild1, QueryPath('child1__grandchild1')),
-                    (Child1, QueryPath('child1')),
-                    (Child2, QueryPath('child2')),
-                ]),
-            },
-        ),
-        (
-            MultipleParent1,
-            OrderedDict([(MultipleChild, QueryPath('multiplechild'))]),
-            {
-                MultipleChild: OrderedDict(),
-                MultipleParent1: OrderedDict([(MultipleChild, QueryPath('multiplechild'))]),
-            },
-        ),
-    ])
-    def test_get_child_paths(self, model, expected_result, expected_cache):
-        prop = InheritanceModelProperty(None, None)
-        prop._child_paths = {}
-        assert prop._get_child_paths(model) == expected_result
-        assert prop._child_paths == expected_cache
+    def test_get_value_for_model(self):
+        prop = InheritanceModelProperty(value_generator=lambda cls: cls.__name__, output_field=CharField())
+        assert prop._get_value_for_model(Parent) == 'Parent'
 
     @pytest.mark.django_db
     def test_annotation(self, django_assert_num_queries, inheritance_instances):
@@ -201,11 +151,13 @@ class TestInheritanceObjectProperty(object):
     ])
     def test_initializer(self, kwargs):
         prop = InheritanceObjectProperty(**kwargs)
-        assert prop.value_generator(MultipleChild) == 'inheritance.MultipleChild'
-        assert isinstance(prop.output_field, CharField)
+        assert isinstance(prop._inheritance_output_field, CharField)
         assert prop.depth == kwargs.get('depth')
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
         assert prop.verbose_name == kwargs.get('verbose_name')
+
+    def test_get_value_for_model(self):
+        assert InheritanceObjectProperty()._get_value_for_model(Parent) == 'inheritance.Parent'
 
     @pytest.mark.django_db
     @pytest.mark.parametrize('cached', [True, False])
@@ -241,7 +193,7 @@ class TestInheritanceObjectProperty(object):
     @pytest.mark.parametrize('model', [Grandchild1, Child1, Parent])
     def test_cached_raw_values(self, django_assert_num_queries, inheritance_instances, ref, model):
         base_obj = model.objects.select_related().get(pk=inheritance_instances[Grandchild1].pk)
-        ref.descriptor.set_cached_value(base_obj, ref.property.value_generator(model))
+        ref.descriptor.set_cached_value(base_obj, ref.property._get_value_for_model(model))
         with django_assert_num_queries(0):
             child_obj = base_obj.subclass_obj
         assert isinstance(child_obj, model)
