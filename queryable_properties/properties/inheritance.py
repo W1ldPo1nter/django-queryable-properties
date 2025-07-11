@@ -3,7 +3,7 @@ from copy import deepcopy
 from inspect import isclass
 
 import six
-from django.db.models import CharField, Model
+from django.db.models import CharField
 
 from ..compat import get_model
 from ..utils.internal import QueryPath
@@ -64,7 +64,7 @@ class InheritanceObjectProperty(IgnoreCacheMixin, InheritanceMixin, QueryablePro
     def get_value(self, obj):
         if self._descriptor.has_cached_value(obj):
             cached_value = self._descriptor.get_cached_value(obj)
-            if isinstance(cached_value, Model):
+            if isinstance(cached_value, self.model):
                 # The cached value is already the final model object, so it can
                 # be returned as-is.
                 return cached_value
