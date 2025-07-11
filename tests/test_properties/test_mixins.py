@@ -263,6 +263,7 @@ class TestInheritanceMixin(object):
         assert isinstance(result, Q)
         assert result.children == [('child1__grandchild1__isnull', False)]
 
+    @skip_if_no_expressions
     @pytest.mark.parametrize('model, expected_result, expected_cache', [
         (Grandchild1, OrderedDict(), {Grandchild1: OrderedDict()}),
         (
