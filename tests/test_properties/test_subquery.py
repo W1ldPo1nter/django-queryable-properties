@@ -41,7 +41,7 @@ class TestSubqueryFieldProperty(object):
     ])
     def test_initializer(self, kwargs):
         prop = SubqueryFieldProperty(**kwargs)
-        assert prop.queryset is kwargs['queryset']
+        assert prop._inner_queryset is kwargs['queryset']
         assert prop.field_name == kwargs['field_name']
         assert prop.output_field is kwargs.get('output_field')
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
@@ -72,7 +72,7 @@ class TestSubqueryExistenceCheckProperty(object):
     ])
     def test_initializer(self, kwargs):
         prop = SubqueryExistenceCheckProperty(**kwargs)
-        assert prop.queryset is kwargs['queryset']
+        assert prop._inner_queryset is kwargs['queryset']
         assert prop.negated == kwargs.get('negated', False)
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
 
@@ -114,7 +114,7 @@ class TestSubqueryObjectProperty(object):
     ])
     def test_initializer(self, kwargs):
         prop = SubqueryObjectProperty(**kwargs)
-        assert prop.queryset is kwargs['queryset']
+        assert prop._inner_queryset is kwargs['queryset']
         assert prop.field_name is None
         assert prop.output_field is None
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)

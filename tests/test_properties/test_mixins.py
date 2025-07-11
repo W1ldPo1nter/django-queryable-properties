@@ -227,21 +227,23 @@ class TestAnnotationGetterMixin(object):
 class TestSubqueryMixin(object):
 
     @pytest.mark.parametrize('kwargs', [
+        {},
+        {'cached': True},
         {'queryset': ApplicationWithClassBasedProperties.objects.filter(name='test')},
         {'queryset': ApplicationWithClassBasedProperties.objects.all(), 'cached': True}
     ])
     def test_initializer(self, kwargs):
         cls = SubqueryMixin.mix_with_class(QueryableProperty)
         prop = cls(**kwargs)
-        assert prop._queryset is kwargs['queryset']
+        assert prop._inner_queryset is kwargs.get('queryset')
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
 
     @pytest.mark.parametrize('use_function', [False, True])
-    def test_queryset(self, use_function):
+    def test_get_inner_queryset(self, use_function):
         cls = SubqueryMixin.mix_with_class(QueryableProperty)
         queryset = ApplicationWithClassBasedProperties.objects.all()
         prop = cls((lambda: queryset) if use_function else queryset)
-        assert prop.queryset is queryset
+        assert prop._get_inner_queryset(ApplicationWithClassBasedProperties) is queryset
 
 
 class TestInheritanceMixin(object):

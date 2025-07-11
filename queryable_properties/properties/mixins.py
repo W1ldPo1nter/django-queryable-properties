@@ -4,7 +4,6 @@ from functools import wraps
 
 import six
 from django.db.models import BooleanField
-from django.utils.functional import cached_property
 
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
@@ -286,29 +285,30 @@ class SubqueryMixin(AnnotationGetterMixin):
     subqueries.
     """
 
-    def __init__(self, queryset, **kwargs):
+    def __init__(self, queryset=None, **kwargs):
         """
         Initialize a new subquery-based queryable property.
 
         :param queryset: The internal queryset to use as the subquery or a
                          callable without arguments that generates the internal
                          queryset.
-        :type queryset: django.db.models.QuerySet | function
+        :type queryset: django.db.models.QuerySet | function | None
         """
-        self._queryset = queryset
+        self._inner_queryset = queryset
         super(SubqueryMixin, self).__init__(**kwargs)
 
-    @cached_property
-    def queryset(self):
+    def _get_inner_queryset(self, model):
         """
-        Cache and return the base queryset that is to be utilized as the
-        subquery. If a callable was provided, it is called before being
-        returned.
+        Get the base queryset that is to be utilized as the subquery.
 
+        Defaults to evaluating the ``_inner_queryset`` attribute. If it is set
+        to a callable, it is called before being returned.
+
+        :param model: The model class of the outer queryset.
         :return: The base queryset that is to be utilized as the subquery.
         :rtype: django.db.models.QuerySet
         """
-        return self._queryset() if callable(self._queryset) else self._queryset
+        return self._inner_queryset() if callable(self._inner_queryset) else self._inner_queryset
 
 
 class InheritanceMixin(AnnotationGetterMixin):

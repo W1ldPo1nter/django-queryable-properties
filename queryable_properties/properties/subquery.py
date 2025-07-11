@@ -38,7 +38,7 @@ class SubqueryFieldProperty(SubqueryMixin, QueryableProperty):
     def get_annotation(self, cls):
         from django.db.models import Subquery
 
-        return Subquery(self.queryset.values(self.field_name)[:1], output_field=self.output_field)
+        return Subquery(self._get_inner_queryset(cls).values(self.field_name)[:1], output_field=self.output_field)
 
 
 class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
@@ -66,7 +66,7 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
     def get_annotation(self, cls):
         from django.db.models import Exists
 
-        subquery = Exists(self.queryset)
+        subquery = Exists(self._get_inner_queryset(cls))
         if self.negated:
             subquery = ~subquery
         return subquery
@@ -142,14 +142,15 @@ class SubqueryObjectProperty(IgnoreCacheMixin, SubqueryFieldProperty):
         for field in subquery_model._meta.concrete_fields:
             if field is pk_fields[0] or (sub_field_names is not None and field.name not in sub_field_names):
                 continue
-            add_sub_property(field.attname, self._queryset)
+            add_sub_property(field.attname, self._inner_queryset)
             if field.name != field.attname:
                 self._field_aliases[field.name] = field.attname
         for property_name in self._property_names:
             remote_ref = get_queryable_property(subquery_model, property_name)._resolve(subquery_model)[0]
             add_sub_property(
                 property_name,
-                lambda: QueryablePropertiesQuerySetMixin.apply_to(self.queryset).select_properties(property_name),
+                lambda: QueryablePropertiesQuerySetMixin.apply_to(
+                    self._get_inner_queryset(model)).select_properties(property_name),
                 get_output_field(remote_ref.get_annotation()),
             )
 
@@ -211,7 +212,8 @@ class SubqueryObjectProperty(IgnoreCacheMixin, SubqueryFieldProperty):
             if field.attname in self._managed_refs and self._managed_refs[field.attname].property.name in values:
                 field_names.append(field.attname)
                 field_values.append(values[self._managed_refs[field.attname].property.name])
-        subquery_obj = self._subquery_model.from_db(self.queryset.db, field_names, field_values)
+        subquery_obj = self._subquery_model.from_db(
+            self._get_inner_queryset(self.__class__).db, field_names, field_values)
 
         # Populate any queryable properties whose values were queried for the
         # subquery object.
