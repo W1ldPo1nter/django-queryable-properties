@@ -4,7 +4,7 @@ from django import VERSION as DJANGO_VERSION
 from django.db import models
 
 from queryable_properties.managers import QueryablePropertiesManager
-from queryable_properties.properties import InheritanceModelProperty, InheritanceObjectProperty
+from queryable_properties.properties import ContentTypeProperty, InheritanceModelProperty, InheritanceObjectProperty
 
 
 class Abstract(models.Model):
@@ -22,6 +22,7 @@ class Parent(Abstract):
     parent_field = models.CharField(max_length=100, default='parent_field')
 
     subclass_obj = InheritanceObjectProperty(cached=True)
+    content_type = ContentTypeProperty()
 
     if DJANGO_VERSION < (2, 0):
         objects = QueryablePropertiesManager()
