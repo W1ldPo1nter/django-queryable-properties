@@ -213,7 +213,7 @@ class SubqueryObjectProperty(IgnoreCacheMixin, SubqueryFieldProperty):
                 field_names.append(field.attname)
                 field_values.append(values[self._managed_refs[field.attname].property.name])
         subquery_obj = self._subquery_model.from_db(
-            self._get_inner_queryset(self.__class__).db, field_names, field_values)
+            self._get_inner_queryset(obj.__class__).db, field_names, field_values)
 
         # Populate any queryable properties whose values were queried for the
         # subquery object.
