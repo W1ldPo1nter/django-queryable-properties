@@ -5,6 +5,7 @@ from functools import wraps
 import six
 from django.db.models import BooleanField
 
+from ..compat import getcallargs
 from ..exceptions import QueryablePropertyError
 from ..managers import QueryablePropertiesQuerySetMixin
 from ..utils.internal import InjectableMixin, QueryPath
@@ -308,7 +309,14 @@ class SubqueryMixin(AnnotationGetterMixin):
         :return: The base queryset that is to be utilized as the subquery.
         :rtype: django.db.models.QuerySet
         """
-        return self._inner_queryset() if callable(self._inner_queryset) else self._inner_queryset
+        if not callable(self._inner_queryset):
+            return self._inner_queryset
+
+        try:
+            getcallargs(self._inner_queryset, model)
+        except TypeError:
+            return self._inner_queryset()
+        return self._inner_queryset(model)
 
 
 class InheritanceMixin(AnnotationGetterMixin):

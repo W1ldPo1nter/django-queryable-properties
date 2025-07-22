@@ -20,6 +20,13 @@ try:  # pragma: no cover
 except ImportError:  # pragma: no cover
     from inspect import getargspec as getfullargspec
 
+try:  # pragma: no cover
+    from inspect import signature
+except ImportError:  # pragma: no cover
+    from inspect import getcallargs
+else:  # pragma: no cover
+    getcallargs = lambda func, *args, **kwargs: signature(func).bind(*args, **kwargs)
+
 from django.db.models.sql.query import Query
 
 try:  # pragma: no cover

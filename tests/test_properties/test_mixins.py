@@ -4,7 +4,7 @@ from collections import OrderedDict
 import pytest
 import six
 from django import VERSION as DJANGO_VERSION
-from django.db.models import CharField, Q
+from django.db.models import CharField, Q, QuerySet
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (
@@ -14,7 +14,7 @@ from queryable_properties.properties import (
 from queryable_properties.properties.mixins import IgnoreCacheMixin, InheritanceMixin, SubqueryMixin
 from queryable_properties.utils import get_queryable_property, QueryPath
 from queryable_properties.utils.internal import get_queryable_property_descriptor
-from ..app_management.models import ApplicationWithClassBasedProperties
+from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
 from ..inheritance.models import Child1, Child2, Grandchild1, MultipleChild, MultipleParent1, Parent, ProxyChild
 from ..marks import skip_if_no_composite_pks, skip_if_no_expressions
 
@@ -238,12 +238,17 @@ class TestSubqueryMixin(object):
         assert prop._inner_queryset is kwargs.get('queryset')
         assert prop.cached is kwargs.get('cached', QueryableProperty.cached)
 
-    @pytest.mark.parametrize('use_function', [False, True])
-    def test_get_inner_queryset(self, use_function):
+    @pytest.mark.parametrize('queryset, expected_model', [
+        (ApplicationWithClassBasedProperties.objects.all(), ApplicationWithClassBasedProperties),
+        (lambda: ApplicationWithClassBasedProperties.objects.all(), ApplicationWithClassBasedProperties),
+        (lambda model: model.objects.all(), VersionWithClassBasedProperties),
+    ])
+    def test_get_inner_queryset(self, queryset, expected_model):
         cls = SubqueryMixin.mix_with_class(QueryableProperty)
-        queryset = ApplicationWithClassBasedProperties.objects.all()
-        prop = cls((lambda: queryset) if use_function else queryset)
-        assert prop._get_inner_queryset(ApplicationWithClassBasedProperties) is queryset
+        prop = cls(queryset)
+        result = prop._get_inner_queryset(VersionWithClassBasedProperties)
+        assert isinstance(result, QuerySet)
+        assert result.model is expected_model
 
 
 class TestInheritanceMixin(object):
