@@ -4,7 +4,8 @@ from collections import OrderedDict
 import pytest
 import six
 from django import VERSION as DJANGO_VERSION
-from django.db.models import CharField, Q, QuerySet
+from django.db.models import CharField, Q
+from django.db.models.query import QuerySet
 
 from queryable_properties.exceptions import QueryablePropertyError
 from queryable_properties.properties import (
