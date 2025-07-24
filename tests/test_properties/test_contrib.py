@@ -60,15 +60,20 @@ class TestContentTypeProperty(object):
                 assert instance.content_type == content_types_by_pk[instance.pk]
 
     @pytest.mark.django_db
-    @pytest.mark.parametrize('depth, expected_model', [
-        (None, Grandchild1),
-        (2, Grandchild1),
-        (1, Child1),
-        (0, Parent),
+    @pytest.mark.parametrize('query_model, depth, expected_model', [
+        (Parent, None, Grandchild1),
+        (Parent, 2, Grandchild1),
+        (Parent, 1, Child1),
+        (Parent, 0, Parent),
+        (Child1, None, Grandchild1),
+        (Child1, 1, Grandchild1),
+        (Child1, 0, Child1),
+        (Grandchild1, None, Grandchild1),
+        (Grandchild1, 0, Grandchild1),
     ])
-    def test_depth_levels(self, monkeypatch, inheritance_instances, depth, expected_model):
+    def test_depth_levels(self, monkeypatch, inheritance_instances, query_model, depth, expected_model):
         prop = get_queryable_property(Parent, 'content_type')
         monkeypatch.setattr(prop, 'depth', depth)
 
-        instance = Parent.objects.select_properties('content_type').get(pk=inheritance_instances[Grandchild1].pk)
+        instance = query_model.objects.select_properties('content_type').get(pk=inheritance_instances[Grandchild1].pk)
         assert instance.content_type == ContentType.objects.get_for_model(expected_model)
