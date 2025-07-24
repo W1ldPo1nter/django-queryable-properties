@@ -22,7 +22,7 @@ class Parent(Abstract):
     parent_field = models.CharField(max_length=100, default='parent_field')
 
     subclass_obj = InheritanceObjectProperty(cached=True)
-    if DJANGO_VERSION >= (1, 11):
+    if DJANGO_VERSION >= (4, 0):
         content_type = ContentTypeProperty()
 
     if DJANGO_VERSION < (2, 0):

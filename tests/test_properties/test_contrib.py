@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 import pytest
 import six
+from django import VERSION as DJANGO_VERSION
 from django.contrib.contenttypes.models import ContentType
 
 from queryable_properties.properties import ContentTypeProperty, QueryableProperty
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath
-from ..marks import skip_if_no_subqueries
 from ..inheritance.models import Child1, Child2, DisconnectedGrandchild2, Grandchild1, Parent
 
 
-@skip_if_no_subqueries
+@pytest.mark.skipif(DJANGO_VERSION < (4, 0), reason="Lookup classes couldn't be used as filters before Django 4.0")
 class TestContentTypeProperty(object):
 
     @pytest.mark.parametrize('kwargs', [

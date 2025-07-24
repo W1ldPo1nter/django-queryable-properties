@@ -20,7 +20,7 @@ class ContentTypeProperty(InheritanceMixin, SubqueryObjectProperty):
         super(ContentTypeProperty, self).__init__(**kwargs)
 
     def _get_value_for_model(self, model):
-        return '.'.join((model._meta.app_label, model._meta.model_name))
+        return model._meta.label_lower
 
     def _get_condition_for_model(self, model, query_path):
         from django.db.models import OuterRef
