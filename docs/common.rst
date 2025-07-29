@@ -756,10 +756,12 @@ on the outer query.
 These ``OuterRef`` objects will always be based on the model the property is defined on - all fields of that model or
 related fields starting from that model can therefore be referenced.
 
-Instead of specifying a queryset directly, the subquery-based properties can also take a callable without any arguments
-as their first parameter, which in turn must return the queryset.
-This is useful in cases where the model class for the subquery's queryset cannot be imported on the module level or is
-defined later in the same module.
+Instead of specifying a queryset directly, the subquery-based properties can also take a callable as their ``queryset``
+parameter, which in turn must return the queryset.
+This callable may either take a single argument, which receives the model class of the outer queryset that embeds the
+subquery (useful in inheritance scenarios) or take no arguments.
+Providing a callable may help in cases where the model class for the subquery's queryset cannot be imported on the
+module level or is defined later in the same module.
 
 .. note::
    In addition to the subquery-based properties shown here, there is also the more advanced
