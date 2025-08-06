@@ -278,7 +278,7 @@ access the instance of the final class for each instance (with all subclass fiel
 Due to the use of ``select_properties``, the property will already be populated for each instance, so the entire loop
 only executes a single query.
 
-The ``InheritanceObjectProperty`` property class is based on
+The ``InheritanceObjectProperty`` property class shares large parts of its implementation with
 :ref:`common:\`\`InheritanceModelProperty\`\`: Getting information about the final model class` and therefore supports
 its ``depth`` argument in addition to all common property arguments.
 
@@ -344,3 +344,59 @@ with these properties in queryset operations:
     # Output:
     # {'name': 'Empire State Building', 'subclass_instance': 'places.Place'}
     # {'name': 'Stoned Pizza', 'subclass_instance': 'places.Restaurant'}
+
+``ContentTypeProperty``: Determining the content type of model objects
+----------------------------------------------------------------------
+
+The property class :class:`queryable_properties.properties.ContentTypeProperty` allows to determine the content type
+of the objects it's attached to.
+This includes handling model inheritance correctly and therefore reporting the actual content type of each object, even
+if it was queried using a base model.
+Due to its interaction with the ``ContentType`` model, it requires Django's
+`contenttypes framework <https://docs.djangoproject.com/en/stable/ref/contrib/contenttypes/>`_  to be installed.
+Due to the features it uses to construct its queries, this property class requires Django 4.0 or higher.
+
+Let's look at a full example based on the example inheritance models from Django's documentation:
+
+.. code-block:: python
+
+    from django.db import models
+    from queryable_properties.properties import ContentTypeProperty
+
+
+    class Place(models.Model):
+        name = models.CharField(max_length=50)
+        address = models.CharField(max_length=80)
+
+        content_type = ContentTypeProperty(cached=True)
+
+        def __str__(self):
+            return self.name
+
+
+    class Restaurant(Place):
+        serves_hot_dogs = models.BooleanField(default=False)
+        serves_pizza = models.BooleanField(default=False)
+
+
+    p = Place.objects.create(name='Empire State Building', address='New York')
+    r = Restaurant.objects.create(name='Stoned Pizza', address='New York', serves_pizza=True)
+
+    for place in Place.objects.select_properties('content_type').order_by('pk'):
+        print(repr(place))
+        print(repr(place.content_type))
+
+    # Output:
+    # <Place: Empire State Building>
+    # <ContentType: places | place>
+    # <Place: Stoned Pizza>
+    # <ContentType: places | restaurant>
+
+In addition to all common property arguments, the following parameters can be used when creating ``ContentTypeProperty``
+instances:
+
+* A ``ContentTypeProperty`` is basically just a preconfigured
+  :ref:`advanced:\`\`SubqueryObjectProperty\`\`: Getting an entire model object from a subquery` and therefore supports
+  the ``field_names`` argument.
+* Since the property class includes inheritance features, the ``depth`` argument described in
+  :ref:`common:\`\`InheritanceModelProperty\`\`: Getting information about the final model class` can also be used.
