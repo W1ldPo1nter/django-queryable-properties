@@ -4,8 +4,10 @@ Changelog
 master (unreleased)
 -------------------
 
-- Added a new ready-to-use queryable property implementation that allows to retrieve the final subclass object in
+- Added a new and advanced queryable property implementation that allows to retrieve the final subclass object in
   inheritance scenarios (``InheritanceObjectProperty``)
+- Added a new and advanced queryable property implementation that allows to determine the content type of the object
+  it's attached to (``ContentTypeProperty``)
 
 1.11.0 (2025-05-13)
 -------------------
