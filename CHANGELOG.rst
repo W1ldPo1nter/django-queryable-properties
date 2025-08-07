@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.12.0 (2025-08-07)
+-------------------
+
 - Added a new and advanced queryable property implementation that allows to retrieve the final subclass object in
   inheritance scenarios (``InheritanceObjectProperty``)
 - Added a new and advanced queryable property implementation that allows to determine the content type of the object
