@@ -288,9 +288,10 @@ autosectionlabel_prefix_document = True
 
 
 def autodoc_skip_member(app, what, name, obj, skip, options):
-    if getattr(obj, '__module__', None) == 'queryable_properties.properties.common':
+    module_parts = getattr(obj, '__module__', '').split('.')
+    if module_parts[:2] == ['queryable_properties', 'properties']:
         if name in ('get_value', 'set_value', 'get_filter', 'get_annotation', 'get_update_kwargs'):
-            return True
+            return module_parts[-1] not in ('base', 'mixins')
         if name == '__init__':
             return False
     return None
