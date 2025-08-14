@@ -14,7 +14,7 @@ Write Django model properties that can be used in database queries.
    annotations
    annotation_based
    updating
-   common
+   common/index
    advanced
    admin
    api
