@@ -11,3 +11,4 @@ while making them usable in querysets at the same time.
 
    basic
    annotation_based
+   subquery
