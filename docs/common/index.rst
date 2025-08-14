@@ -10,3 +10,4 @@ while making them usable in querysets at the same time.
    :maxdepth: 2
 
    basic
+   annotation_based
