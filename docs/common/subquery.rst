@@ -319,7 +319,7 @@ All fields that haven't been selected are treated as deferred and accessing them
    selection of all primary key values.
    If the primary key isn't populated, a ``SubqueryObjectProperty``'s getter will assume that no fields have been
    populated and perform a query to populate them all.
-   This would render the initial selection of the otherfields useless.
+   This would render the initial selection of the other fields useless.
 
 In ``.values()`` or ``.values_list()`` queries, the property behaves like a foreign key again.
 If it is requested via one of these methods, only the subquery object's primary key will be retrieved.
