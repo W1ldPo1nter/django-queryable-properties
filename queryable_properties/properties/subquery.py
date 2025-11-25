@@ -20,7 +20,8 @@ class SubqueryFieldProperty(SubqueryMixin, QueryableProperty):
         Initialize a new property that returns a field value from a subqery.
 
         :param queryset: The internal queryset to use as the subquery or a
-                         callable without arguments that generates the internal
+                         callable that takes no arguments or the outer model
+                         class as its sole argument and generates the internal
                          queryset.
         :type queryset: django.db.models.QuerySet | function
         :param str field_name: The name of the subquery field whose value
@@ -53,7 +54,8 @@ class SubqueryExistenceCheckProperty(SubqueryMixin, QueryableProperty):
         records using a custom subquery.
 
         :param queryset: The internal queryset to use as the subquery or a
-                         callable without arguments that generates the internal
+                         callable that takes no arguments or the outer model
+                         class as its sole argument and generates the internal
                          queryset.
         :type queryset: django.db.models.QuerySet | function
         :param bool negated: Whether to negate the ``EXISTS`` subquery (i.e.
@@ -92,7 +94,8 @@ class SubqueryObjectProperty(IgnoreCacheMixin, SubqueryFieldProperty):
                       reference to a model class (see foreign keys).
         :type model: type | str
         :param queryset: The internal queryset to use as the subquery or a
-                         callable without arguments that generates the internal
+                         callable that takes no arguments or the outer model
+                         class as its sole argument and generates the internal
                          queryset.
         :type queryset: django.db.models.QuerySet | function
         :param field_names: The names of the fields that should be queried for

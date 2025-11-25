@@ -4,6 +4,8 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added missing docstrings and restructured docs regarding common properies
+
 1.12.0 (2025-08-07)
 -------------------
 

@@ -153,8 +153,12 @@ class MappingProperty(AnnotationMixin, QueryableProperty):
         :param django.db.models.Field output_field: The field to represent the
                                                     mapped values in querysets.
         :param mappings: An iterable containing 2-tuples that represent the
-                         mappings to use (the first value of each tuple is
-                         mapped to the second value).
+                         mappings to use (the first value is the expected
+                         attribute value, the second value is the translated
+                         value). Needs to be able to be iterated multiple times
+                         as the whole iterable is evaluated any time the
+                         property is accessed on an object or in queries
+                         (generators can thus not be used).
         :type mappings: collections.Iterable[(object, object)]
         :param default: A default value to return/use in querysets when in case
                         none of the mappings match an encountered value.

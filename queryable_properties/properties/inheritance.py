@@ -55,6 +55,18 @@ class InheritanceObjectProperty(IgnoreCacheMixin, InheritanceMixin, QueryablePro
 
     _inheritance_output_field = CharField()
 
+    def __init__(self, **kwargs):
+        """
+        Initialize a new property that returns the final submodel instance in
+        inheritance scenarios.
+
+        :keyword depth: The maximum depth of the inheritance hierarchy to
+                        follow. Instances of model classes below this maximum
+                        depth will be treated as objects of the maximum depth.
+                        If not provided, no maximum depth will be enforced.
+        """
+        super(InheritanceObjectProperty, self).__init__(**kwargs)
+
     def _get_value_for_model(self, model):
         return '.'.join((model._meta.app_label, model._meta.object_name))
 

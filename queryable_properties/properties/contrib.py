@@ -13,6 +13,19 @@ class ContentTypeProperty(InheritanceMixin, SubqueryObjectProperty):
     _inheritance_output_field = CharField()
 
     def __init__(self, **kwargs):
+        """
+        Initialize a new property that allows to determine the content type of
+        model instances.
+
+        :keyword depth: The maximum depth of the inheritance hierarchy to
+                        follow. Instances of model classes below this maximum
+                        depth will be treated as objects of the maximum depth.
+                        If not provided, no maximum depth will be enforced.
+        :keyword field_names: The names of the fields that should be queried
+                              for content type objects. Fields not present in
+                              this sequence will be deferred. If not provided,
+                              all concrete content type fields will be queried.
+        """
         kwargs['model'] = 'contenttypes.ContentType'
         # Set the _inner_queryset attribute as well as SubqueryObjectProperty
         # will pass it on to the individual field properties.

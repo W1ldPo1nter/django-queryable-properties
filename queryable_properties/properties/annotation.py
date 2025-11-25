@@ -66,6 +66,9 @@ class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, Queryab
                                   is to be checked. May contain the lookup
                                   separator (``__``) to check for more remote
                                   relations.
+        :param bool negated: If ``True``, the property will check for the
+                             *non*-existence of the related objects instead.
+                             Defaults to ``False``.
         """
         super(RelatedExistenceCheckProperty, self).__init__(**kwargs)
         self.query_path = QueryPath(relation_path) + 'isnull'
