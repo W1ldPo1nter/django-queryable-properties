@@ -439,7 +439,7 @@ class queryable_property(QueryableProperty):
         """
         Decorator for a function or method that is used to generate an
         annotation to represent this queryable property in querysets. The
-        :class:`AnnotationMixin` will automatically applied to this property
+        :class:`AnnotationMixin` will automatically be applied to this property
         when this decorator is used.
 
         :param method: The method to decorate.
