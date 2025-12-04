@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.12.1 (2025-12-04)
+-------------------
+
 - Added support for Django 6.0
 - Added support for Python 3.14
 - Added missing docstrings and restructured docs regarding common properies

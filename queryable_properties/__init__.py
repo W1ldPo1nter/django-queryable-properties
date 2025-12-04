@@ -3,7 +3,7 @@
 
 from __future__ import unicode_literals
 
-VERSION = (1, 12, 0)
+VERSION = (1, 12, 1)
 
 __version__ = '.'.join(map(str, VERSION))
 __author__ = 'Marcus Klöpfel'
