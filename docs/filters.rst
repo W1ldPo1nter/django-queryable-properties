@@ -198,7 +198,7 @@ There are two ways to achieve this:
    must be taken when using other mixins (most notably the ``AnnotationMixin`` - see
    :ref:`annotations:The \`\`AnnotationMixin\`\` and custom filter implementations`) that override this method as well
    (the implementations override each other).
-   
+
    This is also relevant for the decorator-based approach as these mixins are automatically added to such properties
    when they use annotations or lookup-based filters.
    The order of the mixins for the class-based approach or the used decorators for the decorator-based approach is
@@ -234,7 +234,7 @@ is used in the ``filter`` decorator instead of ``lookups``):
 
         @is_first_stable_version.filter(boolean=True)
         @classmethod
-        def version_str(cls):  # Only ever called with the 'exact' lookup.
+        def is_first_stable_version(cls):  # Only ever called with the 'exact' lookup.
             return Q(major=1, minor=0)
 
 .. note::
