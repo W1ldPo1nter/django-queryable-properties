@@ -8,15 +8,78 @@ from functools import partial
 
 import six
 
+from .. import settings
 from ..compat import LOOKUP_SEP, pretty_name
 from ..exceptions import QueryablePropertyError
 from ..query import QUERYING_PROPERTIES_MARKER
-from ..utils import get_queryable_property, reset_queryable_property
+from ..utils import get_queryable_property, prefetch_queryable_properties, reset_queryable_property
 from ..utils.internal import NodeModifier, QueryPath, get_queryable_property_descriptor, parametrizable_decorator_method
 from .cache_behavior import CLEAR_CACHE
 from .mixins import AnnotationGetterMixin, AnnotationMixin, LookupFilterMixin
 
 RESET_METHOD_NAME = 'reset_property'
+
+
+class QueryablePropertyFetcher(object):
+    """
+    Fetcher for queryable properties for compatibility with Django's fetch
+    modes.
+
+    Acts as both the fetcher itself and a default fetch mode in Django versions
+    without fetch modes.
+    """
+
+    def __init__(self, descriptor, instance):
+        """
+        Initialize a new queryable property fetcher.
+
+        :param QueryablePropertyDescriptor descriptor: The descriptor of the
+                                                       queryable property.
+        :param django.db.models.Model instance: The model instance triggering
+                                                the fetch.
+        """
+        self.descriptor = descriptor
+        self.field = descriptor.prop  # An attribute named field is expected by Django's fetch modes.
+        self.instance = instance
+        self.value = None
+
+    def fetch(self, *args, **kwargs):
+        """
+        Invoke the default fetch behavior.
+
+        Only called in Django versions without fetch modes.
+
+        :param args: Any positional arguments (for compatibility).
+        :param kwargs: Any keyword arguments (for compatibility).
+        """
+        self.fetch_one(self.instance)
+
+    def fetch_one(self, instance):
+        """
+        Fetch the value of the represented queryable property for a single
+        model instance.
+
+        :param django.db.models.Model instance: The model instance.
+        """
+        if not self.field.get_value:
+            raise AttributeError('Unreadable queryable property.')
+        self.value = self.field.get_value(instance)
+        if self.field.cached:
+            self.descriptor.set_cached_value(instance, self.value)
+
+    def fetch_many(self, instances):
+        """
+        Fetch the value of the represented queryable property for multiple
+        model instances at once.
+
+        :param instances: The model instances.
+        :type instances: collections.Sequence[django.db.models.Model]
+        """
+        if not self.field.get_annotation:
+            raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
+                                         'implement annotation creation.'.format(self.field))
+        prefetch_queryable_properties(instances, self.field.name)
+        self.value = self.descriptor.get_cached_value(self.instance)
 
 
 @six.python_2_unicode_compatible
@@ -53,12 +116,11 @@ class QueryablePropertyDescriptor(property):
         # through annotation selections.
         if not self._ignore_cached_value and self.has_cached_value(obj):
             return self.get_cached_value(obj)
-        if not self.prop.get_value:
-            raise AttributeError('Unreadable queryable property.')
-        value = self.prop.get_value(obj)
-        if self.prop.cached:
-            self.set_cached_value(obj, value)
-        return value
+        fetcher = fetch_mode = QueryablePropertyFetcher(self, obj)
+        if settings.APPLY_FETCH_MODE and self.prop.get_annotation:
+            fetch_mode = getattr(obj._state, 'fetch_mode', fetch_mode)
+        fetch_mode.fetch(fetcher, obj)
+        return fetcher.value
 
     def __set__(self, obj, value):
         # Values set while initializing new objects from DB values should
