@@ -8,8 +8,8 @@ from functools import partial
 
 import six
 
-from .. import settings
 from ..compat import LOOKUP_SEP, pretty_name
+from ..conf import settings
 from ..exceptions import QueryablePropertyError
 from ..query import QUERYING_PROPERTIES_MARKER
 from ..utils import get_queryable_property, prefetch_queryable_properties, reset_queryable_property
