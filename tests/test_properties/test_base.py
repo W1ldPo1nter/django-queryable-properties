@@ -3,6 +3,7 @@ import pytest
 import six
 from django import VERSION as DJANGO_VERSION
 from django.db.models import Count, F, Model, Q
+from django.test.utils import override_settings
 
 from queryable_properties.compat import nullcontext as does_not_raise
 from queryable_properties.exceptions import QueryablePropertyError
@@ -18,6 +19,7 @@ from ..app_management.models import (
     ApplicationWithClassBasedProperties, Category, DummyProperty, VersionWithClassBasedProperties,
     VersionWithDecoratorBasedProperties,
 )
+from ..marks import skip_if_no_fetch_modes
 
 
 def function_with_docstring():
@@ -70,6 +72,50 @@ class TestQueryablePropertyDescriptor(object):
         monkeypatch.setattr(dummy_property, 'get_value', None)
         with pytest.raises(AttributeError):
             getattr(model_instance, dummy_property.name)
+
+    @skip_if_no_fetch_modes
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('versions')
+    @pytest.mark.parametrize('property_name, setting_enabled', [
+        ('major_minor', False),  # Setting disabled and no annotator
+        ('major_minor', True),  # Setting enabled, but no annotator
+        ('version', False),  # Setting disabled with annotator
+    ])
+    def test_default_fetch_mode(self, property_name, setting_enabled):
+        from django.db.models import RAISE
+
+        versions = VersionWithClassBasedProperties.objects.fetch_mode(RAISE)
+        with override_settings(QUERYABLE_PROPERTIES_APPLY_FETCH_MODE=setting_enabled):
+            getattr(versions[0], property_name)  # Would raise an exception if the mode above was applied.
+
+    @skip_if_no_fetch_modes
+    @pytest.mark.django_db
+    def test_get_fetch_peers(self, django_assert_num_queries, versions):
+        from django.db.models import FETCH_PEERS
+
+        versions[0].delete()
+        descriptor = ApplicationWithClassBasedProperties.version_count
+        with django_assert_num_queries(2):
+            applications = list(ApplicationWithClassBasedProperties.objects.fetch_mode(FETCH_PEERS).order_by('pk'))
+            with override_settings(QUERYABLE_PROPERTIES_APPLY_FETCH_MODE=True):
+                assert applications[0].version_count == 3
+            for application in applications:
+                assert descriptor.has_cached_value(application)
+            assert applications[1].version_count == 4
+
+    @skip_if_no_fetch_modes
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures('applications')
+    def test_get_fetch_blocked(self, django_assert_num_queries):
+        from django.core.exceptions import FieldFetchBlocked
+        from django.db.models import RAISE
+
+        with django_assert_num_queries(1):
+            applications = list(ApplicationWithClassBasedProperties.objects.fetch_mode(RAISE))
+            with override_settings(QUERYABLE_PROPERTIES_APPLY_FETCH_MODE=True):
+                for application in applications:
+                    with pytest.raises(FieldFetchBlocked):
+                        application.version_count
 
     @pytest.mark.parametrize('cached, setter_cache_behavior, values, expected_values', [
         # The setter cache behavior should not make a difference if a property

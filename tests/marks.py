@@ -29,3 +29,7 @@ skip_if_no_composite_pks = pytest.mark.skipif(
     DJANGO_VERSION < (5, 2),
     reason="Composite PKs didn't exist before Django 5.2",
 )
+skip_if_no_fetch_modes = pytest.mark.skipif(
+    DJANGO_VERSION < (6, 1),
+    reason="Fetch modes didn't exist before Django 6.1",
+)
