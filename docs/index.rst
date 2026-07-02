@@ -16,6 +16,7 @@ Write Django model properties that can be used in database queries.
    updating
    common/index
    admin
+   settings
    api
    changelog
 

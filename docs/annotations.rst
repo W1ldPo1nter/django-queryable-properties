@@ -405,14 +405,55 @@ This solves the problems mentioned above:
 Querying properties for already loaded model instances
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Queryable property values may also be queried for model instances that were previously queried from the database.
-The utility function :func:`queryable_properties.utils.prefetch_queryable_properties` can be used for this purpose,
-which is akin to Django's |prefetch-related-objects|_ function, which serves a similar purpose for related objects.
+Queryable property values may also be queried in bulk for model instances that were previously queried from the
+database.
+This can be done in two ways:
+
+- In Django 6.1+, queryable properties can be globally configured to apply Django's fetch modes.
+- Using a utility function provided by *django-queryable-properties* specifically for this purpose.
+
+Applying fetch modes to queryable properties
+""""""""""""""""""""""""""""""""""""""""""""
+
+In Django versions that support fetch modes, calls of the ``fetch_mode`` queryset method can be configured to also
+affect annotatable queryable properties on the model instances being queried the same way they would affect relation
+fields or deferred fields.
+To enable this behavior, the value of the ``QUERYABLE_PROPERTIES_APPLY_FETCH_MODE`` setting must be ``True`` (see
+:ref:`settings:Settings`).
+
+This is particularly useful in conjunction with the ``FETCH_PEERS`` fetch mode, which will fetch the value of an
+annotatable queryable properties for all objects in the queryset in a single query when the property is first accessed
+on any object in the queryset.
+As a result, the following example based on the ``version_str`` property from the examples above will only execute two
+queries regardless of the number of ``ApplicationVersion`` instances - one to load the instances themselves and one to
+load the ``version_str`` for all of the instances at once:
+
+.. code-block:: python
+
+    # Requires QUERYABLE_PROPERTIES_APPLY_FETCH_MODE = True
+
+    from django.db.models import FETCH_PEERS
+
+    for version in ApplicationVersion.objects.fetch_mode(FETCH_PEERS):
+        print(version.version_str)  # Loads all version_str values during the first iteration
+
+Notes:
+
+- Enabling ``QUERYABLE_PROPERTIES_APPLY_FETCH_MODE`` is compatible with all fetch modes defined by Django.
+- When used with the ``FETCH_PEERS`` fetch mode, the fetched properties always behave like cached properties as is the
+  case for ``select_properties``.
+
+Using the utility function
+""""""""""""""""""""""""""
+
+The utility function :func:`queryable_properties.utils.prefetch_queryable_properties`, which is akin to Django's
+|prefetch-related-objects|_ function, may be used to fetch queryable property values for model instances regardless
+of how they were constructed.
 This function can be used to load the values of one or multiple annotatable queryable properties for a sequence of
 model instances at once, which is especially useful to improve performance for queryable properties whose getter would
 otherwise execute a query.
 
-:func:`queryable_properties.utils.prefetch_queryable_properties` takes the sequence of model instances as well as any
+``queryable_properties.utils.prefetch_queryable_properties`` takes the sequence of model instances as well as any
 number of query paths to the queryable properties to load the values for.
 For the ``version_str`` property from the examples above, this could be achieved like this:
 
