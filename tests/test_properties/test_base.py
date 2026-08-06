@@ -82,9 +82,9 @@ class TestQueryablePropertyDescriptor(object):
         ('version', False),  # Setting disabled with annotator
     ])
     def test_default_fetch_mode(self, property_name, setting_enabled):
-        from django.db.models import RAISE
+        from django.db.models import FETCH_RAISE
 
-        versions = VersionWithClassBasedProperties.objects.fetch_mode(RAISE)
+        versions = VersionWithClassBasedProperties.objects.fetch_mode(FETCH_RAISE)
         with override_settings(QUERYABLE_PROPERTIES_APPLY_FETCH_MODE=setting_enabled):
             getattr(versions[0], property_name)  # Would raise an exception if the mode above was applied.
 
@@ -108,10 +108,10 @@ class TestQueryablePropertyDescriptor(object):
     @pytest.mark.usefixtures('applications')
     def test_get_fetch_blocked(self, django_assert_num_queries):
         from django.core.exceptions import FieldFetchBlocked
-        from django.db.models import RAISE
+        from django.db.models import FETCH_RAISE
 
         with django_assert_num_queries(1):
-            applications = list(ApplicationWithClassBasedProperties.objects.fetch_mode(RAISE))
+            applications = list(ApplicationWithClassBasedProperties.objects.fetch_mode(FETCH_RAISE))
             with override_settings(QUERYABLE_PROPERTIES_APPLY_FETCH_MODE=True):
                 for application in applications:
                     with pytest.raises(FieldFetchBlocked):
