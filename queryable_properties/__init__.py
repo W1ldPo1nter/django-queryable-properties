@@ -3,11 +3,11 @@
 
 from __future__ import unicode_literals
 
-VERSION = (1, 12, 1)
+VERSION = (1, 13, 0)
 
 __version__ = '.'.join(map(str, VERSION))
 __author__ = 'Marcus Klöpfel'
-__copyright__ = 'Copyright 2025, Marcus Klöpfel'
+__copyright__ = 'Copyright 2026, Marcus Klöpfel'
 __license__ = 'BSD'
 __maintainer__ = 'Marcus Klöpfel'
 __email__ = 'marcus.kloepfel@gmail.com'

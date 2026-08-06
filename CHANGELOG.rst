@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.13.0 (2026-08-06)
+-------------------
+
 - Added support for Django 6.1
 - Added a Django setting that allows to apply queryset fetch modes to annotatable queryable properties
   (``QUERYABLE_PROPERTIES_APPLY_FETCH_MODE``)
