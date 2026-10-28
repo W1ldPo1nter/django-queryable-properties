@@ -6,6 +6,8 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db.models import CharField
 
+from .mock import Mock
+
 try:
     from django.db.models import Value
 except ImportError:
@@ -23,7 +25,6 @@ from .dummy_lib.models import ReleaseTypeModel
 from .inheritance.models import (
     Child1, Child2, DisconnectedGrandchild2, Grandchild1, MultipleChild, MultipleParent1, MultipleParent2, Parent,
 )
-from .mock import Mock
 
 collect_ignore = []
 if DJANGO_VERSION < (4, 1):

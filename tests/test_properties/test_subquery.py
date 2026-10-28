@@ -4,6 +4,8 @@ import six
 from django.core.exceptions import FieldError
 from django.db import models
 
+from ..mock import Mock
+
 try:
     from django.db.models.functions import Substr
 except ImportError:
@@ -20,7 +22,6 @@ from ..app_management.models import (
     VersionWithClassBasedProperties,
 )
 from ..marks import skip_if_no_composite_pks, skip_if_no_subqueries
-from ..mock import Mock
 
 pytestmark = [skip_if_no_subqueries]
 
