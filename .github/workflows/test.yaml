@@ -27,12 +27,6 @@ jobs:
         run: |
           echo "PYTHON=$(echo '${{ matrix.python_version }}')" >> $GITHUB_ENV
           echo "TOXFACTOR=$(echo '${{ matrix.python_version }}' | sed -r 's/^([0-9]+)\.([0-9]+)$/py\1\2/g')" >> $GITHUB_ENV
-      - name: Install distutils via setuptools for new Python versions
-        run: pip install -U setuptools
-        if: >-
-          matrix.python_version == '3.12' ||
-          matrix.python_version == '3.13' ||
-          matrix.python_version == '3.14'
       - name: Install importlib-metadata for older Python versions
         run: pip install "importlib-metadata<3"
         if: >-
@@ -42,6 +36,12 @@ jobs:
           matrix.python_version == '3.7'
       - name: Install test utilities
         run: pip install "tox<4" tox-factor "coverage<5"
+      - name: Install distutils via setuptools and upgrade coverage on new Python versions
+        run: pip install -U setuptools coverage==7.17
+        if: >-
+          matrix.python_version == '3.12' ||
+          matrix.python_version == '3.13' ||
+          matrix.python_version == '3.14'
       - name: Lint with flake8
         run: tox -e flake8
         if: matrix.python_version == '3.14'
