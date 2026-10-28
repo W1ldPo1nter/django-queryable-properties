@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import pytest
-from mock import Mock, patch
 
 from queryable_properties.managers import QueryablePropertiesQuerySet
 from queryable_properties.properties.operations import QuerySetOperation, SelectRelatedOperation
-from tests.inheritance.models import Parent
+from ..inheritance.models import Parent
+from ..mock import Mock, patch
 
 
 class TestQuerySetOperation(object):

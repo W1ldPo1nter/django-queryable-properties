@@ -6,7 +6,6 @@ from django.contrib.admin import site
 from django.contrib.admin.filters import ChoicesFieldListFilter, FieldListFilter
 from django.contrib.admin.options import ModelAdmin
 from django.db.models.query import QuerySet
-from mock import Mock, patch
 
 from queryable_properties.admin import QueryablePropertiesChangeListMixin
 from queryable_properties.compat import nullcontext
@@ -15,6 +14,7 @@ from queryable_properties.utils import get_queryable_property
 from ..app_management.admin import ApplicationAdmin, VersionAdmin, VersionInline
 from ..app_management.models import ApplicationWithClassBasedProperties, VersionWithClassBasedProperties
 from ..marks import skip_if_no_expressions
+from ..mock import Mock, patch
 from .test_checks import DummyListFilter
 
 

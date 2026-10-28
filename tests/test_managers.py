@@ -2,7 +2,6 @@
 
 import pytest
 from django import VERSION as DJANGO_VERSION
-from mock import Mock, patch
 from six.moves import cPickle
 
 from queryable_properties.compat import ModelIterable, ValuesQuerySet
@@ -18,6 +17,7 @@ from .app_management.models import (
     ApplicationTag, ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties,
     VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties,
 )
+from .mock import Mock, patch
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
