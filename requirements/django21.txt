@@ -1,0 +1,9 @@
+attrs<19.2
+coverage==4.5.4
+Django>=2.1,<2.2
+more-itertools<8.11
+pytest==4.0.2
+pytest-cov==2.8.1
+pytest-django==3.10.0
+pytest-pythonpath==0.7.3
+six>=1.9

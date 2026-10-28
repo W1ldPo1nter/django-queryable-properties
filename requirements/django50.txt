@@ -1,0 +1,8 @@
+coverage==4.5.4
+Django>=5.0,<5.1
+pytest==6.2.5
+pytest-asyncio==1.4.1
+pytest-cov==2.8.1
+pytest-django==3.10.0
+pytest-pythonpath==0.7.3
+six>=1.9
