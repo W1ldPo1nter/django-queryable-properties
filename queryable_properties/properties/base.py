@@ -75,9 +75,6 @@ class QueryablePropertyFetcher(object):
         :param instances: The model instances.
         :type instances: collections.Sequence[django.db.models.Model]
         """
-        if not self.field.get_annotation:
-            raise QueryablePropertyError('Queryable property "{}" needs to be added as annotation but does not '
-                                         'implement annotation creation.'.format(self.field))
         prefetch_queryable_properties(instances, self.field.name)
         self.value = self.descriptor.get_cached_value(self.instance)
 
