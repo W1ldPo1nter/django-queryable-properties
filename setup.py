@@ -5,8 +5,6 @@ from __future__ import unicode_literals
 
 import io
 import os
-import subprocess
-from distutils.cmd import Command
 
 from setuptools import find_packages, setup
 
@@ -20,44 +18,6 @@ def read_file(*path_parts, **kwargs):
 
 META = {}
 exec(read_file('queryable_properties', '__init__.py', mode='rb'), {}, META)
-
-
-class PytestCommand(Command):
-    """
-    Distutils command to run tests via pytest in the current environment.
-    """
-    description = 'Run tests in the current environment using pytest.'
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        import py
-        return py.test.cmdline.main([])
-
-
-class ToxCommand(Command):
-    """
-    Distutils command to run tests via tox, which must be installed and be able
-    to access all supported python versions.
-    """
-    description = ('Run tests using tox, which must already be installed and be able to access all supported python '
-                   'versions to create its environments.')
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        return subprocess.call(['tox'])
-
 
 setup(
     name='django-queryable-properties',
@@ -120,19 +80,4 @@ setup(
         'Django>=1.4',
         'six>=1.9',
     ],
-    tests_require=[
-        'Django>=1.4',
-        'six>=1.9',
-        'coverage',
-        'flake8',
-        'mock',
-        'pytest',
-        'pytest-cov',
-        'pytest-django',
-        'pytest-pythonpath',
-    ],
-    cmdclass={
-        'test': PytestCommand,
-        'tox': ToxCommand,
-    },
 )
