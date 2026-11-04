@@ -4,6 +4,8 @@ Changelog
 master (unreleased)
 -------------------
 
+- Added support for Python 3.15
+
 1.13.0 (2026-08-06)
 -------------------
 

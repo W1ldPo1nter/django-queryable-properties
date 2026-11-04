@@ -19,6 +19,7 @@ jobs:
           - '3.12'
           - '3.13'
           - '3.14'
+          - '3.15'
     container:
       image: python:${{ matrix.python_version }}
     steps:
@@ -41,10 +42,11 @@ jobs:
         if: >-
           matrix.python_version == '3.12' ||
           matrix.python_version == '3.13' ||
-          matrix.python_version == '3.14'
+          matrix.python_version == '3.14' ||
+          matrix.python_version == '3.15'
       - name: Lint with flake8
         run: tox -e flake8
-        if: matrix.python_version == '3.14'
+        if: matrix.python_version == '3.15'
       - name: Test via tox
         run: tox -- -p no:warnings
       - name: Generate coverage report
