@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import pytest
+import six
 from django.db.models import Avg, Q
 
 from queryable_properties.properties import AggregateProperty, AnnotationProperty, RelatedExistenceCheckProperty
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import QueryPath
 from ..app_management.models import ApplicationWithClassBasedProperties, CategoryWithClassBasedProperties
-from ..marks import skip_if_no_expressions
+from ..marks import skip_if_no_expressions, skip_if_no_subqueries
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
@@ -29,9 +30,7 @@ class TestAnnotationProperty(object):
         assert categories[1].version_count == 4
 
     def test_annotation(self, categories):
-        assert list(CategoryWithClassBasedProperties.objects.order_by('-version_count')) == [
-            categories[0], categories[1]
-        ]
+        assert list(CategoryWithClassBasedProperties.objects.order_by('-version_count')) == categories[:2]
 
 
 class TestAggregateProperty(object):
@@ -41,16 +40,34 @@ class TestAggregateProperty(object):
         (False, False),
         (True, True),
     ])
-    def test_initializer(self, cached, expected_cached):
+    @pytest.mark.parametrize('use_subquery, expected_use_subquery', [
+        (None, False),
+        (False, False),
+        (True, True),
+    ])
+    def test_initializer(self, cached, expected_cached, use_subquery, expected_use_subquery):
         annotation = Avg('test')
-        prop = AggregateProperty(annotation, cached=cached)
+        prop = AggregateProperty(annotation, cached=cached, use_subquery=use_subquery)
         assert prop.annotation is annotation
         assert prop.cached is expected_cached
+        assert prop.use_subquery is expected_use_subquery
 
     def test_getter(self, applications, versions):
         assert applications[0].major_sum == 5
         versions[0].delete()
         assert applications[0].major_sum == 4
+
+    def test_annotation_without_subquery(self, applications, versions):
+        versions[0].delete()
+        assert list(ApplicationWithClassBasedProperties.objects.order_by('major_sum')) == applications[:2]
+
+    @skip_if_no_subqueries
+    def test_annotation_with_subquery(self, applications, versions):
+        versions[0].delete()
+        queryset = ApplicationWithClassBasedProperties.objects.filter(version_count_subquery=3)
+        sql = six.text_type(queryset.query)
+        assert 'WHERE (SELECT COUNT' in sql
+        assert queryset.get() == applications[0]
 
 
 class TestRelatedExistenceCheckProperty(object):

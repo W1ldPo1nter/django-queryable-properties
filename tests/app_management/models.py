@@ -193,6 +193,7 @@ class ApplicationWithClassBasedProperties(Application):
                                                             .order_by('-major', '-minor', '-patch')),
             property_names=('version',),
         )
+        version_count_subquery = AggregateProperty(models.Count('versions'), use_subquery=True)
     version_count = VersionCountProperty()
     stable_version_count = AggregateProperty(models.Count('versions', filter=models.Q(versions__release_type='s')))
     major_sum = AggregateProperty(models.Sum('versions__major'))

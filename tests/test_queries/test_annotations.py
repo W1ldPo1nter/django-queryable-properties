@@ -4,6 +4,7 @@ import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db import connection, models
 
+from queryable_properties.compat import LOOKUP_SEP
 from queryable_properties.query import QUERYING_PROPERTIES_MARKER
 from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
@@ -11,19 +12,15 @@ from ..app_management.models import (
     VersionWithDecoratorBasedProperties,
 )
 from ..conftest import Concat, Value
-from ..marks import skip_if_no_alias, skip_if_no_expressions
+from ..marks import skip_if_no_alias, skip_if_no_expressions, skip_if_no_subqueries
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 
 class TestAggregateAnnotations(object):
 
-    @pytest.mark.parametrize('model, filters', [
-        (ApplicationWithClassBasedProperties, {}),
-        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}),
-        (ApplicationWithDecoratorBasedProperties, {}),
-        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}),
-    ])
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('filters', [{}, {'version_count__gt': 3}])
     def test_cached_annotation_value(self, model, filters):
         # Filter both before and after the select_properties call to check if
         # the annotation gets selected correctly regardless
@@ -37,34 +34,38 @@ class TestAggregateAnnotations(object):
             assert application.major_sum == 5
             assert not hasattr(application, QUERYING_PROPERTIES_MARKER)
 
-    @pytest.mark.parametrize('model, limit, expected_total', [
-        (ApplicationWithClassBasedProperties, None, 8),
-        (ApplicationWithClassBasedProperties, 1, 4),
-        (ApplicationWithDecoratorBasedProperties, None, 8),
-        (ApplicationWithDecoratorBasedProperties, 1, 4),
+    @pytest.mark.parametrize('model, property_name, limit, expected_total', [
+        (ApplicationWithClassBasedProperties, 'version_count', None, 8),
+        (ApplicationWithClassBasedProperties, 'version_count', 1, 4),
+        (ApplicationWithDecoratorBasedProperties, 'version_count', None, 8),
+        (ApplicationWithDecoratorBasedProperties, 'version_count', 1, 4),
+        pytest.param(ApplicationWithClassBasedProperties, 'version_count_subquery', None, 8,
+                     marks=skip_if_no_subqueries),
+        pytest.param(ApplicationWithClassBasedProperties, 'version_count_subquery', 1, 4, marks=skip_if_no_subqueries),
     ])
-    def test_aggregate_based_on_queryable_property(self, model, limit, expected_total):
-        result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum('version_count'))
+    def test_aggregate_based_on_queryable_property(self, model, property_name, limit, expected_total):
+        result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum(property_name))
         assert result['total_version_count'] == expected_total
 
-    @pytest.mark.parametrize('model, limit, expected_total', [
-        (VersionWithClassBasedProperties, None, 32),
-        (VersionWithClassBasedProperties, 4, 16),
-        (VersionWithDecoratorBasedProperties, None, 32),
-        (VersionWithDecoratorBasedProperties, 4, 16),
+    @pytest.mark.parametrize('model, property_path, limit, expected_total', [
+        (VersionWithClassBasedProperties, 'application__version_count', None, 32),
+        (VersionWithClassBasedProperties, 'application__version_count', 4, 16),
+        (VersionWithDecoratorBasedProperties, 'application__version_count', None, 32),
+        (VersionWithDecoratorBasedProperties, 'application__version_count', 4, 16),
+        pytest.param(VersionWithClassBasedProperties, 'application__version_count_subquery', None, 32,
+                     marks=skip_if_no_subqueries),
+        pytest.param(VersionWithClassBasedProperties, 'application__version_count_subquery', 4, 16,
+                     marks=skip_if_no_subqueries),
     ])
-    def test_aggregate_based_on_queryable_property_across_relation(self, model, limit, expected_total):
-        result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum('application__version_count'))
+    def test_aggregate_based_on_queryable_property_across_relation(self, model, property_path, limit, expected_total):
+        result = model.objects.all()[:limit].aggregate(total_version_count=models.Sum(property_path))
         assert result['total_version_count'] == expected_total
 
     @skip_if_no_expressions
-    @pytest.mark.parametrize('model, annotation', [
-        (VersionWithClassBasedProperties, models.F('application__version_count')),
-        (VersionWithDecoratorBasedProperties, models.F('application__version_count')),
-    ])
-    def test_annotation_based_on_queryable_property_across_relation(self, model, annotation):
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    def test_annotation_based_on_queryable_property_across_relation(self, model):
         model.objects.all()[0].delete()
-        queryset = model.objects.annotate(annotation=annotation)
+        queryset = model.objects.annotate(annotation=models.F('application__version_count'))
         assert all(obj.annotation == obj.application.version_count for obj in queryset)
 
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
@@ -76,12 +77,8 @@ class TestAggregateAnnotations(object):
         assert queryset._result_cache is None
 
     @skip_if_no_alias
-    @pytest.mark.parametrize('model, with_selection', [
-        (ApplicationWithClassBasedProperties, False),
-        (ApplicationWithClassBasedProperties, True),
-        (ApplicationWithDecoratorBasedProperties, False),
-        (ApplicationWithDecoratorBasedProperties, True),
-    ])
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('with_selection', [False, True])
     def test_alias(self, model, with_selection):
         queryset = model.objects.alias(alias=models.F('version_count') + 1)
         if with_selection:
@@ -107,27 +104,21 @@ class TestAggregateAnnotations(object):
     @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
     def test_raw_query(self, model):
         pks, names = zip(*model.objects.values_list('pk', 'name'))
-        queryset = model.objects.raw('SELECT id, name, 5 AS version_count FROM {}'.format(model._meta.db_table))
-        counter = 0
-        for application in queryset:
+        apps = list(model.objects.raw('SELECT id, name, 5 AS version_count FROM {}'.format(model._meta.db_table)))
+        assert len(apps) == 2
+        for application in apps:
             assert model.version_count.has_cached_value(application) is True
             assert application.version_count == 5
             assert application.pk in pks
             assert application.name in names
             assert not hasattr(application, QUERYING_PROPERTIES_MARKER)
-            counter += 1
-        assert counter == 2
 
 
 @skip_if_no_expressions
 class TestExpressionAnnotations(object):
 
-    @pytest.mark.parametrize('model, filters', [
-        (VersionWithClassBasedProperties, {}),
-        (VersionWithDecoratorBasedProperties, {}),
-        (VersionWithClassBasedProperties, {'version': '1.2.3'}),
-        (VersionWithDecoratorBasedProperties, {'version': '1.2.3'}),
-    ])
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('filters', [{}, {'version': '1.2.3'}])
     def test_cached_annotation_value(self, model, filters):
         # Filter both before and after the select_properties call to check if
         # the annotation gets selected correctly regardless
@@ -158,7 +149,7 @@ class TestExpressionAnnotations(object):
         queryset = model.objects.annotate(annotation=annotation)
         assert queryset.count() == len(queryset) == expected_count
         assert all(record_checker(obj) for obj in queryset)
-        if '__' not in property_name:
+        if LOOKUP_SEP not in property_name:
             # Check that a property annotation used implicitly by another
             # annotation does not lead to a selection of the property
             # annotation
@@ -166,12 +157,8 @@ class TestExpressionAnnotations(object):
             assert all(not descriptor.has_cached_value(obj) for obj in queryset)
 
     @skip_if_no_alias
-    @pytest.mark.parametrize('model, with_selection', [
-        (VersionWithClassBasedProperties, False),
-        (VersionWithClassBasedProperties, True),
-        (VersionWithDecoratorBasedProperties, False),
-        (VersionWithDecoratorBasedProperties, True),
-    ])
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('with_selection', [False, True])
     def test_alias(self, model, with_selection):
         queryset = model.objects.alias(alias=Concat(Value('V'), 'version'))
         if with_selection:

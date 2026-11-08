@@ -5,6 +5,7 @@ import six
 from django import VERSION as DJANGO_VERSION
 from django.db import models
 
+from queryable_properties.compat import LOOKUP_SEP
 from queryable_properties.utils import get_queryable_property
 from queryable_properties.utils.internal import get_queryable_property_descriptor
 from ..app_management.models import (
@@ -18,27 +19,20 @@ pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 class TestFilterWithoutAnnotations(object):
 
-    @pytest.mark.parametrize('model, filters, expected_count, expected_major_minor', [
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('filters, expected_count, expected_major_minor', [
         # Test that filter that don't involve queryable properties still work
-        (VersionWithClassBasedProperties, models.Q(major=2, minor=0), 2, '2.0'),
-        (VersionWithDecoratorBasedProperties, models.Q(major=2, minor=0), 2, '2.0'),
-        (VersionWithClassBasedProperties, models.Q(minor=2) | models.Q(patch=3), 2, '1.2'),
-        (VersionWithDecoratorBasedProperties, models.Q(minor=2) | models.Q(patch=3), 2, '1.2'),
+        (models.Q(major=2, minor=0), 2, '2.0'),
+        (models.Q(minor=2) | models.Q(patch=3), 2, '1.2'),
         # All querysets are expected to return objects with the same
         # major_minor value (major_minor parameter).
-        (VersionWithClassBasedProperties, models.Q(major_minor='1.2'), 2, '1.2'),
-        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.2'), 2, '1.2'),
+        (models.Q(major_minor='1.2'), 2, '1.2'),
         # Also test that using non-property filters still work and can be used
         # together with filters for queryable properties
-        (VersionWithClassBasedProperties, models.Q(major_minor='1.3') & models.Q(major=1), 4, '1.3'),
-        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.3') & models.Q(major=1), 4, '1.3'),
-        (VersionWithClassBasedProperties, models.Q(major_minor='1.3') | models.Q(patch=1), 4, '1.3'),
-        (VersionWithDecoratorBasedProperties, models.Q(major_minor='1.3') | models.Q(patch=1), 4, '1.3'),
+        (models.Q(major_minor='1.3') & models.Q(major=1), 4, '1.3'),
+        (models.Q(major_minor='1.3') | models.Q(patch=1), 4, '1.3'),
         # Also test nested filters
-        (VersionWithClassBasedProperties, (models.Q(major_minor='2.0') | models.Q(patch=0)) & models.Q(minor=0),
-         2, '2.0'),
-        (VersionWithDecoratorBasedProperties, (models.Q(major_minor='2.0') | models.Q(patch=0)) & models.Q(minor=0),
-         2, '2.0'),
+        ((models.Q(major_minor='2.0') | models.Q(patch=0)) & models.Q(minor=0), 2, '2.0'),
     ])
     def test_simple_filter(self, model, filters, expected_count, expected_major_minor):
         queryset = model.objects.filter(filters)
@@ -100,11 +94,10 @@ class TestFilterWithoutAnnotations(object):
             assert version.application.name == 'My cool App'
 
     @skip_if_no_expressions
-    @pytest.mark.parametrize('model, property_name, condition', [
-        (VersionWithClassBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
-        (VersionWithDecoratorBasedProperties, 'major_minor', models.Q(major_minor='1.3')),
-        (VersionWithClassBasedProperties, 'version', models.Q(version='1.3.0') | models.Q(version='1.3.1')),
-        (VersionWithDecoratorBasedProperties, 'version', models.Q(version='1.3.0') | models.Q(version='1.3.1')),
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('property_name, condition', [
+        ('major_minor', models.Q(major_minor='1.3')),
+        ('version', models.Q(version='1.3.0') | models.Q(version='1.3.1')),
     ])
     def test_filter_in_case_expression(self, model, property_name, condition):
         queryset = model.objects.annotate(is_13=models.Case(
@@ -159,7 +152,7 @@ class TestFilterWithAggregateAnnotation(object):
         (ApplicationWithDecoratorBasedProperties, 'version_count', models.Q(version_count__gt=3, major_sum__gt=5), 0),
         (ApplicationWithDecoratorBasedProperties, 'version_count',
          models.Q(version_count__gt=3) | models.Q(major_sum__gt=5), 2),
-        # Filters across relations
+        # Regular filters across relations
         # A query containing an aggregate across a relation is still only
         # grouped by fields of the query's model, so in this case the version
         # count is the total number of application versions per category.
@@ -177,12 +170,25 @@ class TestFilterWithAggregateAnnotation(object):
          models.Q(applications__version_count=8, name__contains='Windows'), 0),
         (CategoryWithDecoratorBasedProperties, 'applications__version_count',
          models.Q(applications__version_count=8, name__contains='Windows'), 0),
+        # Subquery-based filters across relations
+        # Since the grouping happens in a subquery, the version count doesn't
+        # suffer from the problem described above.
+        pytest.param(CategoryWithClassBasedProperties, 'applications__version_count_subquery',
+                     models.Q(applications__version_count_subquery=4), 3, marks=skip_if_no_subqueries),
+        pytest.param(CategoryWithClassBasedProperties, 'applications__version_count_subquery',
+                     models.Q(applications__version_count_subquery=8), 0, marks=skip_if_no_subqueries),
+        pytest.param(CategoryWithClassBasedProperties, 'applications__version_count_subquery',
+                     models.Q(applications__version_count_subquery=4, name__contains='Linux'), 2,
+                     marks=skip_if_no_subqueries),
+        pytest.param(CategoryWithClassBasedProperties, 'applications__version_count_subquery',
+                     models.Q(applications__version_count_subquery=8, name__contains='Linux'), 0,
+                     marks=skip_if_no_subqueries),
     ])
     def test_select_query(self, model, property_name, filters, expected_count):
         queryset = model.objects.filter(filters)
         assert property_name in queryset.query.annotations
         assert queryset.count() == len(queryset) == expected_count
-        if '__' not in property_name:
+        if LOOKUP_SEP not in property_name:
             # Check that a property annotation used implicitly by a filter does
             # not lead to a selection of the property annotation.
             descriptor = get_queryable_property_descriptor(model, property_name)
@@ -258,7 +264,7 @@ class TestFilterWithExpressionAnnotation(object):
         assert len(queryset) == expected_count
         if record_checker:
             assert all(record_checker(obj) for obj in queryset)
-        if '__' not in property_name:
+        if LOOKUP_SEP not in property_name:
             # Check that a property annotation used implicitly by a filter does
             # not lead to a selection of the property annotation.
             descriptor = get_queryable_property_descriptor(model, property_name)
@@ -319,7 +325,7 @@ class TestFilterWithSubqueryAnnotation(object):
         queryset = model.objects.filter(filters)
         assert property_name in queryset.query.annotations
         assert queryset.count() == len(queryset) == expected_count
-        if '__' not in property_name:
+        if LOOKUP_SEP not in property_name:
             # Check that a property annotation used implicitly by a filter does
             # not lead to a selection of the property annotation.
             descriptor = get_queryable_property_descriptor(model, property_name)
