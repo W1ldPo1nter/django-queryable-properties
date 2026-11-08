@@ -34,19 +34,37 @@ class AggregateProperty(AnnotationProperty):
     queryset annotations and getter values.
     """
 
-    def __init__(self, aggregate, **kwargs):
+    use_subquery = False
+
+    def __init__(self, aggregate, use_subquery=None, **kwargs):
         """
         Initialize a new property that gets its value by retrieving an
         aggregated value from the database.
 
-        :param django.db.models.Aggregate aggregate: The aggregate to use to
-                                                     determine the value of
-                                                     this property.
+        :param aggregate: The aggregate to use to determine the value of this
+                          property.
+        :type aggregate: django.db.models.Aggregate
+        :param use_subquery: Determines if the aggregate computation should be
+                             performed in a subquery to avoid side effects for
+                             the main query. A value of None means using the
+                             default value.
+        :type use_subquery: bool | None
         """
         super(AggregateProperty, self).__init__(aggregate, **kwargs)
+        if use_subquery is not None:
+            self.use_subquery = use_subquery
 
     def get_value(self, obj):
         return self.get_queryset_for_object(obj).aggregate(**{self.name: self.annotation})[self.name]
+
+    def get_annotation(self, cls):
+        if not self.use_subquery:
+            return super(AggregateProperty, self).get_annotation(cls)
+
+        from django.db.models import OuterRef, Subquery
+        inner_name = '-'.join((self.name, 'subquery'))
+        inner_query = self.get_queryset(self.model).filter(pk=OuterRef('pk')).annotate(**{inner_name: self.annotation})
+        return Subquery(inner_query.values(inner_name)[:1])
 
 
 class RelatedExistenceCheckProperty(BooleanMixin, AnnotationGetterMixin, QueryableProperty):

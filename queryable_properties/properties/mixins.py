@@ -191,6 +191,7 @@ class AnnotationGetterMixin(AnnotationMixin):
         :param cached: Determines if values obtained by the getter should be
                        cached (similar to ``cached_property``). A value of None
                        means using the default value.
+        :type cached: bool | None
         """
         super(AnnotationGetterMixin, self).__init__(*args, **kwargs)
         if cached is not None:
