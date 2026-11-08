@@ -206,9 +206,10 @@ class QueryableProperty(object):
         """
         Initialize a new queryable property.
 
-        :param str verbose_name: An optional verbose name of the property. If
-                                 not provided it defaults to a prettified
-                                 version of the property's name.
+        :param str | None verbose_name: An optional verbose name of the
+                                        property. If not provided it defaults
+                                        to a prettified version of the
+                                        property's name.
         """
         self.model = None
         self.name = None
