@@ -135,9 +135,8 @@ class TestSubqueryObjectProperty(object):
             {'pk': 'id', 'application': 'application_id'},
         ),
         (ApplicationWithClassBasedProperties, None, ['version_count', 'has_version_with_changelog'], {'pk': 'id'}),
-        pytest.param(DownloadLink, None, ['alternative'], {'version': 'version_id'},
-                     marks=[skip_if_no_composite_pks]),
-        pytest.param(DownloadLink, ['url'], [], {'version': 'version_id'}, marks=[skip_if_no_composite_pks]),
+        pytest.param(DownloadLink, None, ['alternative'], {'version': 'version_id'}, marks=skip_if_no_composite_pks),
+        pytest.param(DownloadLink, ['url'], [], {'version': 'version_id'}, marks=skip_if_no_composite_pks),
     ])
     def test_finalize_setup(self, subquery_model, field_names, property_names, expected_aliases):
         model = Mock(__name__='MockModel')
