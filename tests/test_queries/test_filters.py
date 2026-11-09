@@ -174,18 +174,18 @@ class TestFilterWithAggregateAnnotation(object):
         # Since the grouping happens in a subquery, the version count doesn't
         # suffer from the problem described above.
         pytest.param(CategoryWithClassBasedProperties, 'applications__version_count_subquery',
-                     models.Q(applications__version_count_subquery=4), 3, marks=skip_if_no_subqueries),
+                     models.Q(applications__version_count_subquery=4), 2, marks=skip_if_no_subqueries),
         pytest.param(CategoryWithClassBasedProperties, 'applications__version_count_subquery',
                      models.Q(applications__version_count_subquery=8), 0, marks=skip_if_no_subqueries),
         pytest.param(CategoryWithClassBasedProperties, 'applications__version_count_subquery',
-                     models.Q(applications__version_count_subquery=4, name__contains='Linux'), 2,
+                     models.Q(applications__version_count_subquery=4, name__contains='Linux'), 1,
                      marks=skip_if_no_subqueries),
         pytest.param(CategoryWithClassBasedProperties, 'applications__version_count_subquery',
                      models.Q(applications__version_count_subquery=8, name__contains='Linux'), 0,
                      marks=skip_if_no_subqueries),
     ])
     def test_select_query(self, model, property_name, filters, expected_count):
-        queryset = model.objects.filter(filters)
+        queryset = model.objects.filter(filters).distinct()
         assert property_name in queryset.query.annotations
         assert queryset.count() == len(queryset) == expected_count
         if LOOKUP_SEP not in property_name:
