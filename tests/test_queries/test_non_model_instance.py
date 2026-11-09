@@ -16,15 +16,12 @@ pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 class TestAggregateAnnotations(object):
 
-    @pytest.mark.parametrize('model, filters, expected_version_counts', [
-        (ApplicationWithClassBasedProperties, {}, {3, 4}),
-        (ApplicationWithClassBasedProperties, {'name__contains': 'cool'}, {3}),
-        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}, {4}),
-        (ApplicationWithClassBasedProperties, {'version_count': 5}, set()),
-        (ApplicationWithDecoratorBasedProperties, {}, {3, 4}),
-        (ApplicationWithDecoratorBasedProperties, {'name__contains': 'cool'}, {3}),
-        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}, {4}),
-        (ApplicationWithDecoratorBasedProperties, {'version_count': 5}, set()),
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('filters, expected_version_counts', [
+        ({}, {3, 4}),
+        ({'name__contains': 'cool'}, {3}),
+        ({'version_count__gt': 3}, {4}),
+        ({'version_count': 5}, set()),
     ])
     def test_values_to_limit_fields(self, model, filters, expected_version_counts):
         # Delete one version to create distinct version counts
@@ -80,15 +77,12 @@ class TestAggregateAnnotations(object):
         assert queryset.count() == len(queryset) == 1
         assert queryset[0]['version_count'] == 4
 
-    @pytest.mark.parametrize('model, filters, expected_version_counts', [
-        (ApplicationWithClassBasedProperties, {}, {3, 4}),
-        (ApplicationWithClassBasedProperties, {'name__contains': 'cool'}, {3}),
-        (ApplicationWithClassBasedProperties, {'version_count__gt': 3}, {4}),
-        (ApplicationWithClassBasedProperties, {'version_count': 5}, set()),
-        (ApplicationWithDecoratorBasedProperties, {}, {3, 4}),
-        (ApplicationWithDecoratorBasedProperties, {'name__contains': 'cool'}, {3}),
-        (ApplicationWithDecoratorBasedProperties, {'version_count__gt': 3}, {4}),
-        (ApplicationWithDecoratorBasedProperties, {'version_count': 5}, set()),
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('filters, expected_version_counts', [
+        ({}, {3, 4}),
+        ({'name__contains': 'cool'}, {3}),
+        ({'version_count__gt': 3}, {4}),
+        ({'version_count': 5}, set()),
     ])
     def test_values_list(self, model, filters, expected_version_counts):
         # Delete one version to create distinct version counts
@@ -142,15 +136,12 @@ class TestAggregateAnnotations(object):
 @skip_if_no_expressions
 class TestExpressionAnnotations(object):
 
-    @pytest.mark.parametrize('model, filters, expected_versions', [
-        (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
-        (VersionWithClassBasedProperties, {'patch': 0}, {'1.3.0', '2.0.0'}),
-        (VersionWithClassBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
-        (VersionWithClassBasedProperties, {'version': '2.0.0'}, {'2.0.0'}),
-        (VersionWithDecoratorBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
-        (VersionWithDecoratorBasedProperties, {'patch': 0}, {'1.3.0', '2.0.0'}),
-        (VersionWithDecoratorBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
-        (VersionWithDecoratorBasedProperties, {'version': '2.0.0'}, {'2.0.0'}),
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('filters, expected_versions', [
+        ({}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
+        ({'patch': 0}, {'1.3.0', '2.0.0'}),
+        ({'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
+        ({'version': '2.0.0'}, {'2.0.0'}),
     ])
     def test_values_to_limit_fields(self, model, filters, expected_versions):
         queryset = model.objects.filter(**filters).select_properties('version').values('version')
@@ -182,15 +173,12 @@ class TestExpressionAnnotations(object):
         assert queryset.count() == len(queryset) == 4
         assert set(obj_dict['version'] for obj_dict in queryset) == {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}
 
-    @pytest.mark.parametrize('model, filters, expected_versions', [
-        (VersionWithClassBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
-        (VersionWithClassBasedProperties, {'patch': 0}, {'1.3.0', '2.0.0'}),
-        (VersionWithClassBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
-        (VersionWithClassBasedProperties, {'version': '2.0.0'}, {'2.0.0'}),
-        (VersionWithDecoratorBasedProperties, {}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
-        (VersionWithDecoratorBasedProperties, {'patch': 0}, {'1.3.0', '2.0.0'}),
-        (VersionWithDecoratorBasedProperties, {'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
-        (VersionWithDecoratorBasedProperties, {'version': '2.0.0'}, {'2.0.0'}),
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('filters, expected_versions', [
+        ({}, {'1.2.3', '1.3.0', '1.3.1', '2.0.0'}),
+        ({'patch': 0}, {'1.3.0', '2.0.0'}),
+        ({'major_minor': '1.3'}, {'1.3.0', '1.3.1'}),
+        ({'version': '2.0.0'}, {'2.0.0'}),
     ])
     def test_values_list(self, model, filters, expected_versions):
         queryset = model.objects.filter(**filters).select_properties('version').values_list('version', flat=True)

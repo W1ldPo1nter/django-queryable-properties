@@ -15,21 +15,16 @@ pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures('versions')]
 
 class TestAggregateAnnotations(object):
 
-    @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
         # version count (ASC/DESC depending on the reverse parameter).
-        (ApplicationWithClassBasedProperties, ('version_count',), False, False),
-        (ApplicationWithDecoratorBasedProperties, ('version_count',), False, False),
-        (ApplicationWithClassBasedProperties, ('version_count',), False, True),
-        (ApplicationWithDecoratorBasedProperties, ('version_count',), False, True),
-        (ApplicationWithClassBasedProperties, ('version_count', '-name'), False, False),
-        (ApplicationWithDecoratorBasedProperties, ('version_count', '-name'), False, False),
-        (ApplicationWithClassBasedProperties, ('-version_count',), True, False),
-        (ApplicationWithDecoratorBasedProperties, ('-version_count',), True, False),
-        (ApplicationWithClassBasedProperties, ('-version_count',), True, True),
-        (ApplicationWithDecoratorBasedProperties, ('-version_count',), True, True),
-        (ApplicationWithClassBasedProperties, ('-version_count', 'name'), True, False),
-        (ApplicationWithDecoratorBasedProperties, ('-version_count', 'name'), True, False),
+        (('version_count',), False, False),
+        (('version_count',), False, True),
+        (('version_count', '-name'), False, False),
+        (('-version_count',), True, False),
+        (('-version_count',), True, True),
+        (('-version_count', 'name'), True, False),
     ])
     def test_single_model(self, model, order_by, reverse, with_selection):
         model.objects.all()[0].versions.all()[0].delete()
@@ -42,17 +37,14 @@ class TestAggregateAnnotations(object):
         # selection of the property annotation.
         assert all(model.version_count.has_cached_value(application) is with_selection for application in results)
 
-    @pytest.mark.parametrize('model, order_by, reverse', [
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('order_by, reverse', [
         # All parametrizations are expected to yield results ordered by the
         # version count (ASC/DESC depending on the reverse parameter).
-        (VersionWithClassBasedProperties, ('application__version_count',), False),
-        (VersionWithDecoratorBasedProperties, ('application__version_count',), False),
-        (VersionWithClassBasedProperties, ('application__version_count', '-application__name'), False),
-        (VersionWithDecoratorBasedProperties, ('application__version_count', '-application__name'), False),
-        (VersionWithClassBasedProperties, ('-application__version_count',), True),
-        (VersionWithDecoratorBasedProperties, ('-application__version_count',), True),
-        (VersionWithClassBasedProperties, ('-application__version_count', 'application__name'), True),
-        (VersionWithDecoratorBasedProperties, ('-application__version_count', 'application__name'), True),
+        (('application__version_count',), False),
+        (('application__version_count', '-application__name'), False),
+        (('-application__version_count',), True),
+        (('-application__version_count', 'application__name'), True),
     ])
     def test_across_relation(self, model, order_by, reverse):
         model.objects.all()[0].delete()  # Create a different version count for the application fixtures.
@@ -63,33 +55,22 @@ class TestAggregateAnnotations(object):
 @skip_if_no_expressions
 class TestExpressionAnnotations(object):
 
-    @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
         # full version (ASC/DESC depending on the reverse parameter).
-        (VersionWithClassBasedProperties, ('version',), False, False),
-        (VersionWithDecoratorBasedProperties, ('version',), False, False),
-        (VersionWithClassBasedProperties, ('version',), False, True),
-        (VersionWithDecoratorBasedProperties, ('version',), False, True),
-        (VersionWithClassBasedProperties, ('version', '-major'), False, False),
-        (VersionWithDecoratorBasedProperties, ('version', '-major'), False, False),
-        (VersionWithClassBasedProperties, ('-version',), True, False),
-        (VersionWithDecoratorBasedProperties, ('-version',), True, False),
-        (VersionWithClassBasedProperties, ('-version',), True, True),
-        (VersionWithDecoratorBasedProperties, ('-version',), True, True),
-        (VersionWithClassBasedProperties, ('-version', 'minor'), True, False),
-        (VersionWithDecoratorBasedProperties, ('-version', 'minor'), True, False),
-        (VersionWithClassBasedProperties, (Concat(Value('V'), 'version').asc(),), False, False),
-        (VersionWithDecoratorBasedProperties, (Concat(Value('V'), 'version').asc(),), False, False),
-        (VersionWithClassBasedProperties, (Concat(Value('V'), 'version').asc(),), False, True),
-        (VersionWithDecoratorBasedProperties, (Concat(Value('V'), 'version').asc(),), False, True),
-        (VersionWithClassBasedProperties, (Concat(Value('V'), 'version').asc(), '-patch'), False, False),
-        (VersionWithDecoratorBasedProperties, (Concat(Value('V'), 'version').asc(), '-patch'), False, False),
-        (VersionWithClassBasedProperties, (Concat(Value('V'), 'version').desc(),), True, False),
-        (VersionWithDecoratorBasedProperties, (Concat(Value('V'), 'version').desc(),), True, False),
-        (VersionWithClassBasedProperties, (Concat(Value('V'), 'version').desc(),), True, True),
-        (VersionWithDecoratorBasedProperties, (Concat(Value('V'), 'version').desc(),), True, True),
-        (VersionWithClassBasedProperties, (Concat(Value('V'), 'version').desc(), 'major'), True, False),
-        (VersionWithDecoratorBasedProperties, (Concat(Value('V'), 'version').desc(), 'major'), True, False),
+        (('version',), False, False),
+        (('version',), False, True),
+        (('version', '-major'), False, False),
+        (('-version',), True, False),
+        (('-version',), True, True),
+        (('-version', 'minor'), True, False),
+        ((Concat(Value('V'), 'version').asc(),), False, False),
+        ((Concat(Value('V'), 'version').asc(),), False, True),
+        ((Concat(Value('V'), 'version').asc(), '-patch'), False, False),
+        ((Concat(Value('V'), 'version').desc(),), True, False),
+        ((Concat(Value('V'), 'version').desc(),), True, True),
+        ((Concat(Value('V'), 'version').desc(), 'major'), True, False),
     ])
     def test_single_model(self, model, order_by, reverse, with_selection):
         queryset = model.objects.all()
@@ -101,38 +82,19 @@ class TestExpressionAnnotations(object):
         # selection of the property annotation
         assert all(model.version.has_cached_value(version) is with_selection for version in results)
 
-    @pytest.mark.parametrize('model, order_by, expected_names', [
-        (ApplicationWithClassBasedProperties, ('versions__version',),
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('order_by, expected_names', [
+        (('versions__version',), ['My cool App', 'Another App', 'My cool App', 'Another App']),
+        (('versions__version', '-name'), ['My cool App', 'Another App', 'My cool App', 'Another App']),
+        (('-versions__version',), ['Another App', 'My cool App', 'Another App', 'My cool App']),
+        (('-versions__version', 'name'), ['Another App', 'My cool App', 'Another App', 'My cool App']),
+        ((Concat(Value('V'), 'versions__version').asc(),),
          ['My cool App', 'Another App', 'My cool App', 'Another App']),
-        (ApplicationWithDecoratorBasedProperties, ('versions__version',),
+        ((Concat(Value('V'), 'versions__version').asc(), '-name'),
          ['My cool App', 'Another App', 'My cool App', 'Another App']),
-        (ApplicationWithClassBasedProperties, ('versions__version', '-name'),
-         ['My cool App', 'Another App', 'My cool App', 'Another App']),
-        (ApplicationWithDecoratorBasedProperties, ('versions__version', '-name'),
-         ['My cool App', 'Another App', 'My cool App', 'Another App']),
-        (ApplicationWithClassBasedProperties, ('-versions__version',),
+        ((Concat(Value('V'), 'versions__version').desc(),),
          ['Another App', 'My cool App', 'Another App', 'My cool App']),
-        (ApplicationWithDecoratorBasedProperties, ('-versions__version',),
-         ['Another App', 'My cool App', 'Another App', 'My cool App']),
-        (ApplicationWithClassBasedProperties, ('-versions__version', 'name'),
-         ['Another App', 'My cool App', 'Another App', 'My cool App']),
-        (ApplicationWithDecoratorBasedProperties, ('-versions__version', 'name'),
-         ['Another App', 'My cool App', 'Another App', 'My cool App']),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'versions__version').asc(),),
-         ['My cool App', 'Another App', 'My cool App', 'Another App']),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'versions__version').asc(),),
-         ['My cool App', 'Another App', 'My cool App', 'Another App']),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'versions__version').asc(), '-name'),
-         ['My cool App', 'Another App', 'My cool App', 'Another App']),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'versions__version').asc(), '-name'),
-         ['My cool App', 'Another App', 'My cool App', 'Another App']),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'versions__version').desc(),),
-         ['Another App', 'My cool App', 'Another App', 'My cool App']),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'versions__version').desc(),),
-         ['Another App', 'My cool App', 'Another App', 'My cool App']),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'versions__version').desc(), 'name'),
-         ['Another App', 'My cool App', 'Another App', 'My cool App']),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'versions__version').desc(), 'name'),
+        ((Concat(Value('V'), 'versions__version').desc(), 'name'),
          ['Another App', 'My cool App', 'Another App', 'My cool App']),
     ])
     def test_across_relation(self, model, order_by, expected_names):
@@ -159,33 +121,22 @@ class TestExpressionAnnotations(object):
 @skip_if_no_subqueries
 class TestSubqueryAnnotations(object):
 
-    @pytest.mark.parametrize('model, order_by, reverse, with_selection', [
+    @pytest.mark.parametrize('model', [ApplicationWithClassBasedProperties, ApplicationWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('order_by, reverse, with_selection', [
         # All parametrizations are expected to yield results ordered by the
         # full version (ASC/DESC depending on the reverse parameter).
-        (ApplicationWithClassBasedProperties, ('highest_version',), False, False),
-        (ApplicationWithDecoratorBasedProperties, ('highest_version',), False, False),
-        (ApplicationWithClassBasedProperties, ('highest_version',), False, True),
-        (ApplicationWithDecoratorBasedProperties, ('highest_version',), False, True),
-        (ApplicationWithClassBasedProperties, ('highest_version', '-name'), False, False),
-        (ApplicationWithDecoratorBasedProperties, ('highest_version', '-name'), False, False),
-        (ApplicationWithClassBasedProperties, ('-highest_version',), True, False),
-        (ApplicationWithDecoratorBasedProperties, ('-highest_version',), True, False),
-        (ApplicationWithClassBasedProperties, ('-highest_version',), True, True),
-        (ApplicationWithDecoratorBasedProperties, ('-highest_version',), True, True),
-        (ApplicationWithClassBasedProperties, ('-highest_version', 'name'), True, False),
-        (ApplicationWithDecoratorBasedProperties, ('-highest_version', 'name'), True, False),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'highest_version').asc(),), False, False),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'highest_version').asc(),), False, False),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'highest_version').asc(),), False, True),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'highest_version').asc(),), False, True),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'highest_version').asc(), '-name'), False, False),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'highest_version').asc(), '-name'), False, False),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'highest_version').desc(),), True, False),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'highest_version').desc(),), True, False),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'highest_version').desc(),), True, True),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'highest_version').desc(),), True, True),
-        (ApplicationWithClassBasedProperties, (Concat(Value('V'), 'highest_version').desc(), 'name'), True, False),
-        (ApplicationWithDecoratorBasedProperties, (Concat(Value('V'), 'highest_version').desc(), 'name'), True, False),
+        (('highest_version',), False, False),
+        (('highest_version',), False, True),
+        (('highest_version', '-name'), False, False),
+        (('-highest_version',), True, False),
+        (('-highest_version',), True, True),
+        (('-highest_version', 'name'), True, False),
+        ((Concat(Value('V'), 'highest_version').asc(),), False, False),
+        ((Concat(Value('V'), 'highest_version').asc(),), False, True),
+        ((Concat(Value('V'), 'highest_version').asc(), '-name'), False, False),
+        ((Concat(Value('V'), 'highest_version').desc(),), True, False),
+        ((Concat(Value('V'), 'highest_version').desc(),), True, True),
+        ((Concat(Value('V'), 'highest_version').desc(), 'name'), True, False),
     ])
     def test_single_model(self, model, order_by, reverse, with_selection):
         model.objects.all()[0].versions.get(version='2.0.0').delete()
@@ -198,18 +149,15 @@ class TestSubqueryAnnotations(object):
         # selection of the property annotation
         assert all(model.highest_version.has_cached_value(app) is with_selection for app in results)
 
-    @pytest.mark.parametrize('model, order_by, reverse', [
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('order_by, reverse', [
         # All parametrizations are expected to yield results ordered by the
         # application's highest version and version pk (ASC/DESC depending on
         # the reverse parameter).
-        (VersionWithClassBasedProperties, ('application__highest_version', 'pk'), False),
-        (VersionWithDecoratorBasedProperties, ('application__highest_version', 'pk'), False),
-        (VersionWithClassBasedProperties, ('-application__highest_version', '-pk'), True),
-        (VersionWithDecoratorBasedProperties, ('-application__highest_version', '-pk'), True),
-        (VersionWithClassBasedProperties, (Concat(Value('V'), 'application__highest_version').asc(), 'pk'), False),
-        (VersionWithDecoratorBasedProperties, (Concat(Value('V'), 'application__highest_version').asc(), 'pk'), False),
-        (VersionWithClassBasedProperties, (Concat(Value('V'), 'application__highest_version').desc(), '-pk'), True),
-        (VersionWithDecoratorBasedProperties, (Concat(Value('V'), 'application__highest_version').desc(), '-pk'), True),
+        (('application__highest_version', 'pk'), False),
+        (('-application__highest_version', '-pk'), True),
+        ((Concat(Value('V'), 'application__highest_version').asc(), 'pk'), False),
+        ((Concat(Value('V'), 'application__highest_version').desc(), '-pk'), True),
     ])
     def test_across_relation(self, model, order_by, reverse):
         model.objects.filter(version='2.0.0')[0].delete()

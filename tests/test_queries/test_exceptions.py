@@ -71,11 +71,10 @@ class TestUpdate(object):
         with pytest.raises(QueryablePropertyError):
             model.objects.update(highest_version='1.3.37')
 
-    @pytest.mark.parametrize('model, kwargs', [
-        (VersionWithClassBasedProperties, {'major_minor': '42.42', 'major': 18}),
-        (VersionWithClassBasedProperties, {'major_minor': '1.2', 'version': '1.3.37', 'minor': 5}),
-        (VersionWithDecoratorBasedProperties, {'major_minor': '42.42', 'major': 18}),
-        (VersionWithDecoratorBasedProperties, {'major_minor': '1.2', 'version': '1.3.37', 'minor': 5}),
+    @pytest.mark.parametrize('model', [VersionWithClassBasedProperties, VersionWithDecoratorBasedProperties])
+    @pytest.mark.parametrize('kwargs', [
+        {'major_minor': '42.42', 'major': 18},
+        {'major_minor': '1.2', 'version': '1.3.37', 'minor': 5},
     ])
     def test_exception_on_conflicting_values(self, model, kwargs):
         with pytest.raises(QueryablePropertyError):
