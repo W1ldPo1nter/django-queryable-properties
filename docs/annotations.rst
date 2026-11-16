@@ -548,14 +548,16 @@ category.
 
 There are options to work around this when running into this problem:
 
+- Do not directly use an aggregate like ``Count`` at all and count the versions per application using a
+  `subquery <https://docs.djangoproject.com/en/stable/ref/models/expressions/#subquery-expressions>`_.
+  This subquery will then also be performed correctly when the queryable property is used from a related model.
+  The ``use_subquery`` option of the :ref:`common/annotation_based:\`\`AggregateProperty\`\`` class allows to do this
+  without any boilerplate.
 - Use |aggregation-values|_ yourself.
   For the example above, a ``.values('pk', 'applications__pk')`` call before the ``.filter()`` call would be
   sufficient.
   Keep in mind that the same category can then be returned multiple times if more than one of its versions matches the
   filter condition.
-- Do not directly use an aggregate like ``Count`` at all and count the versions per application using a
-  `subquery <https://docs.djangoproject.com/en/stable/ref/models/expressions/#subquery-expressions>`_.
-  This subquery will then also be performed correctly when the queryable property is used from a related model.
 
 .. |aggregation-values| replace:: ``values()`` to set the ``GROUP BY`` clause
 .. _aggregation-values: https://docs.djangoproject.com/en/stable/topics/db/aggregation/#values

@@ -63,11 +63,17 @@ reduced to (**not recommended**):
 ^^^^^^^^^^^^^^^^^^^^^
 
 *django-queryable-properties* also comes with a property class for simple aggregates that simply takes an aggregate
-object and uses it for both queryset annotations as well as the getter.
-This is therefore not entirely different from the ``AnnotationProperty`` class shown above.
-The main difference between the two is that while ``AnnotationProperty`` uses ``QuerySet.annotate`` to query the getter
-value, ``AggregateProperty`` uses ``QuerySet.aggregate``, which is slightly more efficient.
-Using ``AggregateProperty`` for aggregate annotations might also make code more clear/readable.
+object and uses it for both queryset annotations as well as the getter implementation.
+This is not entirely different from the ``AnnotationProperty`` class shown above.
+However, there are two main differences:
+
+- While ``AnnotationProperty`` uses ``QuerySet.annotate`` to query the getter value, ``AggregateProperty`` uses
+  ``QuerySet.aggregate``, which is slightly more efficient.
+- ``AggregateProperty`` offers an optional ``use_subquery`` argument, which can be used in Django 1.11 or higher.
+  Enabling this option by setting it to ``True`` changes the internal annotation to compute the aggregate value in an
+  explicit subquery.
+  As a result, the annotation doesn't introduce a ``GROUP BY`` in the outer query, which can avoid unexpected side
+  effects and solves the problem described in :ref:`annotations:Regarding aggregate annotations across relations`.
 
 As an example, the ``Application`` model could receive a simple property that returns the number of versions like the
 one in the :ref:`annotation_based:Implementation` section of annotation-based properties.
@@ -82,12 +88,7 @@ one in the :ref:`annotation_based:Implementation` section of annotation-based pr
     class Application(Model):
         ...  # other fields/properties
 
-        version_count = AggregateProperty(Count('versions'))
-
-.. note::
-   Since this property deals with aggregates, the notes
-   :ref:`annotations:Regarding aggregate annotations across relations` apply when using such properties across
-   relations in querysets.
+        version_count = AggregateProperty(Count('versions'), use_subquery=True)
 
 .. admonition:: Arguments and supported features
 
