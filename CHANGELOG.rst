@@ -5,6 +5,7 @@ master (unreleased)
 -------------------
 
 - Added support for Python 3.15
+- Added an option to compute aggregate values in subqueries to ``AggregateProperty``
 
 1.13.0 (2026-08-06)
 -------------------
