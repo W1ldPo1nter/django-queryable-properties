@@ -4,6 +4,9 @@ Changelog
 master (unreleased)
 -------------------
 
+1.14.0 (2026-11-20)
+-------------------
+
 - Added support for Python 3.15
 - Added an option to compute aggregate values in subqueries to ``AggregateProperty``
 
